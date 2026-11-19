@@ -78,7 +78,7 @@
   const RAMPS = {
     paper: ['#FFFFFF', '#DDE3EE'], olive: ['#CFDBA8', '#7C9150'], green: ['#A6E86A', '#2E8B1E'], blue: ['#9CCBF8', '#2759B0'], red: ['#FFA184', '#C0241A'],
     gold: ['#FFEE96', '#DE9C14'], steel: ['#F4F6F9', '#98A2AE'], orange: ['#FFCB78', '#E2750B'], purple: ['#CDB8F4', '#6540B0'], skin: ['#FFE3BF', '#E6AC74'],
-    manila: ['#FBE39A', '#D2A040'], pink: ['#FFD0DB', '#EE8BA6'], wood: ['#D6A866', '#8B5A2A'], pad: ['#FFF9C4', '#F0D860'], glass: ['#F1FAFF', '#B9DCF2'], sky: ['#5E9FE0', '#DDEEFB'], hill: ['#A6CF62', '#4F8F2A'],
+    manila: ['#FBE39A', '#D2A040'], cream: ['#FFF6E8', '#EFCFA8'], pink: ['#FFD0DB', '#EE8BA6'], wood: ['#D6A866', '#8B5A2A'], pad: ['#FFF9C4', '#F0D860'], glass: ['#F1FAFF', '#B9DCF2'], sky: ['#5E9FE0', '#DDEEFB'], hill: ['#A6CF62', '#4F8F2A'],
   };
   /** Pattern defs for a drawing on `grid` units shown at `size` px. The ramp is rendered with one row per
       screen pixel and the pattern cell sized to match, so a dither dot is always exactly one pixel. */
@@ -89,7 +89,7 @@
   };
 
   // outline tints
-  const O = { pink: '#963A56', paper: '#55647F', olive: '#485B24', green: '#1D5F12', blue: '#1A3C80', red: '#851810', gold: '#8F6206', steel: '#56606C', wood: '#5F3F18', purple: '#422878' };
+  const O = { cream: '#963A56', pink: '#963A56', paper: '#55647F', olive: '#485B24', green: '#1D5F12', blue: '#1A3C80', red: '#851810', gold: '#8F6206', steel: '#56606C', wood: '#5F3F18', purple: '#422878' };
   const sh = (rx) => `<ellipse cx="16" cy="29.2" rx="${rx || 10}" ry="1.8" fill="#000" opacity=".2"/>`;
   const f = (g, o, extra) => `fill="url(#g-${g})" stroke="${O[o || g]}" stroke-width="1.5" stroke-linejoin="round"${extra ? ' ' + extra : ''}`;
   const line = (d, c, w) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w || 1.5}" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -139,18 +139,18 @@
 
   /* The mascot: a winged pig, heading right, in two frames (wing up, wing down) that the stylesheet
      alternates to make it flap as it flies through the sky. An original drawing. */
-  const WING_UP = `<path d="M12.500 14c-2.200-7.500 2.800-11 7.500-9.800-1.500 3-2.300 6.300-2.800 9.800z" ${f('paper')}/>${line('M15 7.500c-.300 2 0 4 .500 6M17.500 6c-.800 2.500-.800 5-.500 7.500', '#8C9BB5', 1)}`;
+  const WING_UP = `<path d="M12.500 14c-2.200-7.500 2.800-11 7.500-9.800-1.500 3-2.300 6.300-2.800 9.800z" ${f('cream')}/>${line('M15 7.500c-.300 2 0 4 .500 6M17.500 6c-.800 2.500-.800 5-.500 7.500', '#C79A70', 1)}`;
   const pig = (wing) => `${line('M5.800 17.500c-2.800-.800-2.800-4.200 0-3.800', O.pink, 1.600)}<rect x="9.500" y="23" width="3" height="5" rx="1.200" ${f('pink')}/><rect x="16.500" y="23.500" width="3" height="5" rx="1.200" ${f('pink')}/>
     <ellipse cx="14.500" cy="18" rx="9.800" ry="7.200" ${f('pink')}/><path d="M7 15c1-3.500 5-5 8.500-4.600-3 .6-6 2-8.500 4.600z" fill="url(#p-d50)"/>
     <path d="M20.500 10.500l1.200-4.300 3.300 3.300z" ${f('pink')}/><circle cx="24" cy="15" r="5.600" ${f('pink')}/><ellipse cx="28.600" cy="16.200" rx="2.300" ry="2.700" fill="#F7A3B8" stroke="${O.pink}" stroke-width="1.200"/>
     <circle cx="28" cy="15.600" r=".550" fill="${O.pink}"/><circle cx="29.400" cy="16.800" r=".550" fill="${O.pink}"/><circle cx="24.400" cy="13.300" r="1" fill="#2B1A20"/>${wing}`;
   G.pig1 = pig(WING_UP);
-  G.pig2 = pig(`<path d="M12 15c-5.500 1.500-8 6.500-5.500 10.500 2.500-3 6-5.500 10-7.500z" ${f('paper')}/>${line('M9.500 19c.800 1 2.500 1.500 4 1M8 22c1.300.500 3 .300 4.500-.700', '#8C9BB5', 1)}`);
+  G.pig2 = pig(`<path d="M12 15c-5.500 1.500-8 6.500-5.500 10.500 2.500-3 6-5.500 10-7.500z" ${f('cream')}/>${line('M9.500 19c.800 1 2.500 1.500 4 1M8 22c1.300.500 3 .300 4.500-.700', '#C79A70', 1)}`);
   /* The EPIG logo is Truffle: the first cell of the assistant's sprite sheet, cropped close, in the sheet's own
      direction (facing right, toward the wordmark), so the logo and the corner assistant are plainly the same pig.
      Files: assets/logo/epig-48.png and epig-32.png. The assistant in the corner is the same sheet mirrored.
      EHR.icon('logo', size) shows the 48px bitmap, doubled with hard pixels above 56px, and the 32px one below 40px. */
-  const LOGO = { 32: 'assets/logo/epig-32.png', 48: 'assets/logo/epig-48.png' };
+  const LOGO = { 24: 'assets/logo/epig-24.png', 32: 'assets/logo/epig-32.png', 48: 'assets/logo/epig-48.png' };
   /* The small mark: the pig's face on a sky tile. Dialog title bars and anywhere under 40px. */
   G.brand = `${sh(11)}<rect x="3" y="2.500" width="26" height="25.500" rx="6.500" ${f('sky', 'blue')}/><path d="M5.200 10c0-3.600 2.400-5.400 5.600-5.400h10.400c3.200 0 5.600 1.800 5.600 5.400-6-2.200-15.600-2.200-21.600 0z" fill="url(#p-d50)"/>
     <path d="M8 13l1-6.500 5.500 3.500z" ${f('pink')}/><path d="M24 13l-1-6.500-5.500 3.500z" ${f('pink')}/><circle cx="16" cy="16.500" r="8.800" ${f('pink')}/>
@@ -159,12 +159,12 @@
   const GRID = {};   // glyphs drawn on a grid other than 32 (none at present)
   E.GLYPHS = Object.keys(G);
 
-  /* Era resolution. Icons of the period were bitmaps drawn at a few fixed sizes, not vectors. Each glyph is
-     rasterised once at 16, 24, 32 and 48 pixels when the page starts, and every use shows one of those
-     bitmaps, either at its own size or exactly doubled with hard pixels (a 96px icon is the 48px bitmap
-     twice over). EHR.icon(name, size) snaps the size it is asked for to the nearest of these. */
-  const NATIVE = [16, 24, 32, 48];
-  const snap = (size) => (size <= 18 ? [16, 1] : size <= 28 ? [24, 1] : size <= 40 ? [32, 1] : size <= 56 ? [48, 1] : size <= 72 ? [32, 2] : [48, 2]);
+  /* One pixel size everywhere (owner's decision): every icon is a bitmap drawn at half the size it is shown
+     and doubled with hard pixels, so one art pixel is always two screen pixels, whether the icon is 20px in a
+     list or 96px on the login screen. Glyphs are rasterised at each size on the LADDER when the page starts;
+     EHR.icon(name, size) shows the nearest one. Shown sizes are therefore 20, 24, 32, 40, 48, 64 and 96px. */
+  const SCALE = 2, LADDER = [10, 12, 16, 20, 24, 32, 48];
+  const snap = (size) => [LADDER.reduce((best, b) => (Math.abs(b * SCALE - size) < Math.abs(best * SCALE - size) ? b : best), LADDER[0]), SCALE];
   const BMP = {};
   /** A self-contained SVG of one glyph at px pixels, carrying only the fills it uses, dithered for that size. */
   const svgFor = (name, px) => {
@@ -177,19 +177,25 @@
   const raster = (name, px) => new Promise((done) => {
     const img = new Image();
     img.onload = () => {
-      try { const cv = document.createElement('canvas'); cv.width = cv.height = px; cv.getContext('2d').drawImage(img, 0, 0, px, px); (BMP[name] = BMP[name] || {})[px] = cv.toDataURL('image/png'); } catch (e) { BMP.failed = true; }
+      try {
+        const cv = document.createElement('canvas'); cv.width = cv.height = px;
+        const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, px, px);
+        // hard edges: a pixel is either there or not, as in a period bitmap (no soft anti-aliased fringe)
+        const id = ctx.getImageData(0, 0, px, px); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] >= 110 ? 255 : 0; ctx.putImageData(id, 0, 0);
+        (BMP[name] = BMP[name] || {})[px] = cv.toDataURL('image/png');
+      } catch (e) { BMP.failed = true; }
       done();
     };
     img.onerror = () => { BMP.failed = true; done(); };
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgFor(name, px));
   });
   /** Resolves when every bitmap is ready. js/app.js waits for it before drawing the first screen. */
-  E.glyphsReady = Promise.all(E.GLYPHS.flatMap((n) => NATIVE.map((px) => raster(n, px))));
+  E.glyphsReady = Promise.all(E.GLYPHS.flatMap((n) => LADDER.map((px) => raster(n, px))));
 
   /** A glyph as markup. Decorative by default; pass a label to expose it to assistive technology.
       If the browser cannot rasterise (BMP.failed), it falls back to drawing the vector directly. */
   E.icon = (name, size, label) => {
-    const [px, k] = snap(size || 16), d = px * k, src = name === 'logo' ? LOGO[px >= 48 ? 48 : 32] : !BMP.failed && BMP[name] && BMP[name][px];
+    const [px, k] = snap(size || 16), d = px * k, src = name === 'logo' ? LOGO[px] || LOGO[px >= 32 ? 48 : 24] : !BMP.failed && BMP[name] && BMP[name][px];
     if (src) return `<img class="gl" src="${src}" width="${d}" height="${d}" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`;
     return `<svg class="gl" width="${d}" height="${d}" viewBox="0 0 ${GRID[name] || 32} ${GRID[name] || 32}" ${label ? `role="img" aria-label="${E.esc(label)}"` : 'aria-hidden="true"'} focusable="false">${svgFor(name, d).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').replace(/id="([gpc]-[a-z0-9]+)"/g, `id="$1-${name}-${d}"`).replace(/url\(#([gpc]-[a-z0-9]+)\)/g, `url(#$1-${name}-${d})`)}</svg>`;
   };
@@ -197,8 +203,8 @@
   /* The wordmark: "Epig" in heavy, wide, slanted letters, capital E and lower-case pig, a nod to the kind of
      logo it parodies. It is deliberately pig pink, never red, with a curly tail off the g, so it reads as a
      joke and not as the real company's mark. Drawn by hand (no font): three flat bands of pink inside a thick
-     plum outline. Like the glyphs it is a bitmap, rasterised at half size and shown doubled with hard pixels on the login and loading screens; in the
-     banner, where it is small, it is rasterised at its own size so the letters stay open. */
+     plum outline. Like the glyphs it is a bitmap, rasterised at half size and shown doubled with hard pixels everywhere, the banner included, so its pixels
+     match every icon. */
   const WM = [
     [0, 'M0 0h25v7.5H10.5v4.5H22.5v6H10.5v4.5H25V30H0z'],                                                                                 // E
     [29, 'M0 8h17a9 9 0 0 1 9 9v4a9 9 0 0 1-9 9H9.5v10H0zM9.5 13.5v11h7a3 3 0 0 0 3-3v-5a3 3 0 0 0-3-3z'],               // p
@@ -220,7 +226,7 @@
   };
   const WMB = {};
   const wmRaster = (h) => new Promise((done) => {
-    const n = h >= 72 ? h / 2 : h, k = h / n, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
+    const n = h / 2, k = 2, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
     img.onload = () => { try { const cv = document.createElement('canvas'); cv.width = w; cv.height = n; cv.getContext('2d').drawImage(img, 0, 0, w, n); WMB[h] = { src: cv.toDataURL('image/png'), w: w * k }; } catch (e) { /* fall back to the vector */ } done(); };
     img.onerror = done;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wordmarkSvg(n));

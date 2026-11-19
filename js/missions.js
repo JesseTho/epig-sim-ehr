@@ -309,7 +309,7 @@
         <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} stars</b></div></div>
       ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions involve entering orders, so they are written for the Medical Student and Physician roles. The proficiency check below is open to every role.</span></div>`}
       ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress. Finish or abandon it from the mission panel in the corner before starting another.</span></div>` : ''}
-      <div class="mission-grid">${cards}</div>${boss}</div>`;
+      <div class="mission-grid">${cards}</div>${V.gameShelf ? V.gameShelf() : ''}${boss}</div>`;
   };
 
   /** The panel in the bottom-left corner while a mission or the proficiency check is under way. */

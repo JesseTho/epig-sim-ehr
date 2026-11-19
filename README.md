@@ -19,6 +19,7 @@ Corporation and is not for clinical use.
   tasks that check themselves off and a short knowledge check
 - Missions: short patient cases scored bronze, silver or gold, one with a live deterioration event
 - A timed proficiency check with a printable certificate
+- Mini-games: Spot the Unsafe Order and Note Doctor, whose results can be sent into the chart
 - Roles: Medical Student, Physician and Nurse
 
 ## Running it yourself

@@ -63,14 +63,14 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
    word read as one mark. The wordmark is drawn second, so it sits in front and stays fully legible. The
    pig rides a little high and the word a little low, which puts the middle of the pig level with the
    letters (the wordmark bitmap is taller than its capital E because it carries the descender of the g). */
-.bn-brand > .gl, .w-left h1 > .gl, .sp-in h1 > .gl { position: relative; }
+.bn-brand > .gl, .w-brand > .gl, .sp-in h1 > .gl { position: relative; }
 /* Banner lockup: pig, word and tag block share one centre line. The pig and the tag block are centred as
    they are; the wordmark is dropped 5px because its bitmap is taller below the letters (the g) than above,
    which puts the middle of the capital E on that same line. The tag block is as tall as the pig, so their
    tops and bottoms line up too. Everything in the banner sits 3px high to clear the hills. */
 .banner { padding-bottom: 6px; }   /* the level widget and user block ride the same line as the lockup */
 .bn-brand .gl + .wm { margin-left: -21px; transform: translateY(5px); }
-.w-left h1 > .gl, .sp-in h1 > .gl { transform: translateY(-6px); } .w-left h1 .gl + .wm, .sp-in h1 .gl + .wm { margin-left: -40px; transform: translateY(10px); }
+.w-brand > .gl, .sp-in h1 > .gl { transform: translateY(-6px); } .w-brand .gl + .wm, .sp-in h1 .gl + .wm { margin-left: -22px; transform: translateY(10px); }
 /* What it is, said plainly beside the name: "EHR Simulator". Set in the book face so it reads as part of the
    title, not as a control. In the banner it sits above the edition sticker. */
 /* The tag set: SIM EHR over the Student Edition sticker, one block. The set is as wide as the sticker; the
@@ -238,7 +238,7 @@ input.wide { width: 100%; padding: 5px 8px; }
 .mar thead th { text-align: center; } .mar tr.grp th { text-align: left; }
 .mar .mar-med { text-align: left; min-width: 240px; max-width: 240px; padding: 5px 8px; position: sticky; left: 0; background: #fff; z-index: 2; font-weight: 400; } .mar thead .mar-med { background: #EDEBDD; z-index: 3; }
 .mar .nowcol { background: #FFF9D6; } .mar thead .nowcol { background: #F3D872; font-weight: 700; } .mar .mar-med .btn { margin-top: 4px; }
-.mchip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid transparent; border-radius: 2px; padding: 0 3px; font-size: 11px; font-weight: 700; white-space: nowrap; margin: 1px 0; line-height: 15px; }
+.mchip .gl { margin: -3px 0; } .mchip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid transparent; border-radius: 2px; padding: 0 3px; font-size: 11px; font-weight: 700; white-space: nowrap; margin: 1px 0; line-height: 15px; }
 button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var(--hot-2); }
 .mchip.given { background: var(--green-bg); color: var(--green); border-color: #9CCFB1; } .mchip.held, .mchip.refused, .mchip.dc { background: var(--face); color: #3F4233; border-color: #B9B6A4; }
 .mchip.due { background: #FFE27A; color: #3F2C00; border-color: #B88A0E; } .mchip.overdue { background: #B3261E; color: #fff; border-color: #6E150F; } .mchip.future { background: #fff; color: var(--muted); border-color: #B9B6A4; }
@@ -343,7 +343,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 .pal-hide { display: block; margin: 7px 0 0 auto; border: 0; background: none; padding: 0; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
 /* the tab that brings Truffle back */
 #pal-back { position: fixed; right: 0; bottom: 14px; z-index: 55; display: flex; align-items: center; gap: 5px; padding: 3px 9px 3px 5px; border: 1px solid var(--olive-5); border-right: 0; border-radius: 12px 0 0 12px; background: var(--note); color: var(--ink); font: 700 12px var(--title); cursor: pointer; box-shadow: 1px 2px 4px rgba(0, 0, 0, .3); }
-#pal-back i { width: 24px; height: 24px; transform: scaleX(-1); image-rendering: pixelated; background: url("../assets/assistant/pig-sheet-48.png") 0 0 / 96px 48px no-repeat; }
+#pal-back i { width: 32px; height: 32px; transform: scaleX(-1); image-rendering: pixelated; background: url("../assets/assistant/pig-sheet-16.png") 0 0 / 128px 64px no-repeat; }   /* 16px cells, doubled */
 #pal-back:hover { background: #FFF6C4; }
 @media (max-width: 700px) { #pal, #pal-back { display: none; } }
 @media (prefers-reduced-motion: reduce) { .pal-pig.flutter, .pal-pig.flutter i { animation: none !important; } }
@@ -367,6 +367,28 @@ a.btn { text-decoration: none; }
 .boss-main { flex: 1; min-width: 0; } .boss-kick { font: 700 11px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: #7A4F00; }
 .boss h3 { font: 700 26px/1.1 var(--book); color: var(--olive-6); margin: 2px 0 6px; } .boss p { max-width: 75ch; line-height: 1.5; }
 .boss .kv { margin: 8px 0 10px; } .boss-act { display: flex; gap: 8px; }
+
+/* ---------- mini-games ---------- */
+.shelf-h { display: flex; align-items: center; gap: 8px; font: 700 20px var(--book); color: var(--olive-6); margin: 4px 0 8px; }
+.game-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; } @media (max-width: 900px) { .game-grid { grid-template-columns: 1fr; } }
+.game { display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: var(--work); border: 1px solid #A9B38B; }
+.game-main { flex: 1; min-width: 0; } .game-main b { display: block; font: 700 17px var(--book); color: var(--olive-6); } .game-skill { font-size: 11px; color: var(--muted); } .game-main p { margin: 4px 0 0; line-height: 1.45; }
+.game-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; white-space: nowrap; color: var(--muted); } .game-side .btn { margin-top: 4px; }
+.modal.xl { width: 940px; }
+.g-pt { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; } .g-pt span { display: block; color: var(--muted); }
+.g-facts { background: #fff; border: 1px solid var(--line); padding: 8px 10px; margin: 0 0 8px; } .g-facts dd { font-weight: 400; }
+.g-ask { margin: 8px 0; }
+.g-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.g-card { background: #fff; border: 1px solid var(--line); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; } .g-card-h b { display: block; } .g-card-h span { color: var(--muted); }
+.g-card.right { border-color: #9CCFB1; background: #F6FCF8; } .g-card.wrong { border-color: #D98D85; background: #FFF6F5; }
+.g-btns { display: flex; gap: 6px; } .g-btns .btn.on { background: var(--sel); border-color: var(--olive-5); font-weight: 700; } .g-btns .btn.on.stop { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.g-why { display: flex; gap: 6px; align-items: flex-start; margin: 0; line-height: 1.4; }
+.g-split { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; align-items: start; } .g-split h4 { display: flex; align-items: center; gap: 6px; margin-top: 0; }
+.g-note { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid var(--line); font: 13px/1.5 var(--ui); }
+.g-line { border-bottom: 1px solid #ECEADD; } .g-line:last-child { border: 0; }
+.g-l { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 5px 10px; cursor: pointer; }
+button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--amber-bg); box-shadow: inset 3px 0 0 #D99A00; }
+.g-line.found { background: #F6FCF8; } .g-line.missed { background: #FFF6F5; } .g-line.false { background: var(--amber-bg); } .g-line .g-why { padding: 0 10px 6px; }
 
 /* ---------- the mission / proficiency-check panel (bottom-left) ----------
    It sits over the bottom of the task-pane column only, which pads itself so nothing is ever hidden behind it.
@@ -433,22 +455,29 @@ a.btn { text-decoration: none; }
 .w-band.foot { height: auto; min-height: 52px; display: grid; place-items: center; padding: 8px 16px; color: #F1F5E2; text-align: center; border-bottom: 0; border-top: 2px solid #F0B040; }
 .w-mid { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; gap: 44px; padding: 28px 32px;
   background: var(--g-sky) 0 0 / 8px 640px repeat-x, #E3F1FC; image-rendering: pixelated; position: relative; }
-.w-left { width: 440px; max-width: 100%; color: #14233A; }
-.w-left h1 { font: 700 68px/1.05 var(--book); letter-spacing: .04em; margin: 0; display: flex; align-items: center; gap: 12px; color: #12233F; text-shadow: 0 1px 0 rgba(255, 255, 255, .6); }
+.w-left { width: 480px; max-width: 100%; color: #14233A; }
+/* the left-hand scene: five icons scattered around the SIM EHR block, which sits in the middle */
+.scene { position: relative; height: 380px; }
+.scene .collage { position: absolute; inset: 0; height: auto; margin: 0; }
+.collage .c1 { left: 0; top: 30px; transform: rotate(-9deg); } .collage .c2 { left: 190px; top: 0; transform: rotate(8deg); } .collage .c3 { left: 384px; top: 40px; transform: rotate(-4deg); }
+.collage .c4 { left: 30px; top: 270px; transform: rotate(6deg); } .collage .c5 { left: 360px; top: 266px; transform: rotate(-12deg); }
+.scene-tag { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: stretch; }
+.scene-tag .tagnote { margin: 8px 0 0; text-align: center; white-space: nowrap; }
+.w-brand { display: flex; justify-content: center; align-items: center; margin: 0 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line-2); }
 .w-sub { font: italic 400 20px var(--book); margin: 2px 0 12px; color: #1D3557; } .w-lead { font: 14px/1.5 var(--ui); max-width: 34ch; color: #12233F; }
-.collage { position: relative; height: 190px; margin-bottom: 8px; } .collage span { position: absolute; filter: drop-shadow(3px 6px 4px rgba(20, 40, 70, .35)); }
-.collage .c1 { left: 0; top: 62px; transform: rotate(-9deg); } .collage .c2 { left: 84px; top: 4px; transform: rotate(8deg); } .collage .c3 { left: 170px; top: 74px; transform: rotate(-4deg); } .collage .c4 { left: 252px; top: 8px; transform: rotate(6deg); } .collage .c5 { left: 338px; top: 88px; transform: rotate(-12deg); }
+.collage { position: relative; } .collage span { position: absolute; filter: drop-shadow(3px 6px 4px rgba(20, 40, 70, .35)); }
+
 .w-rule { width: 2px; align-self: center; height: 300px; background: #fff; }
 .w-right { width: 380px; max-width: 100%; padding: 18px 20px 20px; background: var(--face); border: 1px solid #47571F; border-radius: 6px; box-shadow: inset 0 0 0 2px #fff, 5px 8px 18px rgba(20, 40, 70, .4); }
 .w-right .field { font-weight: 700; color: var(--ink); margin-bottom: 12px; } .w-right .field input { font: 14px var(--ui); padding: 5px 7px; margin-top: 2px; }
-.role-grid { display: grid; gap: 4px; margin-bottom: 12px; }
+.role-grid { display: grid; gap: 4px; margin-bottom: 12px; } #roleLabel { margin: 0 0 4px; } #roleLabel small { display: block; font-weight: 400; color: var(--muted); }
 .role { display: flex; gap: 10px; align-items: center; padding: 5px 7px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; position: relative; }
 .role input { position: absolute; opacity: 0; } .role small { display: block; color: var(--muted); } .role b { font: 700 14px var(--title); }
 .role .tile { width: 60px; height: 60px; flex: none; display: grid; place-items: center; border: 2px solid #fff; border-radius: 4px; image-rendering: pixelated; background: var(--g-tile) 0 0 / 8px 64px repeat-x, #E8F4FD; box-shadow: 1px 2px 3px rgba(0, 0, 0, .35); }
 .role:hover { background: #F6F5EC; } .role:has(input:checked) { background: var(--sel); border-color: var(--olive-4); } .role:has(input:checked) .tile { border-color: var(--hot-2); }
 .role:has(input:focus-visible) { outline: 2px dotted var(--olive-6); outline-offset: 1px; }
 .w-right .btn.lg { width: 100%; }
-@media (max-width: 860px) { .w-mid { flex-direction: column; gap: 18px; align-items: center; } .w-rule { display: none; } .collage { display: none; } .w-band { height: 28px; } }
+@media (max-width: 860px) { .w-mid { flex-direction: column; gap: 18px; align-items: center; } .w-rule { display: none; } .collage { display: none; } .scene { height: 150px; } .w-band { height: 28px; } }
 
 /* ---------- loading screen ---------- */
 #splash { display: none; }
@@ -471,7 +500,7 @@ a.btn { text-decoration: none; }
 #splash.login .sp-bar i { animation-duration: 1.6s; }
 @keyframes sp-load { to { width: 100%; } } @keyframes sp-rise { from { opacity: 0; transform: translateY(16px); } }
 .sp-skip { color: #12233F; line-height: 1.5; }
-@media (max-width: 620px) { .sp-strip .gl { width: 32px; height: 32px; } .sp-hello { font-size: 30px; } }
+@media (max-width: 620px) { .sp-hello { font-size: 30px; } }
 @media (prefers-reduced-motion: reduce) { .sp-in > * { animation: none; } .sp-bar i { animation: none; width: 100%; } }
 
 /* ---------- learning: the illustrated-encyclopedia pages ---------- */

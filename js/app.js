@@ -189,7 +189,7 @@
     const s = E.progressSummary(pr), ev = E.evidence(pr), g = E.game(pr);
     const report = {
       title: 'EPIG Student Edition — learner report', framework: E.EPA_SOURCE, exportedAt: new Date().toISOString(),
-      learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), proficiencyCheck: E.examReport(pr), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
+      learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), proficiencyCheck: E.examReport(pr), miniGames: E.GAMES.map((g) => { const r = (pr.games || {})[g.id] || {}; return { game: g.name, plays: r.plays || 0, bestPercent: r.best || 0, perfectRounds: r.perfect || 0 }; }), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
       objectives: E.LEARNING.map((lo) => ({
         epa: lo.epa, epaTitle: lo.epaTitle, objective: lo.objective,
         tasks: lo.tasks.map((t) => ({ task: t.text, completedAt: pr.events[t.event] ? new Date(pr.events[t.event]).toISOString() : null })),
@@ -305,8 +305,9 @@
       if (left) return toast(`Complete or remove the ${left} remaining *** placeholder${left > 1 ? 's' : ''} before signing. F2 jumps to the next one.`);
       const student = u.role === 'student';
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
+      if (d.source) n.source = d.source;   // started in a mini-game
       p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id;
-      E.audit(`Signed note: ${n.type}`, p.id);
+      E.audit(`Signed note: ${n.type}${n.source ? ` (started in ${n.source})` : ''}`, p.id);
       if (student) E.message({ type: 'Cosign Note', roles: ['physician'], from: u.name, patientId: p.id, act: 'notes', subject: `${n.type} needs cosign — ${p.name}`, body: `${u.name} (Medical Student) signed a ${n.type} that needs your review and cosignature.` });
       track('note.sign'); if (d.type.startsWith('Handoff')) track('note.handoff');
       toast(student ? 'Note signed and routed for cosign' : 'Note signed'); commit();
@@ -413,7 +414,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       commit();
     },
     progressAsk() { const g = E.game(E.progress()); ui.modal = { type: 'confirm', title: 'Reset your progress?', text: `This erases your ${g.xp} XP, your level, your badges, every completed practice task, all of your knowledge-check answers, your mission stars and your proficiency check results, so you can start over from Level 1. Notes and orders you entered in the charts are kept. This cannot be undone.`, yes: 'progressDo', yesLabel: 'Reset my progress', danger: true }; render(); },
-    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; delete pr.bonus; delete pr.missions; delete pr.exam; delete pr.active; award = null; ui.modal = null; E.audit('Reset own learning progress'); status('Progress reset. You are back at Level 1.'); commit(); },
+    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; delete pr.bonus; delete pr.missions; delete pr.exam; delete pr.active; delete pr.games; award = null; ui.modal = null; E.audit('Reset own learning progress'); status('Progress reset. You are back at Level 1.'); commit(); },
     learnPrint() { window.print(); },
     learnExport() { exportReport(viewedLearner()); },
   };
@@ -483,7 +484,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
 
   // Missions and the proficiency check (js/missions.js) add their actions here and borrow a few helpers.
   E.app = { commit, render, toast, status, go, curPt };
-  Object.assign(A, E.missionActions || {});
+  Object.assign(A, E.missionActions || {}, E.gameActions || {});
 
   // Glyph bitmaps are drawn first; the screen is built from them.
   (E.glyphsReady || Promise.resolve()).then(() => { E.load(); onRoute(); splash('boot'); });

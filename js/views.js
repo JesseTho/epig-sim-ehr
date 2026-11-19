@@ -19,22 +19,24 @@
   const allergyText = (p) => (E.allergiesOf(p).length ? E.allergiesOf(p).map((a) => a.agent).join(', ') : 'No known allergies');
 
   /* ================= login ================= */
+  /* Login, laid out like a sign-in screen: on the left the product (SIM EHR among its icons), on the right a
+     sign-in card with the Epig logo at the top, then name, role and Log in. */
   V.login = () => `
     <div class="welcome">
       <div class="w-band"></div>
       <div class="w-mid">${V.sky('lg')}
         <div class="w-left">
-          <div class="collage" aria-hidden="true">${[['results', 'c1'], ['mar', 'c2'], ['pig1', 'c3'], ['learning', 'c4'], ['code', 'c5']].map(([g, c]) => `<span class="${c}">${icon(g, 88)}</span>`).join('')}</div>
-          <h1>${icon('logo', 96)}${E.wordmark(72)}</h1>
-          <p class="w-sub">${tagSet(true)}</p>
-          <p class="tagnote">an electronic health record simulation</p>
-
-          <p class="w-lead">A simulated hospital record to practise on before you use the real one. To begin, type your name and choose who you are today.</p>
+          <div class="scene">
+            <div class="collage" aria-hidden="true">${[['results', 'c1'], ['mar', 'c2'], ['summary', 'c3'], ['learning', 'c4'], ['code', 'c5']].map(([g, c]) => `<span class="${c}">${icon(g, 96)}</span>`).join('')}</div>
+            <div class="scene-tag"><span class="tagset big">${E.simmark(40, 2)}<span class="sticker">Student Edition</span></span><p class="tagnote">an electronic health record sim</p></div>
+          </div>
         </div>
         <div class="w-rule"></div>
         <div class="w-right">
+          <div class="w-brand">${icon('logo', 96)}${E.wordmark(72)}</div>
           <label class="field">Your name<input id="loginName" placeholder="e.g., Alex Kim" autocomplete="off" maxlength="60"></label>
-          <div class="role-grid">
+          <div class="field" id="roleLabel">Role:</div>
+          <div class="role-grid" role="radiogroup" aria-labelledby="roleLabel">
             ${Object.entries(E.ROLES).map(([id, r], i) => `<label class="role"><input type="radio" name="role" value="${id}"${i === 0 ? ' checked' : ''}><span class="tile">${icon({ student: 'learning', physician: 'idcard', nurse: 'mar' }[id], 48)}</span><span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></span></label>`).join('')}
           </div>
           <div id="loginErr" class="err"></div>
@@ -67,7 +69,7 @@
 
   /* The tag set: the SIM + EHR bitmap over the Student Edition sticker. The sticker stretches to the width of
      the lettering, so the two lines share their left and right edges. `big` is the doubled, login-size version. */
-  const tagSet = (big) => `<span class="tagset${big ? ' big' : ''}">${E.simmark(big ? 34 : 19, big ? 2 : 1)}<span class="sticker">Student Edition</span></span>`;
+  const tagSet = (big) => `<span class="tagset${big ? ' big' : ''}">${E.simmark(big ? 34 : 20, 2)}<span class="sticker">Student Edition</span></span>`;
 
   /* ================= loading screen ================= */
   V.splash = (kind) => {
@@ -97,7 +99,7 @@
       <span class="spacer"></span>
       <span class="bn-tag">${tagSet()}</span>
       <a class="lvl" href="#/learning" title="Open Learning: ${g.xp} XP, ${g.earned.length} of ${E.BADGES.length} badges">${icon('star', 40)}<span class="lvl-t"><b>Level ${g.level} · ${esc(g.title)}</b><span class="xpbar" role="img" aria-label="${g.xp} experience points${g.next ? ', ' + (g.next - g.xp) + ' to the next level' : ''}"><i style="width:${g.pct}%"></i></span></span><span class="lvl-n">${g.xp} XP<br>${icon('medal', 16)}${g.earned.length}/${E.BADGES.length}</span></a>
-      <span class="bn-user"><b>${esc(db.user.name)}</b>${esc(E.roleLabel(db.user.role))}</span>
+      <span class="bn-user" title="The role you are playing. Log out to switch."><b>${esc(db.user.name)}</b>Playing: ${esc(E.roleLabel(db.user.role))}</span>
       <button class="cap" data-act="help" title="Help" aria-label="Help"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.2 6c0-3.600 5.600-3.600 5.600-.2 0 2.200-2.800 2.100-2.800 4.400" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="12.800" r="1.200" fill="#fff"/></svg></button>
       <button class="cap close" data-act="logout" title="Log off" aria-label="Log off"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
     <header class="toolbar">
@@ -282,7 +284,7 @@
   };
 
   /* ================= Notes ================= */
-  V.noteDoc = (p, n) => `<div class="doc-h"><div><h3>${esc(n.type)}</h3><div class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)} (${esc(E.roleLabel(n.role))})${n.cosignedBy ? ` · Cosigned by ${esc(n.cosignedBy)} ${E.fmtDT(n.cosignedTs)}` : ''}</div></div><div>${statusChip(n.status)} ${n.status === 'Cosign needed' && E.can('note.cosign') ? `<button class="btn primary xs" data-act="noteCosign" data-id="${n.id}">Cosign</button>` : ''}</div></div><pre class="doc">${esc(n.text)}</pre>`;
+  V.noteDoc = (p, n) => `<div class="doc-h"><div><h3>${esc(n.type)}</h3><div class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)} (${esc(E.roleLabel(n.role))})${n.cosignedBy ? ` · Cosigned by ${esc(n.cosignedBy)} ${E.fmtDT(n.cosignedTs)}` : ''}${n.source ? ` · ${chip('Started in ' + n.source, 'blue')}` : ''}</div></div><div>${statusChip(n.status)} ${n.status === 'Cosign needed' && E.can('note.cosign') ? `<button class="btn primary xs" data-act="noteCosign" data-id="${n.id}">Cosign</button>` : ''}</div></div><pre class="doc">${esc(n.text)}</pre>`;
   V.act.notes = (p) => {
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), d = p.noteDraft;
     const sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
