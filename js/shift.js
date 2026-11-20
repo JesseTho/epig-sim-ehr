@@ -619,18 +619,29 @@
     const sh = shiftDef(a.id), c = CFG(), h = hosp(a), min = !!E.ui.dockMin, s = E.safety(), n = counts(s, a.start);
     const pct = Math.round(((h - c.startHour) / (c.endHour - c.startHour)) * 100), ph = PHASES.find((x) => x[0] === a.phase) || PHASES[0];
     const order = ['pre', 'rounds', 'day', 'signout'], at = a.phase === 'over' ? 4 : order.indexOf(a.phase);
-    const strip = order.map((id, i) => `<span class="${i < at ? 'done' : i === at ? 'on' : ''}" title="${esc(phaseName(id))}">${{ pre: 'Pre', rounds: 'Rounds', day: 'Day', signout: 'Sign-out' }[id]}</span>`).join('');
-    const fired = sh.events.filter((e) => a.fired[e.id]).sort((x, y) => a.fired[y.id] - a.fired[x.id]).slice(0, 4);
+    const fired = sh.events.filter((e) => a.fired[e.id]).sort((x, y) => a.fired[y.id] - a.fired[x.id]).slice(0, 3);
     const open = crises().filter((x) => x.state === 'open' && x.who === E.db.user.name);
     const left = a.answers.filter((x) => x == null).length;
-    const body = `<div class="ph-strip" aria-label="Phase: ${esc(ph[1])}">${strip}</div>
-      <span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span>
-      <p class="dock-brief">${esc(ph[2])}</p>
+    // One or two things to do now, each a single short line, instead of a paragraph.
+    const me = E.db.user.name, mine = E.db.audit.filter((x) => x.user === me && x.ts >= a.start);
+    const todo = (done, html) => `<li class="${done ? 'done' : ''}"><i class="tick${done ? '1' : '0'}"></i><span>${html}</span></li>`;
+    let now = '';
+    if (a.phase === 'pre') {
+      const read = sh.preRead.filter((re) => mine.some((x) => x.action.startsWith('Read message') && re.test(x.action))).length;
+      const pids = sh.rounds.map((q) => q.pid), looked = pids.filter((pid) => mine.some((x) => x.patientId === pid && /^Viewed/.test(x.action))).length;
+      now = todo(read === sh.preRead.length, `<a href="#/inbox">Read overnight Inbox</a> <b>${read}/${sh.preRead.length}</b>`) + todo(looked === pids.length, `<a href="#/home">Open each chart</a> <b>${looked}/${pids.length}</b>`);
+    } else if (a.phase === 'rounds') now = todo(!left, `Answer the attending <b>${a.answers.length - left}/${a.answers.length}</b>`);
+    else if (a.phase === 'day') now = todo(false, 'Answer pages as they arrive');
+    else now = todo(false, 'Write a Handoff (I-PASS) note on your sickest patient') + todo(false, 'Then end the shift');
+    const next = { pre: ['Rounds', c.rounds], rounds: ['Day work', c.dayWork], day: ['Sign-out', c.signOut], signout: ['Night team', c.endHour] }[a.phase];
+    const body = `<span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span>
+      <p class="dock-next">${next ? `${esc(next[0])} at ${hhmm(next[1])}` : 'The night team is waiting'}</p>
       ${a.paused ? `<p class="shift-paused">${icon('info', 16)}<span>Paused. The ward is holding its breath.</span></p>` : ''}
       ${open.map((x) => { const p = E.pt(x.pid); return `<p class="shift-now">${icon('alert', 16)}<a href="#/pt/${p.id}/orders">${esc(p.name)} needs you now</a></p>`; }).join('')}
       ${s.debriefDue ? `<p class="shift-now">${icon('warn', 16)}<button class="linkish" data-act="debriefOpen">Debrief owed before you sign orders</button></p>` : ''}
-      <h5>Pages and results</h5><ul class="dock-list">${fired.map((e) => `<li>${icon(e.type === 'det' ? 'alert' : e.type === 'result' ? 'results' : 'inbox', 16)}<span><a href="#/pt/${e.pid}/${e.type === 'result' ? 'results' : e.vitals ? 'flowsheets' : 'orders'}">${esc(e.subject)}</a><small>${hhmm(e.at)}</small></span></li>`).join('') || '<li class="hid"><i class="tick0"></i><span>Nothing new yet. The overnight messages are in your Inbox.</span></li>'}</ul>
-      <div class="dock-score">${chip(`${n.harm} harm`, n.harm ? 'red' : 'green')}${chip(`${n.near} near miss${n.near === 1 ? '' : 'es'}`, n.near ? 'amber' : 'grey')}</div>
+      <ul class="dock-list dock-todo">${now}</ul>
+      ${fired.length ? `<h5>New</h5><ul class="dock-list">${fired.map((e) => `<li>${icon(e.type === 'det' ? 'alert' : e.type === 'result' ? 'results' : 'inbox', 16)}<span><a href="#/pt/${e.pid}/${e.type === 'result' ? 'results' : e.vitals ? 'flowsheets' : 'orders'}">${esc(e.subject)}</a><small>${hhmm(e.at)}</small></span></li>`).join('')}</ul>` : ''}
+      ${n.harm || n.near ? `<div class="dock-score">${n.harm ? chip(`${n.harm} harm`, 'red') : ''}${n.near ? chip(`${n.near} near miss${n.near === 1 ? '' : 'es'}`, 'amber') : ''}</div>` : ''}
       <div class="dock-acts">${a.over ? '' : `<button class="btn xs" data-act="shiftPause">${a.paused ? 'Resume' : 'Pause'}</button>`}${a.phase === 'rounds' && left ? `<button class="btn xs primary" data-act="shiftRounds">Rounds (${left})</button>` : ''}<button class="btn xs${a.over || a.phase === 'signout' ? ' primary' : ''}" data-act="shiftEnd">End shift</button></div>`;
     return `<aside class="dock${min ? ' min' : ''} dock-shift${a.paused ? ' paused' : ''}" aria-label="Shift: ${esc(sh.title)}"><header class="dock-h">${icon('log', 16)}<b>${esc(ph[1])}</b><span id="shift-clock" class="dock-timer">${hhmm(h)}</span><button class="cap" data-act="dockToggle" title="${min ? 'Show' : 'Minimize'}" aria-label="${min ? 'Show panel' : 'Minimize panel'}">${min ? MAX_SVG : MIN_SVG}</button></header><div class="dock-b">${body}</div></aside>`;
   };

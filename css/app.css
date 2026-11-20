@@ -572,7 +572,9 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .ph-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 4px; }
 .ph-strip span { padding: 1px 0 2px; text-align: center; font-size: 10px; white-space: nowrap; overflow: hidden; color: var(--muted); background: #fff; border: 1px solid #C9C7BA; }
 .ph-strip .done { background: var(--olive-0); border-color: var(--olive-2); color: #3F501B; } .ph-strip .on { background: var(--hot-2); border-color: var(--hot); color: var(--ink); text-shadow: .5px 0 0 currentColor; }
-.xpbar.shift-bar { width: 100%; height: 9px; margin-bottom: 6px; } .xpbar.shift-bar i { transition: width 1s linear; }
+.xpbar.shift-bar { width: 100%; height: 9px; margin-bottom: 3px; }
+.dock-next { margin: 0 0 8px; font-size: 11px; color: var(--muted); text-align: right; }
+.dock-todo li { padding: 4px 0; font-size: 13px; align-items: center; } .dock-todo li > span { display: flex; flex: 1; justify-content: space-between; gap: 6px; } .dock-todo a { color: var(--ink); } .dock-todo b { font-variant-numeric: tabular-nums; color: var(--olive-6); } .dock-todo li.done a { color: var(--muted); } .xpbar.shift-bar i { transition: width 1s linear; }
 .shift-paused, .shift-now { display: flex; align-items: flex-start; gap: 5px; margin: 0 0 5px; padding: 3px 5px; border: 1px solid; }
 .shift-paused { background: var(--amber-bg); border-color: #E3C36A; color: #4F3300; } .shift-now { background: var(--red-bg); border-color: #E0A19C; font-weight: 700; } .shift-now a { color: var(--red); }
 .linkish { padding: 0; border: 0; background: none; color: var(--red); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; }
@@ -601,3 +603,4 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .tr-move { flex: none; display: flex; gap: 4px; } .tr-move .btn { min-width: 48px; }
 .rp-req { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--note); border: 1px solid var(--line); } .rp-req p { margin: 0; font: 700 14px/1.45 var(--book); }
 .rp-list td { padding-top: 6px; padding-bottom: 6px; } .modal-b .dock-list.wide + .rp-list { margin-top: 10px; }
+.tick1 { flex: none; position: relative; width: 14px; height: 14px; margin: 1px 1px 0; border: 1px solid #2F6B1A; background: #4E9A2E; } .tick1::after { content: ''; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
