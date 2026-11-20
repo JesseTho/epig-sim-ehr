@@ -96,7 +96,7 @@
     const tool = (to, glyph, label, view, extra) => `<a class="tool${r.view === view ? ' on' : ''}${view === 'inbox' && unread ? ' unread' : ''}" href="${to}">${icon(glyph, 32)}<span>${label}</span>${extra || ''}</a>`;
     return `
     <div class="banner">${V.sky('bn')}
-      <a class="bn-brand" href="#/home" title="Patient Lists">${icon('logo', 48)}${E.wordmark(44)}</a>
+      <a class="bn-brand" href="#/home" title="Patient Lists">${E.wordmark(44)}</a>
       <span class="spacer"></span>
       <span class="bn-tag">${tagSet()}</span>
       <a class="lvl" href="#/learning" title="Open Learning: ${g.xp} XP, ${g.earned.length} of ${E.BADGES.length} badges">${icon('star', 40)}<span class="lvl-t"><b>Level ${g.level} · ${esc(g.title)}</b><span class="xpbar" role="img" aria-label="${g.xp} experience points${g.next ? ', ' + (g.next - g.xp) + ' to the next level' : ''}"><i style="width:${g.pct}%"></i></span></span><span class="lvl-n">${g.xp} XP<br>${icon('medal', 16)}${g.earned.length}/${E.BADGES.length}</span></a>
