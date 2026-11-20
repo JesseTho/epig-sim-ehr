@@ -250,8 +250,8 @@
     img.onerror = done;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   });
-  E.glyphsReady = Promise.all([E.glyphsReady, wmRaster(44), wmRaster(72)]);
-  /** The wordmark at 44px (banner) or 72px (login and loading screens). */
+  E.glyphsReady = Promise.all([E.glyphsReady, wmRaster(44), wmRaster(72), wmRaster(88)]);
+  /** The wordmark at 44px (banner), 88px (login and loading screens, where it stands alone) or 72px (certificate, beside the pig). */
   E.wordmark = (h) => (WMB[h] ? `<img class="wm smooth" src="${WMB[h].src}" style="width:${WMB[h].w}px;height:${WMB[h].h}px" alt="Epig" draggable="false">` : wordmarkSvg(h).replace('<svg ', '<svg class="wm" role="img" aria-label="Epig" '));
 
   /* "SIM + EHR": the descriptor that stands over the Student Edition sticker. Book-face capitals, upright,

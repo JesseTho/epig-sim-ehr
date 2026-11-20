@@ -34,7 +34,7 @@
         </div>
         <div class="w-rule"></div>
         <div class="w-right">
-          <div class="w-brand">${icon('logo', 96)}${E.wordmark(72)}</div>
+          <div class="w-brand">${E.wordmark(88)}</div>
           <label class="field">Your name<input id="loginName" placeholder="e.g., Alex Kim" autocomplete="off" maxlength="60"></label>
           <div class="field" id="roleLabel">Role:</div>
           <div class="role-grid" role="radiogroup" aria-labelledby="roleLabel">
@@ -78,7 +78,7 @@
     const who = kind === 'login' && E.db.user ? E.db.user.name : '';
     // One column, top to bottom: the mark, what it is (or a welcome), what is inside, a fact, progress, the notice.
     return `${V.sky('lg')}<div class="sp-in">
-      <h1>${icon('logo', 96)}${E.wordmark(72)}</h1>
+      <h1>${E.wordmark(88)}</h1>
       ${who ? `<p class="sp-hello">Welcome, ${esc(who)}</p>` : `<div class="sp-tag">${tagSet(true)}</div>`}
       <p class="tagnote">${who ? 'Opening your simulated patient list' : 'an electronic health record simulation'}</p>
       <div class="sp-strip" aria-hidden="true">${['patients', 'summary', 'results', 'flowsheets', 'mar', 'notes', 'orders', 'learning'].map((n) => icon(n, 48)).join('')}</div>
