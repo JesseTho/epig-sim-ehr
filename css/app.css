@@ -30,7 +30,7 @@ h3 { font: 700 12px var(--ui); margin: 0; } h4 { font: 700 12px var(--ui); margi
 p { margin: 0 0 8px; } a { color: var(--link); text-underline-offset: 2px; } ul { margin: 0; padding-left: 18px; }
 button, input, select, textarea { font: inherit; color: inherit; caret-color: var(--olive-5); }
 :focus-visible { outline: 2px dotted var(--olive-6); outline-offset: 1px; }
-.gl { flex: none; vertical-align: middle; overflow: visible; image-rendering: pixelated; user-select: none; }
+.gl { flex: none; vertical-align: middle; overflow: visible; user-select: none; }
 .muted { color: var(--muted); } .fine { font-size: 11px; color: var(--muted); margin: 6px 0 0; } .nowrap { white-space: nowrap; }
 .spacer { flex: 1; } .err { color: var(--red); font-weight: 700; margin-right: auto; }
 code, kbd { background: #fff; border: 1px solid var(--line-2); padding: 0 3px; font: 11px "Lucida Console", Consolas, monospace; }
@@ -113,7 +113,7 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
 .status { margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line); font-weight: 700; color: var(--olive-6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; } .status:empty { display: none; }
 
 /* tab controls: workspace tabs and chart activities share one look */
-.wstabs, .acts { display: flex; align-items: flex-end; gap: 2px; padding: 5px 12px 0; flex: none; background: var(--face); border-bottom: 1px solid #919B76; overflow-x: auto; }
+.wstabs, .acts { display: flex; align-items: flex-end; gap: 2px; padding: 5px 12px 0; flex: none; background: var(--face); border-bottom: 1px solid #919B76; overflow-x: auto; overflow-y: hidden; }   /* hidden: the selected tab's 1px overlap must not raise a scroll bar */
 .wstab, .acts a { display: flex; align-items: center; gap: 6px; padding: 3px 11px 4px; border: 1px solid #919B76; border-bottom: 0; border-radius: 3px 3px 0 0; background: var(--g-tab) 0 0 / 8px 26px repeat-x, #ECEADB; image-rendering: pixelated; color: var(--ink); text-decoration: none; white-space: nowrap; margin-bottom: 0; }
 /* Chart tabs line up with what is around them: their top edge with the top of the patient tile in the side
    pane, and their left edge with the cards and headings below them. */
@@ -273,8 +273,9 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 /* the nearest ridge is a separate layer drawn after the pigs, so they pass behind it but in front of the far hills */
 .skyfx.bn .land.near { background-image: var(--land-banner-near); } .skyfx.lg .land.near { background-image: var(--land-near); }
 .fly { position: absolute; left: 0; animation: linear infinite; } .fly.lr { animation-name: fly-lr; } .fly.rl { animation-name: fly-rl; }
-.fly.rl .gl { transform: scaleX(-1); }   /* the pig is drawn heading right */
-.fly .gl { position: absolute; left: 0; top: 0; animation: flap-a .34s steps(1, end) infinite; } .fly .gl + .gl { animation-name: flap-b; }
+/* the flyer is Truffle: the first two cells of the sprite sheet (wing up, wing down), which face right */
+.fly i { position: absolute; inset: 0; background: url("../assets/assistant/pig-sheet-192.png") 0 0 / 400% 200% no-repeat; animation: flap-a .34s steps(1, end) infinite; }
+.fly i + i { background-position: 33.333% 0; animation-name: flap-b; } .fly.rl i { transform: scaleX(-1); }
 .skyfx .fly { pointer-events: auto; cursor: pointer; } .banner > .spacer { pointer-events: none; }
 /* caught: a puff of cloud bursts where the pig was, and the point floats up out of it */
 .poof { position: fixed; z-index: 120; pointer-events: none; width: 0; height: 0; }
@@ -327,7 +328,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 #pal { position: fixed; right: 12px; bottom: 8px; z-index: 55; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
 #pal[hidden], #pal-back[hidden] { display: none; }
 .pal-pig { pointer-events: auto; border: 0; padding: 0; background: none; cursor: pointer; filter: drop-shadow(3px 6px 4px rgba(20, 40, 70, .35)); }
-.pal-pig i { display: block; width: 96px; height: 96px; transform: scaleX(-1); image-rendering: pixelated; background: url("../assets/assistant/pig-sheet-48.png") 0 0 / 384px 192px no-repeat; }
+.pal-pig i { display: block; width: 96px; height: 96px; transform: scaleX(-1); background: url("../assets/assistant/pig-sheet-192.png") 0 0 / 384px 192px no-repeat; }
 .pal-pig[data-pose="wave"] i { background-position: -192px 0; } .pal-pig[data-pose="think"] i { background-position: -288px 0; }
 .pal-pig[data-pose="idea"] i { background-position: 0 -96px; } .pal-pig[data-pose="wait"] i { background-position: -96px -96px; }
 .pal-pig[data-pose="cheer"] i { background-position: -192px -96px; } .pal-pig[data-pose="worry"] i { background-position: -288px -96px; }
@@ -343,7 +344,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 .pal-hide { display: block; margin: 7px 0 0 auto; border: 0; background: none; padding: 0; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
 /* the tab that brings Truffle back */
 #pal-back { position: fixed; right: 0; bottom: 14px; z-index: 55; display: flex; align-items: center; gap: 5px; padding: 3px 9px 3px 5px; border: 1px solid var(--olive-5); border-right: 0; border-radius: 12px 0 0 12px; background: var(--note); color: var(--ink); font: 700 12px var(--title); cursor: pointer; box-shadow: 1px 2px 4px rgba(0, 0, 0, .3); }
-#pal-back i { width: 24px; height: 24px; transform: scaleX(-1); image-rendering: pixelated; background: url("../assets/assistant/pig-sheet-48.png") 0 0 / 96px 48px no-repeat; }
+#pal-back i { width: 32px; height: 32px; transform: scaleX(-1); background: url("../assets/assistant/pig-sheet-192.png") 0 0 / 128px 64px no-repeat; }
 #pal-back:hover { background: #FFF6C4; }
 @media (max-width: 700px) { #pal, #pal-back { display: none; } }
 @media (prefers-reduced-motion: reduce) { .pal-pig.flutter, .pal-pig.flutter i { animation: none !important; } }
@@ -455,7 +456,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .w-band.foot { height: auto; min-height: 52px; display: grid; place-items: center; padding: 8px 16px; color: #F1F5E2; text-align: center; border-bottom: 0; border-top: 2px solid #F0B040; }
 .w-mid { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; gap: 44px; padding: 28px 32px;
   background: var(--g-sky) 0 0 / 8px 640px repeat-x, #E3F1FC; image-rendering: pixelated; position: relative; }
-.music-btn { position: absolute; top: 14px; right: 16px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 5px; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; font: 700 12px var(--ui); color: var(--ink); background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; box-shadow: 2px 3px 5px rgba(18, 35, 63, .3); }
+.w-mid > .music-btn { position: absolute; top: 14px; right: 16px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 5px; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; font: 700 12px var(--ui); color: var(--ink); background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; box-shadow: 2px 3px 5px rgba(18, 35, 63, .3); }
 .music-btn[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #B4CB7C, 2px 3px 5px rgba(18, 35, 63, .3); } .music-btn:hover { box-shadow: inset 0 0 0 2px var(--hot-2), 2px 3px 5px rgba(18, 35, 63, .3); }
 .w-left { width: 480px; max-width: 100%; color: #14233A; }
 /* the left-hand scene: five icons scattered around the SIM EHR block, which sits in the middle */

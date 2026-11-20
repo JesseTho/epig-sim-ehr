@@ -149,28 +149,20 @@
   G.pig2 = pig(`<path d="M12 15c-5.500 1.500-8 6.500-5.500 10.500 2.500-3 6-5.500 10-7.500z" ${f('cream')}/>${line('M9.500 19c.800 1 2.500 1.500 4 1M8 22c1.300.500 3 .300 4.500-.700', '#C79A70', 1)}`);
   /* The EPIG logo is Truffle: the first cell of the assistant's sprite sheet, cropped close, in the sheet's own
      direction (facing right, toward the wordmark), so the logo and the corner assistant are plainly the same pig.
-     Files: assets/logo/epig-48.png and epig-32.png. The assistant in the corner is the same sheet mirrored.
+     File: assets/logo/epig-192.png. The assistant in the corner is the same sheet mirrored.
      EHR.icon('logo', size) shows the 48px bitmap, doubled with hard pixels above 56px, and the 32px one below 40px. */
-  const LOGO = { 32: 'assets/logo/epig-32.png', 48: 'assets/logo/epig-48.png' };
-  /* The logo shown 1:1 (the banner) uses a cut matching the screen's real pixels, so on a 125% or 150% display
-     it is not stretched unevenly. The cuts are made from the same original art at 48, 60, 72 and 96px. */
-  const LOGO_CUTS = [48, 60, 72, 96];
-  const logoFor = (css) => { const want = css * Math.max(1, window.devicePixelRatio || 1); const c = LOGO_CUTS.find((x) => x >= want - 0.5) || 96; return { src: `assets/logo/epig-${c}.png`, smooth: c !== css }; };
-  /* The small mark: the pig's face on a sky tile. Dialog title bars and anywhere under 40px. */
-  G.brand = `${sh(11)}<rect x="3" y="2.500" width="26" height="25.500" rx="6.500" ${f('sky', 'blue')}/><path d="M5.200 10c0-3.600 2.400-5.400 5.600-5.400h10.400c3.200 0 5.600 1.800 5.600 5.400-6-2.200-15.600-2.200-21.600 0z" fill="url(#p-d50)"/>
-    <path d="M8 13l1-6.500 5.500 3.500z" ${f('pink')}/><path d="M24 13l-1-6.500-5.500 3.500z" ${f('pink')}/><circle cx="16" cy="16.500" r="8.800" ${f('pink')}/>
-    <ellipse cx="16" cy="19.300" rx="4.700" ry="3.500" fill="#F7A3B8" stroke="${O.pink}" stroke-width="1.300"/><ellipse cx="14.200" cy="19.300" rx=".850" ry="1.300" fill="${O.pink}"/><ellipse cx="17.800" cy="19.300" rx=".850" ry="1.300" fill="${O.pink}"/>
-    <circle cx="12.300" cy="14.300" r="1.150" fill="#2B1A20"/><circle cx="19.700" cy="14.300" r="1.150" fill="#2B1A20"/>`;
+  /* The logo is Truffle cut at high resolution from the original art; the browser scales it down smoothly. */
+  const LOGO_SRC = 'assets/logo/epig-192.png';
   const GRID = {};   // glyphs drawn on a grid other than 32 (none at present)
   E.GLYPHS = Object.keys(G);
 
-  /* Era resolution. Icons of the period were bitmaps drawn at a few fixed sizes, not vectors. Each glyph is
-     rasterised once at 16, 24, 32 and 48 pixels when the page starts, and every use shows one of those
-     bitmaps, either at its own size or exactly doubled with hard pixels (a 96px icon is the 48px bitmap
-     twice over). EHR.icon(name, size) snaps the size it is asked for to the nearest of these.
-     (A single doubled pixel size for every icon was tried and withdrawn by the owner as too harsh.) */
-  const NATIVE = [16, 24, 32, 48];
-  const snap = (size) => (size <= 18 ? [16, 1] : size <= 28 ? [24, 1] : size <= 40 ? [32, 1] : size <= 56 ? [48, 1] : size <= 72 ? [32, 2] : [48, 2]);
+  /* Resolution (owner's decision): at least Windows XP quality. XP icons were full-colour bitmaps with smooth
+     (alpha-blended) edges at 16, 24, 32 and 48px. Here every glyph is rasterised at the size it is shown times
+     the screen's pixel ratio, so it is sharp on a 100%, 125% or 150% display, and nothing is shown doubled.
+     EHR.icon(name, size) snaps to the nearest of these shown sizes. */
+  const DPR = Math.max(1, window.devicePixelRatio || 1), SIZES = [16, 24, 32, 48, 64, 96];
+  const snapSize = (size) => SIZES.reduce((b, s) => (Math.abs(s - size) < Math.abs(b - size) ? s : b), SIZES[0]);
+  const NATIVE = SIZES.map((s) => Math.round(s * DPR));
   const BMP = {};
   /** A self-contained SVG of one glyph at px pixels, carrying only the fills it uses, dithered for that size. */
   const svgFor = (name, px) => {
@@ -199,8 +191,8 @@
   /** A glyph as markup. Decorative by default; pass a label to expose it to assistive technology.
       If the browser cannot rasterise (BMP.failed), it falls back to drawing the vector directly. */
   E.icon = (name, size, label) => {
-    const [px, k] = snap(size || 16), d = px * k, src = name === 'logo' ? LOGO[px >= 48 ? 48 : 32] : !BMP.failed && BMP[name] && BMP[name][px];
-    if (name === 'logo' && k === 1 && px === 48) { const l = logoFor(48); return `<img class="gl${l.smooth ? ' smooth' : ''}" src="${l.src}" width="48" height="48" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`; }
+    const d = snapSize(size || 16), px = Math.round(d * DPR), src = name === 'logo' ? LOGO_SRC : !BMP.failed && BMP[name] && BMP[name][px];
+
     if (src) return `<img class="gl" src="${src}" width="${d}" height="${d}" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`;
     return `<svg class="gl" width="${d}" height="${d}" viewBox="0 0 ${GRID[name] || 32} ${GRID[name] || 32}" ${label ? `role="img" aria-label="${E.esc(label)}"` : 'aria-hidden="true"'} focusable="false">${svgFor(name, d).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').replace(/id="([gpc]-[a-z0-9]+)"/g, `id="$1-${name}-${d}"`).replace(/url\(#([gpc]-[a-z0-9]+)\)/g, `url(#$1-${name}-${d})`)}</svg>`;
   };
@@ -233,8 +225,8 @@
   const wmRaster = (h) => new Promise((done) => {
     // large: drawn at half size and doubled (the chunky login look). small: drawn at the screen's real
     // resolution so a scaled display (125%, 150%) does not stretch it unevenly.
-    const dpr = Math.max(1, window.devicePixelRatio || 1), n = h >= 72 ? h / 2 : Math.round(h * dpr), k = h / n, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
-    img.onload = () => { try { const cv = document.createElement('canvas'); cv.width = w; cv.height = n; cv.getContext('2d').drawImage(img, 0, 0, w, n); WMB[h] = { src: cv.toDataURL('image/png'), w: Math.round(w * k), smooth: h < 72 }; } catch (e) { /* fall back to the vector */ } done(); };
+    const dpr = Math.max(1, window.devicePixelRatio || 1), n = Math.round(h * dpr), k = h / n, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
+    img.onload = () => { try { const cv = document.createElement('canvas'); cv.width = w; cv.height = n; cv.getContext('2d').drawImage(img, 0, 0, w, n); WMB[h] = { src: cv.toDataURL('image/png'), w: Math.round(w * k), smooth: true }; } catch (e) { /* fall back to the vector */ } done(); };
     img.onerror = done;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wordmarkSvg(n));
   });
@@ -251,7 +243,7 @@
   E.simmark = (capHeight, scale) => {
     // scale 2: drawn small and doubled, like the Epig wordmark beside it on the login screen.
     // scale 1: drawn at the screen's real resolution and shown smooth, so it stays sharp on scaled displays.
-    const r = scale === 1 ? Math.max(1, window.devicePixelRatio || 1) : 1, k = scale === 1 ? 1 / r : scale, key = capHeight + 'x' + scale + 'x' + r;
+    const r = Math.max(1, window.devicePixelRatio || 1), k = 1 / r, key = capHeight + 'x' + r;
     if (!SIMB[key]) {
       const cap = capHeight / k, face = '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif';
       const probe = document.createElement('canvas').getContext('2d');
@@ -273,7 +265,7 @@
       const px = Math.round(inkA + gap), py = Math.round((top - plus) / 2), arm = Math.max(1, Math.round(plus / 3)), mid = Math.round((plus - arm) / 2);
       const o = Math.round(r); ctx.fillStyle = '#1D5F12'; ctx.fillRect(px + mid - o, py - o, arm + 2 * o, plus + 2 * o); ctx.fillRect(px - o, py + mid - o, plus + 2 * o, arm + 2 * o);
       ctx.fillStyle = '#3DAA2B'; ctx.fillRect(px + mid, py, arm, plus); ctx.fillRect(px, py + mid, plus, arm);
-      SIMB[key] = { src: cv.toDataURL('image/png'), w: Math.round(w * k), h: Math.round(h * k), smooth: scale === 1 };
+      SIMB[key] = { src: cv.toDataURL('image/png'), w: Math.round(w * k), h: Math.round(h * k), smooth: true };
     }
     return `<img class="sm${SIMB[key].smooth ? ' smooth' : ''}" src="${SIMB[key].src}" width="${SIMB[key].w}" height="${SIMB[key].h}" alt="SIM plus EHR" draggable="false">`;
   };

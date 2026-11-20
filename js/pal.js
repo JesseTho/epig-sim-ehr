@@ -4,8 +4,8 @@
    there is something useful to say, steps aside when it would cover a control, and can be put away. When put
    away it leaves a small tab in the corner to bring it back.
 
-   Artwork: assets/assistant/pig-sheet-48.png, a 4 x 2 sheet of 48px cells cut down from artwork supplied by the
-   project owner and shown doubled with hard pixels, to match the logo and the icons
+   Artwork: assets/assistant/pig-sheet-192.png, a 4 x 2 sheet of 192px cells cut from artwork supplied by the
+   project owner and scaled down smoothly by the browser, matching the logo
    (pig-sheet-source.png is the file as received). The sheet faces right; the stylesheet mirrors it so the pig
    faces into the screen. Cells, left to right, top row then bottom row: */
 (function () {

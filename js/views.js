@@ -59,7 +59,7 @@
     const fly = (name, cls, size, top, dur, offset) => {
       const key = kind + n++, left = dur - ((now + offset) % dur);
       if (popped[key] > now) return '';
-      return `<span class="fly ${cls}" data-act="pigPop" data-key="${key}" data-left="${left.toFixed(1)}" style="top:${top};width:${size}px;height:${size}px;${at(dur, offset)}">${icon(name + '1', size)}${icon(name + '2', size)}</span>`;
+      return `<span class="fly ${cls}" data-act="pigPop" data-key="${key}" data-left="${left.toFixed(1)}" style="top:${top};width:${size}px;height:${size}px;${at(dur, offset)}"><i></i><i></i></span>`;   // Truffle's two wing frames
     };
     // Back to front: clouds, the distant hills, the pigs, the nearest hill.
     const far = '<i class="land"></i>';
