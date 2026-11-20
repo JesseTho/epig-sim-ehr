@@ -113,6 +113,7 @@
     alert: `${sh(11)}<path d="M16 3.5L29.5 27h-27z" ${f('red')}/><path d="M16 6.8l3.6 6.4h-7.2z" fill="url(#p-d50)"/><rect x="14.4" y="11.5" width="3.2" height="8.5" rx="1.5" fill="#fff"/><circle cx="16" cy="23.3" r="1.8" fill="#fff"/>`,
     logout: `${sh()}<path d="M7 4.5h13v23H7z" ${f('wood')}/><path d="M9.5 7l8 2.5v17l-8-2.5z" fill="#F0C98C" stroke="${O.wood}" stroke-width="1.2" stroke-linejoin="round"/><circle cx="15.3" cy="17" r="1.2" fill="${O.wood}"/><path d="M19 13.5h5.5V10l6 6-6 6v-3.5H19z" ${f('green')}/>`,
     call: `${sh(11)}<rect x="3" y="8" width="18.500" height="16" rx="3" ${f('blue')}/><path d="M21.500 13.500l7.500-4.500v14l-7.500-4.500z" ${f('steel')}/><path d="M5 12c0-1.600 1-2.400 2.400-2.400h9.800c1.400 0 2.400.8 2.400 2.400z" fill="url(#p-d50)"/><circle cx="8" cy="19.500" r="2.200" ${f('green')}/>`,
+    music: `${sh(10)}<path d="M4.500 12h5l7-6.500v21l-7-6.500h-5z" ${f('steel')}/><path d="M6 13.500h3.500" stroke="#fff" stroke-width="1.500" stroke-linecap="round" opacity=".8"/>${line('M20 11c2 2.800 2 7.200 0 10M23.500 8c4 4.800 4 11.200 0 16', O.blue, 2.200)}`,
     search: `${sh(9)}<path d="M19.5 19.5l8 8" stroke="${O.wood}" stroke-width="5.5" stroke-linecap="round"/><path d="M19.5 19.5l8 8" stroke="#C99555" stroke-width="2.8" stroke-linecap="round"/><circle cx="13" cy="13" r="8.8" fill="url(#g-glass)" stroke="${O.steel}" stroke-width="2.4"/><path d="M7.5 11.5c1-4 6-5.6 9-3.6-3.4.2-6.6 1.4-9 3.6z" fill="url(#p-d50)"/>`,
     summary: `${sh()}${board}<path d="M16 23.5c-5-3.6-6.4-6.4-5-8.6 1.3-2 3.8-1.6 5 .4 1.2-2 3.7-2.4 5-.4 1.4 2.2 0 5-5 8.6z" ${f('red')}/>`,
     review: `${sh(12)}<path d="M3.5 8.5a1.5 1.5 0 0 1 1.5-1.5h7l2.5 3h12a1.5 1.5 0 0 1 1.5 1.5V26H3.5z" ${f('manila', 'gold')}/><path d="M9 6h13v10H9z" ${f('paper')}/>${line('M11.5 9.5h8M11.5 12.5h8', '#8C9BB5', 1.2)}<path d="M2.5 14h22.5l3.5 12H5.5z" ${f('manila', 'gold')}/>`,
@@ -151,6 +152,10 @@
      Files: assets/logo/epig-48.png and epig-32.png. The assistant in the corner is the same sheet mirrored.
      EHR.icon('logo', size) shows the 48px bitmap, doubled with hard pixels above 56px, and the 32px one below 40px. */
   const LOGO = { 32: 'assets/logo/epig-32.png', 48: 'assets/logo/epig-48.png' };
+  /* The logo shown 1:1 (the banner) uses a cut matching the screen's real pixels, so on a 125% or 150% display
+     it is not stretched unevenly. The cuts are made from the same original art at 48, 60, 72 and 96px. */
+  const LOGO_CUTS = [48, 60, 72, 96];
+  const logoFor = (css) => { const want = css * Math.max(1, window.devicePixelRatio || 1); const c = LOGO_CUTS.find((x) => x >= want - 0.5) || 96; return { src: `assets/logo/epig-${c}.png`, smooth: c !== css }; };
   /* The small mark: the pig's face on a sky tile. Dialog title bars and anywhere under 40px. */
   G.brand = `${sh(11)}<rect x="3" y="2.500" width="26" height="25.500" rx="6.500" ${f('sky', 'blue')}/><path d="M5.200 10c0-3.600 2.400-5.400 5.600-5.400h10.400c3.200 0 5.600 1.800 5.600 5.400-6-2.200-15.600-2.200-21.600 0z" fill="url(#p-d50)"/>
     <path d="M8 13l1-6.500 5.500 3.500z" ${f('pink')}/><path d="M24 13l-1-6.500-5.500 3.500z" ${f('pink')}/><circle cx="16" cy="16.500" r="8.800" ${f('pink')}/>
@@ -195,6 +200,7 @@
       If the browser cannot rasterise (BMP.failed), it falls back to drawing the vector directly. */
   E.icon = (name, size, label) => {
     const [px, k] = snap(size || 16), d = px * k, src = name === 'logo' ? LOGO[px >= 48 ? 48 : 32] : !BMP.failed && BMP[name] && BMP[name][px];
+    if (name === 'logo' && k === 1 && px === 48) { const l = logoFor(48); return `<img class="gl${l.smooth ? ' smooth' : ''}" src="${l.src}" width="48" height="48" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`; }
     if (src) return `<img class="gl" src="${src}" width="${d}" height="${d}" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`;
     return `<svg class="gl" width="${d}" height="${d}" viewBox="0 0 ${GRID[name] || 32} ${GRID[name] || 32}" ${label ? `role="img" aria-label="${E.esc(label)}"` : 'aria-hidden="true"'} focusable="false">${svgFor(name, d).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').replace(/id="([gpc]-[a-z0-9]+)"/g, `id="$1-${name}-${d}"`).replace(/url\(#([gpc]-[a-z0-9]+)\)/g, `url(#$1-${name}-${d})`)}</svg>`;
   };
@@ -225,14 +231,16 @@
   };
   const WMB = {};
   const wmRaster = (h) => new Promise((done) => {
-    const n = h >= 72 ? h / 2 : h, k = h / n, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
-    img.onload = () => { try { const cv = document.createElement('canvas'); cv.width = w; cv.height = n; cv.getContext('2d').drawImage(img, 0, 0, w, n); WMB[h] = { src: cv.toDataURL('image/png'), w: w * k }; } catch (e) { /* fall back to the vector */ } done(); };
+    // large: drawn at half size and doubled (the chunky login look). small: drawn at the screen's real
+    // resolution so a scaled display (125%, 150%) does not stretch it unevenly.
+    const dpr = Math.max(1, window.devicePixelRatio || 1), n = h >= 72 ? h / 2 : Math.round(h * dpr), k = h / n, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
+    img.onload = () => { try { const cv = document.createElement('canvas'); cv.width = w; cv.height = n; cv.getContext('2d').drawImage(img, 0, 0, w, n); WMB[h] = { src: cv.toDataURL('image/png'), w: Math.round(w * k), smooth: h < 72 }; } catch (e) { /* fall back to the vector */ } done(); };
     img.onerror = done;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wordmarkSvg(n));
   });
   E.glyphsReady = Promise.all([E.glyphsReady, wmRaster(44), wmRaster(72)]);
   /** The wordmark at 44px (banner) or 72px (login and loading screens). */
-  E.wordmark = (h) => (WMB[h] ? `<img class="wm" src="${WMB[h].src}" width="${WMB[h].w}" height="${h}" alt="Epig" draggable="false">` : wordmarkSvg(h).replace('<svg ', '<svg class="wm" role="img" aria-label="Epig" '));
+  E.wordmark = (h) => (WMB[h] ? `<img class="wm${WMB[h].smooth ? ' smooth' : ''}" src="${WMB[h].src}" width="${WMB[h].w}" height="${h}" alt="Epig" draggable="false">` : wordmarkSvg(h).replace('<svg ', '<svg class="wm" role="img" aria-label="Epig" '));
 
   /* "SIM + EHR": the descriptor that stands over the Student Edition sticker. Book-face capitals, upright,
      navy, with a green cross between the two words. It is a bitmap at the same pixel density as the Epig
@@ -241,9 +249,11 @@
      edges of the S and the R and its top is the top of the capitals; nothing needs nudging in the stylesheet. */
   const SIMB = {};
   E.simmark = (capHeight, scale) => {
-    const key = capHeight + 'x' + scale;
+    // scale 2: drawn small and doubled, like the Epig wordmark beside it on the login screen.
+    // scale 1: drawn at the screen's real resolution and shown smooth, so it stays sharp on scaled displays.
+    const r = scale === 1 ? Math.max(1, window.devicePixelRatio || 1) : 1, k = scale === 1 ? 1 / r : scale, key = capHeight + 'x' + scale + 'x' + r;
     if (!SIMB[key]) {
-      const cap = capHeight / scale, face = '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif';
+      const cap = capHeight / k, face = '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif';
       const probe = document.createElement('canvas').getContext('2d');
       let size = Math.round(cap / 0.69);
       probe.font = `700 ${size}px ${face}`;
@@ -252,20 +262,20 @@
       const a = probe.measureText('SIM'), b = probe.measureText('EHR');
       const inkA = a.actualBoundingBoxLeft + a.actualBoundingBoxRight, inkB = b.actualBoundingBoxLeft + b.actualBoundingBoxRight;
       const plus = Math.max(5, Math.round(cap * 0.62)), gap = Math.max(2, Math.round(cap * 0.2)), top = Math.ceil(probe.measureText('SEHR').actualBoundingBoxAscent);
-      const w = Math.ceil(inkA + gap + plus + gap + inkB), h = top + 1;                             // one extra row for the light edge under the letters
+      const w = Math.ceil(inkA + gap + plus + gap + inkB), h = top + Math.round(r);                             // one extra row for the light edge under the letters
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
       const ctx = cv.getContext('2d');
       ctx.font = `700 ${size}px ${face}`; ctx.textBaseline = 'alphabetic';
       const xA = a.actualBoundingBoxLeft, xB = inkA + gap + plus + gap + b.actualBoundingBoxLeft;
-      ctx.fillStyle = 'rgba(255, 255, 255, .75)'; ctx.fillText('SIM', xA, top + 1); ctx.fillText('EHR', xB, top + 1);
+      ctx.fillStyle = 'rgba(255, 255, 255, .45)'; ctx.fillText('SIM', xA, top + Math.round(r)); ctx.fillText('EHR', xB, top + Math.round(r));
       ctx.fillStyle = '#12233F'; ctx.fillText('SIM', xA, top); ctx.fillText('EHR', xB, top);
       // the cross: a dark green outline one pixel thick around a lighter green plus, centred on the capitals
       const px = Math.round(inkA + gap), py = Math.round((top - plus) / 2), arm = Math.max(1, Math.round(plus / 3)), mid = Math.round((plus - arm) / 2);
-      ctx.fillStyle = '#1D5F12'; ctx.fillRect(px + mid - 1, py - 1, arm + 2, plus + 2); ctx.fillRect(px - 1, py + mid - 1, plus + 2, arm + 2);
+      const o = Math.round(r); ctx.fillStyle = '#1D5F12'; ctx.fillRect(px + mid - o, py - o, arm + 2 * o, plus + 2 * o); ctx.fillRect(px - o, py + mid - o, plus + 2 * o, arm + 2 * o);
       ctx.fillStyle = '#3DAA2B'; ctx.fillRect(px + mid, py, arm, plus); ctx.fillRect(px, py + mid, plus, arm);
-      SIMB[key] = { src: cv.toDataURL('image/png'), w: w * scale, h: h * scale };
+      SIMB[key] = { src: cv.toDataURL('image/png'), w: Math.round(w * k), h: Math.round(h * k), smooth: scale === 1 };
     }
-    return `<img class="sm" src="${SIMB[key].src}" width="${SIMB[key].w}" height="${SIMB[key].h}" alt="SIM plus EHR" draggable="false">`;
+    return `<img class="sm${SIMB[key].smooth ? ' smooth' : ''}" src="${SIMB[key].src}" width="${SIMB[key].w}" height="${SIMB[key].h}" alt="SIM plus EHR" draggable="false">`;
   };
 
   /** Ordered-dither mask at a density out of 16; used for the loading screen's stepped dissolve. */

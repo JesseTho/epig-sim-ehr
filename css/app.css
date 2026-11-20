@@ -57,7 +57,7 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
   background: var(--g-banner) 0 0 / 8px 72px repeat-x, #D6E9F9; }
 .banner > :not(.skyfx) { image-rendering: auto; position: relative; z-index: 1; } .w-mid > :not(.skyfx), .sp-in { position: relative; z-index: 1; }
 .bn-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #12233F; filter: drop-shadow(2px 3px 2px rgba(18, 35, 63, .3)); }
-.wm { flex: none; display: block; image-rendering: pixelated; }
+.wm { flex: none; display: block; image-rendering: pixelated; } .wm.smooth, .gl.smooth { image-rendering: auto; }
 /* the mascot sits tight against the wordmark: the wordmark bitmap carries its own left margin for the slant */
 /* The lockup: the pig flies in from the left with its nose tucked just behind the capital E, so pig and
    word read as one mark. The wordmark is drawn second, so it sits in front and stays fully legible. The
@@ -76,7 +76,7 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
 /* The tag set: SIM EHR over the Student Edition sticker, one block. The set is as wide as the sticker; the
    capitals above are spread to that same width, first letter flush left and last letter flush right. */
 .tagset { display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; vertical-align: top; }
-.sm { display: block; align-self: flex-start; image-rendering: pixelated; }
+.sm { display: block; align-self: flex-start; image-rendering: pixelated; } .sm.smooth { image-rendering: auto; }
 .tagset .sticker { padding-left: 0; padding-right: 0; text-align: center; }   /* as wide as the lettering above it */
 .tagset.big { gap: 8px; } .tagset.big .sticker { font-size: 14px; padding-top: 7px; padding-bottom: 8px; background: var(--g-sticker-30) 0 0 / 8px 30px repeat-x, #E6A61C; }
 
@@ -455,6 +455,8 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .w-band.foot { height: auto; min-height: 52px; display: grid; place-items: center; padding: 8px 16px; color: #F1F5E2; text-align: center; border-bottom: 0; border-top: 2px solid #F0B040; }
 .w-mid { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; gap: 44px; padding: 28px 32px;
   background: var(--g-sky) 0 0 / 8px 640px repeat-x, #E3F1FC; image-rendering: pixelated; position: relative; }
+.music-btn { position: absolute; top: 14px; right: 16px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 5px; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; font: 700 12px var(--ui); color: var(--ink); background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; box-shadow: 2px 3px 5px rgba(18, 35, 63, .3); }
+.music-btn[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #B4CB7C, 2px 3px 5px rgba(18, 35, 63, .3); } .music-btn:hover { box-shadow: inset 0 0 0 2px var(--hot-2), 2px 3px 5px rgba(18, 35, 63, .3); }
 .w-left { width: 480px; max-width: 100%; color: #14233A; }
 /* the left-hand scene: five icons scattered around the SIM EHR block, which sits in the middle */
 .scene { position: relative; height: 380px; }

@@ -17,6 +17,7 @@
   function render() {
     pendingRender = false;
     const root = $('#root');
+    if (E.music) E.music.scene(E.db.user ? null : 'login');   // the login music plays on the login screen only
     if (!E.db.user) { root.innerHTML = V.login(); $('#modal').innerHTML = ''; if (E.pal) E.pal.sync(null, false); return; }
     const r = route(), sc = $('#activity') || $('.main');
     const keep = sc && lastHash === location.hash ? sc.scrollTop : 0;
@@ -217,6 +218,7 @@
       if (E.pal) setTimeout(() => E.pal.greet(), noSplash ? 0 : 2300);
     },
     logout() { E.audit('Logged out'); E.db.user = null; E.db.openTabs = []; ui.modal = null; ui.learnWho = null; lastHash = null; E.save(); render(); },
+    musicToggle() { if (E.music) E.music.toggle(); render(); },
     help() { ui.modal = { type: 'help' }; render(); },
     closeModal() { ui.modal = null; render(); },
     listFilter(d) { ui.listFilter = d.id; render(); },

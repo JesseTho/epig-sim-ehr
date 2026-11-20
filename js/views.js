@@ -25,6 +25,7 @@
     <div class="welcome">
       <div class="w-band"></div>
       <div class="w-mid">${V.sky('lg')}
+        <button class="music-btn" data-act="musicToggle" aria-pressed="${!!(E.music && E.music.wanted)}" title="Turn the login music ${E.music && E.music.wanted ? 'off' : 'on'}">${icon('music', 24)}<span>Music: ${E.music && E.music.wanted ? 'On' : 'Off'}</span></button>
         <div class="w-left">
           <div class="scene">
             <div class="collage" aria-hidden="true">${[['results', 'c1'], ['mar', 'c2'], ['summary', 'c3'], ['learning', 'c4'], ['code', 'c5']].map(([g, c]) => `<span class="${c}">${icon(g, 96)}</span>`).join('')}</div>
