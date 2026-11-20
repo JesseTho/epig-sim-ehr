@@ -69,7 +69,7 @@
 
   /* The tag set: the SIM + EHR bitmap over the Student Edition sticker. The sticker stretches to the width of
      the lettering, so the two lines share their left and right edges. `big` is the doubled, login-size version. */
-  const tagSet = (big) => `<span class="tagset${big ? ' big' : ''}">${E.simmark(big ? 34 : 20, 2)}<span class="sticker">Student Edition</span></span>`;
+  const tagSet = (big) => `<span class="tagset${big ? ' big' : ''}">${E.simmark(big ? 34 : 19, big ? 2 : 1)}<span class="sticker">Student Edition</span></span>`;
 
   /* ================= loading screen ================= */
   V.splash = (kind) => {

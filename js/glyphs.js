@@ -150,7 +150,7 @@
      direction (facing right, toward the wordmark), so the logo and the corner assistant are plainly the same pig.
      Files: assets/logo/epig-48.png and epig-32.png. The assistant in the corner is the same sheet mirrored.
      EHR.icon('logo', size) shows the 48px bitmap, doubled with hard pixels above 56px, and the 32px one below 40px. */
-  const LOGO = { 24: 'assets/logo/epig-24.png', 32: 'assets/logo/epig-32.png', 48: 'assets/logo/epig-48.png' };
+  const LOGO = { 32: 'assets/logo/epig-32.png', 48: 'assets/logo/epig-48.png' };
   /* The small mark: the pig's face on a sky tile. Dialog title bars and anywhere under 40px. */
   G.brand = `${sh(11)}<rect x="3" y="2.500" width="26" height="25.500" rx="6.500" ${f('sky', 'blue')}/><path d="M5.200 10c0-3.600 2.400-5.400 5.600-5.400h10.400c3.200 0 5.600 1.800 5.600 5.400-6-2.200-15.600-2.200-21.600 0z" fill="url(#p-d50)"/>
     <path d="M8 13l1-6.500 5.500 3.500z" ${f('pink')}/><path d="M24 13l-1-6.500-5.500 3.500z" ${f('pink')}/><circle cx="16" cy="16.500" r="8.800" ${f('pink')}/>
@@ -159,12 +159,13 @@
   const GRID = {};   // glyphs drawn on a grid other than 32 (none at present)
   E.GLYPHS = Object.keys(G);
 
-  /* One pixel size everywhere (owner's decision): every icon is a bitmap drawn at half the size it is shown
-     and doubled with hard pixels, so one art pixel is always two screen pixels, whether the icon is 20px in a
-     list or 96px on the login screen. Glyphs are rasterised at each size on the LADDER when the page starts;
-     EHR.icon(name, size) shows the nearest one. Shown sizes are therefore 20, 24, 32, 40, 48, 64 and 96px. */
-  const SCALE = 2, LADDER = [10, 12, 16, 20, 24, 32, 48];
-  const snap = (size) => [LADDER.reduce((best, b) => (Math.abs(b * SCALE - size) < Math.abs(best * SCALE - size) ? b : best), LADDER[0]), SCALE];
+  /* Era resolution. Icons of the period were bitmaps drawn at a few fixed sizes, not vectors. Each glyph is
+     rasterised once at 16, 24, 32 and 48 pixels when the page starts, and every use shows one of those
+     bitmaps, either at its own size or exactly doubled with hard pixels (a 96px icon is the 48px bitmap
+     twice over). EHR.icon(name, size) snaps the size it is asked for to the nearest of these.
+     (A single doubled pixel size for every icon was tried and withdrawn by the owner as too harsh.) */
+  const NATIVE = [16, 24, 32, 48];
+  const snap = (size) => (size <= 18 ? [16, 1] : size <= 28 ? [24, 1] : size <= 40 ? [32, 1] : size <= 56 ? [48, 1] : size <= 72 ? [32, 2] : [48, 2]);
   const BMP = {};
   /** A self-contained SVG of one glyph at px pixels, carrying only the fills it uses, dithered for that size. */
   const svgFor = (name, px) => {
@@ -179,9 +180,7 @@
     img.onload = () => {
       try {
         const cv = document.createElement('canvas'); cv.width = cv.height = px;
-        const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, px, px);
-        // hard edges: a pixel is either there or not, as in a period bitmap (no soft anti-aliased fringe)
-        const id = ctx.getImageData(0, 0, px, px); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] >= 110 ? 255 : 0; ctx.putImageData(id, 0, 0);
+        cv.getContext('2d').drawImage(img, 0, 0, px, px);
         (BMP[name] = BMP[name] || {})[px] = cv.toDataURL('image/png');
       } catch (e) { BMP.failed = true; }
       done();
@@ -190,12 +189,12 @@
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgFor(name, px));
   });
   /** Resolves when every bitmap is ready. js/app.js waits for it before drawing the first screen. */
-  E.glyphsReady = Promise.all(E.GLYPHS.flatMap((n) => LADDER.map((px) => raster(n, px))));
+  E.glyphsReady = Promise.all(E.GLYPHS.flatMap((n) => NATIVE.map((px) => raster(n, px))));
 
   /** A glyph as markup. Decorative by default; pass a label to expose it to assistive technology.
       If the browser cannot rasterise (BMP.failed), it falls back to drawing the vector directly. */
   E.icon = (name, size, label) => {
-    const [px, k] = snap(size || 16), d = px * k, src = name === 'logo' ? LOGO[px] || LOGO[px >= 32 ? 48 : 24] : !BMP.failed && BMP[name] && BMP[name][px];
+    const [px, k] = snap(size || 16), d = px * k, src = name === 'logo' ? LOGO[px >= 48 ? 48 : 32] : !BMP.failed && BMP[name] && BMP[name][px];
     if (src) return `<img class="gl" src="${src}" width="${d}" height="${d}" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`;
     return `<svg class="gl" width="${d}" height="${d}" viewBox="0 0 ${GRID[name] || 32} ${GRID[name] || 32}" ${label ? `role="img" aria-label="${E.esc(label)}"` : 'aria-hidden="true"'} focusable="false">${svgFor(name, d).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').replace(/id="([gpc]-[a-z0-9]+)"/g, `id="$1-${name}-${d}"`).replace(/url\(#([gpc]-[a-z0-9]+)\)/g, `url(#$1-${name}-${d})`)}</svg>`;
   };
@@ -203,8 +202,8 @@
   /* The wordmark: "Epig" in heavy, wide, slanted letters, capital E and lower-case pig, a nod to the kind of
      logo it parodies. It is deliberately pig pink, never red, with a curly tail off the g, so it reads as a
      joke and not as the real company's mark. Drawn by hand (no font): three flat bands of pink inside a thick
-     plum outline. Like the glyphs it is a bitmap, rasterised at half size and shown doubled with hard pixels everywhere, the banner included, so its pixels
-     match every icon. */
+     plum outline. Like the glyphs it is a bitmap, rasterised at half size and shown doubled with hard pixels on the login and loading screens; in the
+     banner, where it is small, it is rasterised at its own size so the letters stay open. */
   const WM = [
     [0, 'M0 0h25v7.5H10.5v4.5H22.5v6H10.5v4.5H25V30H0z'],                                                                                 // E
     [29, 'M0 8h17a9 9 0 0 1 9 9v4a9 9 0 0 1-9 9H9.5v10H0zM9.5 13.5v11h7a3 3 0 0 0 3-3v-5a3 3 0 0 0-3-3z'],               // p
@@ -226,7 +225,7 @@
   };
   const WMB = {};
   const wmRaster = (h) => new Promise((done) => {
-    const n = h / 2, k = 2, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
+    const n = h >= 72 ? h / 2 : h, k = h / n, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
     img.onload = () => { try { const cv = document.createElement('canvas'); cv.width = w; cv.height = n; cv.getContext('2d').drawImage(img, 0, 0, w, n); WMB[h] = { src: cv.toDataURL('image/png'), w: w * k }; } catch (e) { /* fall back to the vector */ } done(); };
     img.onerror = done;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wordmarkSvg(n));

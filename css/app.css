@@ -238,7 +238,7 @@ input.wide { width: 100%; padding: 5px 8px; }
 .mar thead th { text-align: center; } .mar tr.grp th { text-align: left; }
 .mar .mar-med { text-align: left; min-width: 240px; max-width: 240px; padding: 5px 8px; position: sticky; left: 0; background: #fff; z-index: 2; font-weight: 400; } .mar thead .mar-med { background: #EDEBDD; z-index: 3; }
 .mar .nowcol { background: #FFF9D6; } .mar thead .nowcol { background: #F3D872; font-weight: 700; } .mar .mar-med .btn { margin-top: 4px; }
-.mchip .gl { margin: -3px 0; } .mchip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid transparent; border-radius: 2px; padding: 0 3px; font-size: 11px; font-weight: 700; white-space: nowrap; margin: 1px 0; line-height: 15px; }
+.mchip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid transparent; border-radius: 2px; padding: 0 3px; font-size: 11px; font-weight: 700; white-space: nowrap; margin: 1px 0; line-height: 15px; }
 button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var(--hot-2); }
 .mchip.given { background: var(--green-bg); color: var(--green); border-color: #9CCFB1; } .mchip.held, .mchip.refused, .mchip.dc { background: var(--face); color: #3F4233; border-color: #B9B6A4; }
 .mchip.due { background: #FFE27A; color: #3F2C00; border-color: #B88A0E; } .mchip.overdue { background: #B3261E; color: #fff; border-color: #6E150F; } .mchip.future { background: #fff; color: var(--muted); border-color: #B9B6A4; }
@@ -343,7 +343,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 .pal-hide { display: block; margin: 7px 0 0 auto; border: 0; background: none; padding: 0; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
 /* the tab that brings Truffle back */
 #pal-back { position: fixed; right: 0; bottom: 14px; z-index: 55; display: flex; align-items: center; gap: 5px; padding: 3px 9px 3px 5px; border: 1px solid var(--olive-5); border-right: 0; border-radius: 12px 0 0 12px; background: var(--note); color: var(--ink); font: 700 12px var(--title); cursor: pointer; box-shadow: 1px 2px 4px rgba(0, 0, 0, .3); }
-#pal-back i { width: 32px; height: 32px; transform: scaleX(-1); image-rendering: pixelated; background: url("../assets/assistant/pig-sheet-16.png") 0 0 / 128px 64px no-repeat; }   /* 16px cells, doubled */
+#pal-back i { width: 24px; height: 24px; transform: scaleX(-1); image-rendering: pixelated; background: url("../assets/assistant/pig-sheet-48.png") 0 0 / 96px 48px no-repeat; }
 #pal-back:hover { background: #FFF6C4; }
 @media (max-width: 700px) { #pal, #pal-back { display: none; } }
 @media (prefers-reduced-motion: reduce) { .pal-pig.flutter, .pal-pig.flutter i { animation: none !important; } }
