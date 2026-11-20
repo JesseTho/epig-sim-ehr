@@ -264,7 +264,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
    Clouds drift left to right behind the land. Now and then the mascot, a winged pig, flies through,
    its two frames alternating to flap. Markup and timing come from V.sky in js/views.js. */
 .skyfx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-.skyfx .cl { position: absolute; left: 0; image-rendering: pixelated; background-repeat: no-repeat; animation: drift linear infinite; }
+.skyfx .cl { position: absolute; left: 0; background-size: 100% 100%; background-repeat: no-repeat; animation: drift linear infinite; }
 .cl.a { width: 180px; height: 40px; background-image: var(--cloud-a); } .cl.b { width: 120px; height: 28px; background-image: var(--cloud-b); } .cl.c { width: 260px; height: 54px; background-image: var(--cloud-c); }
 @keyframes drift { from { transform: translateX(-270px); } to { transform: translateX(100vw); } }
 .skyfx .land { position: absolute; left: 0; right: 0; bottom: 0; image-rendering: pixelated; }

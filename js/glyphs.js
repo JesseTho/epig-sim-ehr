@@ -337,6 +337,15 @@
   // --land has whole numbers of waves across its width, so it tiles left and right without a seam.
   set('--land', land(2400, 210, ridges(210).slice(0, 2)));
   set('--land-near', land(2400, 210, ridges(210).slice(2)));
+  /* Scenery artwork (assets/scene): supplied art, one cut per screen scaling so one art pixel is one real pixel
+     (the asset rule in DESIGN.md). These replace the scenery drawn above; the drawn versions remain as the
+     fallback while a file loads. Addresses are absolute because a url() in a CSS variable resolves against
+     the stylesheet that uses it. */
+  const scene = (v, name, cuts, w) => set(v, new URL(`assets/scene/${name}-${cutFor(cuts, w)}.png`, document.baseURI).href);
+  scene('--cloud-a', 'cloud-a', [180, 225, 270, 360], 180); scene('--cloud-b', 'cloud-b', [120, 150, 180, 240], 120); scene('--cloud-c', 'cloud-c', [260, 325, 390, 520], 260);
+  // end scenery artwork
+
+
   /* The hospital on the hill. ASSET RULE (see DESIGN.md): one art pixel is one real screen pixel, hard edges,
      never shown enlarged. So it is drawn on a 144 x 112 grid scaled by the screen's pixel ratio, with every
      rectangle snapped to whole pixels, and its shading is a one-pixel ordered dither. No image file. */
@@ -366,4 +375,5 @@
     R(LINE, 62, 89, 20, 23); R(DOOR, 63, 90, 18, 22); R(GLASS, 65, 92, 6, 10); R(GLASS, 73, 92, 6, 10); R('#FFFFFF', 65, 92, 2, 2); R('#FFFFFF', 73, 92, 2, 2); R('#F2C94C', 71, 101, 1, 2);
     return cv.toDataURL('image/png');
   })());
+  scene('--hospital', 'hospital', [144, 180, 216, 288], 144);   // supplied art; the drawn one above is the fallback
 })();
