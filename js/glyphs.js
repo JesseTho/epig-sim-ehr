@@ -343,7 +343,10 @@
      the stylesheet that uses it. */
   const scene = (v, name, cuts, w) => set(v, new URL(`assets/scene/${name}-${cutFor(cuts, w)}.png`, document.baseURI).href);
   scene('--cloud-a', 'cloud-a', [180, 225, 270, 360], 180); scene('--cloud-b', 'cloud-b', [120, 150, 180, 240], 120); scene('--cloud-c', 'cloud-c', [260, 325, 390, 520], 260);
+  scene('--land', 'hills-far', [2400, 3000, 3600, 4800], 2400); scene('--land-near', 'hills-near', [2400, 3000, 3600, 4800], 2400);
+  scene('--land-banner', 'hills-banner-far', [4800, 6000, 7200, 9600], 4800); scene('--land-banner-near', 'hills-banner-near', [4800, 6000, 7200, 9600], 4800);
   // end scenery artwork
+
 
 
   /* The hospital on the hill. ASSET RULE (see DESIGN.md): one art pixel is one real screen pixel, hard edges,
