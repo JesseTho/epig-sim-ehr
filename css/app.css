@@ -69,8 +69,8 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
    which puts the middle of the capital E on that same line. The tag block is as tall as the pig, so their
    tops and bottoms line up too. Everything in the banner sits 3px high to clear the hills. */
 .banner { padding-bottom: 6px; }   /* the level widget and user block ride the same line as the lockup */
-.bn-brand .gl + .wm { margin-left: -21px; transform: translateY(5px); }
-.w-brand > .gl, .sp-in h1 > .gl { transform: translateY(-6px); } .w-brand .gl + .wm, .sp-in h1 .gl + .wm { margin-left: -22px; transform: translateY(10px); }
+.bn-brand .gl + .wm { margin-left: -20.5px; transform: translateY(5px); }
+.w-brand > .gl, .sp-in h1 > .gl { transform: translateY(-6px); } .w-brand .gl + .wm, .sp-in h1 .gl + .wm { margin-left: -20px; transform: translateY(10px); }
 /* What it is, said plainly beside the name: "EHR Simulator". Set in the book face so it reads as part of the
    title, not as a control. In the banner it sits above the edition sticker. */
 /* The tag set: SIM EHR over the Student Edition sticker, one block. The set is as wide as the sticker; the
