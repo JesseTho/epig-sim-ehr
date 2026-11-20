@@ -148,7 +148,7 @@
   /* ---------- game layer: experience points, levels, badges ----------
      Points reward doing the work and getting the knowledge check right first time.
      Nothing is ever deducted, so there is no incentive to avoid trying. */
-  E.XP = { task: 50, quizRight: 100, quizTried: 25, pig: 1, pigMax: 10, star: 50, exam: 300, game: 10, gameMax: 50, shift: 200 };   // shift: a full score on a shift (best result on each shift counts, in proportion)   // game: per perfect mini-game round, up to gameMax per game   // star: per mission star (best result counts); exam: passing the proficiency check   // pigMax: the most bonus points flying pigs can ever add
+  E.XP = { task: 50, quizRight: 100, quizTried: 25, pig: 1, pigMax: 10, star: 50, exam: 300, game: 10, gameMax: 50, shift: 200, case: 60 };   // case: per star on a PBL case (best result on each case counts)     // shift: a full score on a shift (best result on each shift counts, in proportion)   // game: per perfect mini-game round, up to gameMax per game   // star: per mission star (best result counts); exam: passing the proficiency check   // pigMax: the most bonus points flying pigs can ever add
   /** How many flying pigs this learner has caught. Every catch is counted, even past the bonus limit. */
   E.pigs = (pr) => pr.pigs || pr.bonus || 0;
   E.LEVELS = [[0, 'New Arrival'], [400, 'Observer'], [900, 'Clerk'], [1600, 'Sub-Intern'], [2400, 'Acting Intern'], [3100, 'Ready for the Wards']];
@@ -171,7 +171,7 @@
   E.game = (pr) => {
     const s = E.progressSummary(pr);
     const xp = s.tasksDone * E.XP.task + s.quizCorrect * E.XP.quizRight + (s.quizAnswered - s.quizCorrect) * E.XP.quizTried + Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax)   // flying pigs: a small bonus, capped
-      + E.missionStars(pr) * E.XP.star + (pr.exam && pr.exam.passed ? E.XP.exam : 0) + (E.gameXp ? E.gameXp(pr) : 0) + (E.shiftXp ? E.shiftXp(pr) : 0);
+      + E.missionStars(pr) * E.XP.star + (pr.exam && pr.exam.passed ? E.XP.exam : 0) + (E.gameXp ? E.gameXp(pr) : 0) + (E.shiftXp ? E.shiftXp(pr) : 0) + (E.caseXp ? E.caseXp(pr) : 0);
     let level = 0;
     E.LEVELS.forEach(([min], i) => { if (xp >= min) level = i; });
     const floor = E.LEVELS[level][0], next = E.LEVELS[level + 1] ? E.LEVELS[level + 1][0] : null;

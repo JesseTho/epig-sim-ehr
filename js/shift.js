@@ -17,7 +17,14 @@
    orders can be signed, three suspends privileges until a five-question remediation round is passed.
 
    FACULTY: the shifts, the harm rules and the remediation questions are data in this file and can be edited
-   here. Timings are in EHR.CONFIG.shift (js/config.js). Clinical content is simplified for teaching. */
+   here. Timings are in EHR.CONFIG.shift (js/config.js). Clinical content is simplified for teaching.
+
+   TIME: this file has its own hospital hour, minutes x 60 / (endHour - startHour) real seconds: 80 with the
+   defaults. It runs the shift clock and every harm rescue timer, in a shift or out of one. A PBL case keeps a
+   slower hour of its own (EHR.CONFIG.cases.hourSeconds, 240 by default) for its decision tree; a rescue timer
+   that starts during a case still counts in this file's 80-second hours. Every one of these clocks stops while
+   the learner has paused (EHR.pauseChecks), the tab is hidden, a question dialog is open or privileges are
+   suspended. */
 (function () {
   const E = window.EHR, V = E.V, esc = E.esc, icon = E.icon;
   const CFG = () => Object.assign({ minutes: 16, startHour: 7, endHour: 19, rounds: 8.5, dayWork: 9.5, signOut: 17.5, harmDelay: 30, rescueHours: 3, strikes: 3, remediationQuestions: 5, remediationPass: 4 }, (E.CONFIG && E.CONFIG.shift) || {});
@@ -40,6 +47,14 @@
   const myShift = () => (E.db && E.db.user ? shiftOf(E.progress()) : null);
   const say = (text, title, glyph) => { if (E.app) E.app.toast(text, title, glyph); };
   const pose = (name, ms) => { if (E.pal) E.pal.pose(name, ms || 4000); };
+  const same = (a, b) => (E.sameUser ? E.sameUser(a, b) : a === b);
+  /* The learner's own pause, for everyone who keeps a clock (js/core.js reads E.pauseChecks to hold lab results
+     and simulated staff). A hidden tab pauses a shift too, so that is covered here as well. */
+  (E.pauseChecks = E.pauseChecks || []).push(() => { const a = myShift(); return !!(a && a.paused && !a.over); });
+  /** True while anything that registered a pause check says the learner has paused. A broken check never stops the clock. */
+  const pausedAnywhere = () => (E.pauseChecks || []).some((f) => { try { return !!f(); } catch (e) { return false; } });
+  /** Hospital time left on a crisis before the rapid response, such as "2 h 35 min". */
+  const leftText = (c) => { const m = Math.ceil((Math.max(0, c.left || 0) / hourMs()) * 60); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; };
 
   /* =====================================================================================================
      1. HARM RULES
@@ -152,7 +167,7 @@
   };
   /** A harmful order was stopped before it reached the patient. Called by the simulated attending (js/sim.js). */
   E.nearMiss = (p, o, why, who) => {
-    if (!E.db.user || o.by !== E.db.user.name) return;
+    if (!E.db.user || !same(o.by, E.db.user.name)) return;
     record('nearmiss', p, o, why, { by: who, outcome: 'stopped' });
     E.audit(`Near miss recorded: ${o.name} stopped by ${who} (${why})`, p.id);
     say(`${who.split(',')[0]} stopped ${o.name} before it reached the patient. It goes on your safety record as a near miss, not as harm.`, `Near miss — ${p.name}`, 'warn');
@@ -160,12 +175,19 @@
   };
   /** Orders cannot be entered on a patient who has been moved to intensive care. Returns the reason, or ''. */
   E.orderLock = (p) => (p && p.icu ? `${p.name} was transferred to intensive care at ${E.fmtTime(p.icu.ts)}. The ICU team writes the orders now. This chart takes no new orders until the sim data is reset.` : '');
-  /** After a second harm event the attending wants a debrief before more orders are signed. Opens it; true if one is owed. */
-  E.safetyGate = () => {
+  /** After a second harm event the attending wants a debrief before more orders are signed. Opens it; true if one is owed.
+      The attending's own words are "look after the patient first", so orders for a patient who is in crisis right
+      now (or the patient of a running case, whose course the case decides) go through; everything else waits. */
+  E.safetyGate = (p) => {
     const s = E.safety();
-    if (!s.debriefDue) return false;
+    if (!s.debriefDue || (p && gateOpenFor(p))) return false;
     openDebrief();
     return true;
+  };
+  const gateOpenFor = (p) => {
+    const me = E.db.user.name, act = E.progress().active;
+    if (crises().some((c) => c.pid === p.id && c.state === 'open' && same(c.who, me))) return true;
+    return !!(act && act.type === 'case' && E.CASES && (E.CASES.find((x) => x.id === act.id) || {}).pid === p.id);
   };
 
   /* ---------- escalation ---------- */
@@ -181,22 +203,47 @@
       pose('sad', 6000);
     } else if (s.strikes === max - 1) {
       s.debriefDue = ev.id;
-      E.message({ type: 'Safety', from: att, patientId: p.id, act: 'orders', critical: true, subject: `Debrief needed before you sign more orders — ${p.name}`, body: `This is the second time one of your orders has harmed a patient. Look after ${mrms(p)} first: stop the order and treat what it caused.\n\nThen, before you sign anything else, I need three questions answered about what went wrong. The debrief opens when you next try to sign orders, or from the notice in the chart.\n\nOne more harm event and your privileges are suspended.` });
+      // orders for this patient still go through while they are in crisis (E.safetyGate), so the advice can be followed
+      E.message({ type: 'Safety', from: att, patientId: p.id, act: 'orders', critical: true, subject: `Debrief needed before you sign more orders — ${p.name}`, body: `This is the second time ${ev.source === 'case' ? 'a decision of yours' : 'one of your orders'} has harmed a patient. Look after ${mrms(p)} first${ev.source === 'case' ? '' : ': stop the order and treat what it caused'}. Orders for ${him(p)} still go through while ${he(p).toLowerCase()} needs you.\n\nThen, before you sign anything else, I need three questions answered about what went wrong. The debrief opens when you next try to sign orders for another patient, or from the notice in the chart.\n\nOne more harm event and your privileges are suspended.` });
     } else {
-      E.message({ type: 'Safety', from: att, patientId: p.id, act: 'orders', critical: true, subject: `About ${p.name}`, body: `I have been told that ${ev.order} harmed ${mrms(p)}: ${ev.title.toLowerCase()}.\n\nDeal with it now: the nurse's page says what ${he(p).toLowerCase()} needs. This is on your safety record as one harm event. A second one means a debrief with me before you sign more orders. A third suspends your privileges.` });
+      E.message({ type: 'Safety', from: att, patientId: p.id, act: 'orders', critical: true, subject: `About ${p.name}`, body: ev.source === 'case'
+        ? `I have been told that ${mrms(p)} was harmed: ${ev.title.toLowerCase()}.\n\nThis is on your safety record as one harm event. A second one means a debrief with me before you sign more orders. A third suspends your privileges.`
+        : `I have been told that ${ev.order} harmed ${mrms(p)}: ${ev.title.toLowerCase()}.\n\nDeal with it now: the nurse's page says what ${he(p).toLowerCase()} needs. This is on your safety record as one harm event. A second one means a debrief with me before you sign more orders. A third suspends your privileges.` });
     }
   }
+
+  /** A harm-graded step in a PBL case (js/cases.js calls this). It goes on the safety record and counts toward the
+      page, debrief and suspension exactly like harm from a harm rule, but no rescue timer starts: the case tree
+      already decides what happens to the patient next. Returns the event. */
+  E.caseHarm = ({ pid, title, detail } = {}) => {
+    if (!E.db || !E.db.user) return null;
+    const p = E.pt(pid) || { id: pid, name: 'A case patient', sex: 'F', attending: 'Your attending' }, act = E.progress().active;
+    const ev = record('harm', p, null, title || 'Harm in a case', { source: 'case', detail: detail || '', outcome: 'case', caseId: act && act.type === 'case' ? act.id : null });
+    E.audit(`Harm event recorded in a case: ${ev.title}`, p.id);
+    pose('gasp', 5000);
+    escalate(ev, p);
+    return ev;
+  };
 
   /* ---------- the debrief after a second harm event: three questions about what went wrong ---------- */
   function openDebrief() {
     const s = E.safety(), ev = s.events.find((e) => e.id === s.debriefDue) || s.events.filter((e) => e.kind === 'harm').pop();
-    const r = ruleById(ev && ev.rule) || E.HARM_RULES[0], others = shuffle(E.HARM_RULES.filter((x) => x !== r));
-    const mk = (q, key, why) => { const options = shuffle([r[key]].concat(others.slice(0, 3).map((x) => x[key]))); return { q, options, answer: options.indexOf(r[key]), why }; };
-    E.ui.modal = { type: 'safetyDebrief', evId: ev.id, wrong: 0, picked: {}, qs: [
-      mk(`What made ${ev.order} unsafe for ${ev.patient}?`, 'hazard', 'The hazard was in the chart before the order was signed.'),
-      mk('Where could you have seen that before you signed?', 'where', 'Looking there first takes a few seconds.'),
-      mk('Once the patient got worse, what came first?', 'response', 'Stop what is causing the harm, then treat what it caused.'),
-    ] };
+    if (!ev) return;
+    let qs;
+    if (ev.source === 'case') {
+      // a case has no harm rule to ask about, so the questions are the general ones from the remediation bank
+      qs = shuffle(E.REMEDIATION.filter((q) => !q.rule)).slice(0, 3).map((q) => { const options = shuffle(q.options); return { q: q.q, options, answer: options.indexOf(q.options[q.answer]), why: q.why, src: options.map(() => '') }; });
+    } else {
+      const r = ruleById(ev.rule) || E.HARM_RULES[0], others = shuffle(E.HARM_RULES.filter((x) => x !== r)).slice(0, 3);
+      // each wrong option belongs to another harm rule; saying which one is the reason it is wrong here
+      const mk = (q, key, why) => { const from = shuffle([r].concat(others)), options = from.map((x) => x[key]); return { q, options, answer: from.indexOf(r), why, src: from.map((x) => (x === r ? '' : x.title)) }; };
+      qs = [
+        mk(`What made ${ev.order} unsafe for ${ev.patient}?`, 'hazard', 'The hazard was in the chart before the order was signed.'),
+        mk('Where could you have seen that before you signed?', 'where', 'Looking there first takes a few seconds.'),
+        mk('Once the patient got worse, what came first?', 'response', 'Stop what is causing the harm, then treat what it caused.'),
+      ];
+    }
+    E.ui.modal = { type: 'safetyDebrief', evId: ev.id, wrong: 0, picked: {}, missed: {}, qs };
     if (E.app) E.app.render();
   }
 
@@ -228,7 +275,7 @@
   function scan() {
     const u = E.db.user; let ch = false;
     E.db.patients.forEach((p) => p.orders.forEach((o) => {
-      if (o.harmChk || !o.signedTs || o.signedTs < E.db.createdAt || o.by !== u.name || !['Active', 'In process', 'Completed'].includes(o.status)) return;
+      if (o.harmChk || !o.signedTs || o.signedTs < E.db.createdAt || !same(o.by, u.name) || !['Active', 'In process', 'Completed'].includes(o.status)) return;
       o.harmChk = true; ch = true;
       if (p.icu) return;
       const r = E.harmRule(p, o);
@@ -236,7 +283,7 @@
     }));
     return ch;
   }
-  const treated = (c, p, need) => need.every((g) => p.orders.some((x) => x.by === c.who && x.ts >= c.onsetTs && g.includes(x.catId) && !['Declined', 'Discontinued', 'Draft'].includes(x.status)));
+  const treated = (c, p, need) => need.every((g) => p.orders.some((x) => same(x.by, c.who) && x.ts >= c.onsetTs && g.includes(x.catId) && !['Declined', 'Discontinued', 'Draft'].includes(x.status)));
   function toIcu(c, p, why) {
     c.state = 'icu'; c.endTs = Date.now();
     crises().forEach((x) => { if (x !== c && x.pid === p.id && (x.state === 'open' || x.state === 'pending')) { x.state = 'icu'; x.endTs = Date.now(); const e2 = E.safety().events.find((e) => e.id === x.eventId); if (e2) e2.outcome = 'icu'; } });
@@ -252,7 +299,7 @@
     let ch = scan();
     const me = E.db.user.name;
     crises().forEach((c) => {
-      if (c.who !== me || !['pending', 'open'].includes(c.state)) return;
+      if (!same(c.who, me) || !['pending', 'open'].includes(c.state)) return;
       const p = E.pt(c.pid), o = c.orderId && p.orders.find((x) => x.id === c.orderId), r = c.kind === 'harm' ? ruleById(c.rule) : null;
       if (c.state === 'pending') {
         if (c.wait > 0) return;
@@ -311,8 +358,15 @@
     rescued: (evId) => (c) => c.crises.some((x) => x.evId === evId && x.state === 'rescued'),
     /** Never tried to order anything with these tags for this patient during the shift (declined attempts count as trying). */
     avoided: (...tags) => (c) => !c.tried.some((o) => tagsOf(o).some((t) => tags.includes(t))),
-    /** The first chart the learner looked at after the event was this patient's. */
-    first: () => (c) => { if (c.seen) return true; const a = c.all.filter((x) => x.patientId && /^(Viewed|Opened)/.test(x.action)).pop(); return !!a && a.patientId === c.pid; },
+    /** Of two pages that arrived together, the learner acted on this patient's (opened the chart, ordered, wrote)
+        before acting on the other one, the `other` event. Reading both messages first is triage, not a choice, so
+        reading does not count as acting. Never acting on this one fails; never acting on the other is fine. */
+    first: (other) => (c) => {
+      const acted = (pid, from) => { const t = c.all.filter((x) => x.patientId === pid && x.ts >= from && !/^Read message|^Marked message/.test(x.action)).map((x) => x.ts); return t.length ? Math.min(...t) : Infinity; };
+      const mine = c.seen ? c.from : acted(c.pid, c.from), od = c.def(other), oFrom = od && c.fired[other];
+      const theirs = oFrom ? (c.seenOf(other) ? oFrom : acted(od.pid, oFrom)) : Infinity;
+      return mine < Infinity && mine <= theirs;
+    },
   };
   const lv = (k) => (p) => { const l = E.latestLab(p, k), d = E.LABS[k]; return `${E.labVal(k, l.value)}${d.unit ? ' ' + d.unit : ''}`; };
   const older = (k) => (p) => { const d = E.LABS[k], vals = p.labs.filter((l) => k in l.values).sort((a, b) => b.ts - a.ts).slice(1).map((l) => l.values[k]); return vals.concat([vals[0] * 1.2, vals[0] * 0.8, vals[0] * 1.35]).map((v) => `${E.labVal(k, v)}${d.unit ? ' ' + d.unit : ''}`); };
@@ -447,7 +501,7 @@
         { ev: 'af', pid: 'p3', text: 'Ordered an ECG for a fast, irregular heart rate', why: 'An ECG confirms the rhythm before anything is done about it.', test: X.ordered('ecg') },
         { ev: 'af', pid: 'p3', text: 'Checked his electrolytes', why: 'Low potassium or magnesium makes a fast atrial fibrillation harder to control.', test: X.ordered('bmp', 'cmp', 'mg') },
         { ev: 'bleed', pid: 'p5', text: 'Answered Mr. Chen’s rebleed with a CBC and fluids or blood', why: 'A fast heart rate and a falling blood pressure after a GI bleed mean rebleeding until proven otherwise.', test: X.rescued('bleed') },
-        { ev: 'bleed', pid: 'p5', text: 'Went to Mr. Chen before the page about visiting hours', why: 'Two pages arrived together. The unstable patient goes first; the other can be told when you will come.', test: X.first() },
+        { ev: 'bleed', pid: 'p5', text: 'Went to Mr. Chen before the page about visiting hours', why: 'Two pages arrived together. The unstable patient goes first; the other can be told when you will come.', test: X.first('visit') },
         { ev: 'bleed', pid: 'p5', text: 'Ordered a type and screen so blood would be ready', why: 'Blood cannot be given until it is matched. Ordering early saves time if he needs it.', test: X.ordered('ts') },
         GAP_X,
       ],
@@ -465,7 +519,7 @@
 
   /* ---------- the clock ---------- */
   let last = Date.now();
-  const holding = () => document.hidden || E.suspended() || (E.ui.modal && ['rounds', 'safetyDebrief'].includes(E.ui.modal.type));
+  const holding = () => document.hidden || E.suspended() || (E.ui.modal && ['rounds', 'safetyDebrief', 'scene'].includes(E.ui.modal.type));   // 'scene': a cutscene or consequence window (js/world.js)
   /** Move sim time on by however long has passed since the last call. Time does not pass while the shift is
       paused, the tab is hidden, the attending is asking a question, or privileges are suspended. */
   function advance() {
@@ -524,7 +578,7 @@
     const mine = E.db.audit.filter((x) => x.user === me && x.ts >= a.start);
     const ctx = (pid, from, evId) => {
       const p = E.pt(pid), all = mine.filter((x) => x.ts >= from);
-      return { pid, seen: !!(evId && a.seen[evId]), all, audit: all.filter((x) => x.patientId === pid),
+      return { pid, from, fired: a.fired, def: (id) => sh.events.find((e) => e.id === id), seenOf: (id) => !!a.seen[id], seen: !!(evId && a.seen[evId]), all, audit: all.filter((x) => x.patientId === pid),
         orders: p.orders.filter((o) => o.by === me && o.ts >= from && !['Declined', 'Draft'].includes(o.status)),
         tried: p.orders.filter((o) => o.by === me && o.ts >= a.start),
         notes: p.notes.filter((n) => n.author === me && n.ts >= from), crises: crises().filter((x) => x.pid === pid && x.shift === a.id && x.onsetTs >= a.start) };

@@ -40,7 +40,7 @@
     if (bounce) {
       const gone = Date.now() - bounce.at;
       if (gone > 760) bounce = null;
-      else $('.tools .tool').filter((x) => (x.getAttribute('href') || x.dataset.act) === bounce.key).forEach((x) => { const gl = $('.gl', x); if (gl) { gl.style.animationDelay = -gone + 'ms'; gl.classList.add('bounce'); } });
+      else $$('.tools .tool').filter((x) => (x.getAttribute('href') || x.dataset.act) === bounce.key).forEach((x) => { const gl = $('.gl', x); if (gl) { gl.style.animationDelay = -gone + 'ms'; gl.classList.add('bounce'); } });
     }
   }
   const commit = () => { E.save(); render(); };

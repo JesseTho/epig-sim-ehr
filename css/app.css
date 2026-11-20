@@ -658,3 +658,100 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .ib-msg { padding: 14px 16px; max-width: 900px; } .ib-msg pre.doc { max-width: none; }
 .ib-none { margin: auto; text-align: center; color: var(--muted); padding: 30px; } .ib-none p { margin: 8px 0 0; }
 @media (max-width: 1000px) { .ib-folders { width: 160px; } .ib-head, .ib-row { grid-template-columns: 14px 100px minmax(0, 1fr) 96px; } .ib-head > :nth-child(4), .ib-head > :nth-child(5), .ib-row .ib-pt, .ib-row .ib-from { display: none; } }
+
+/* =====================================================================================================
+   PBL cases (js/cases.js) and the world outside the chart (js/world.js). See docs/cases-and-world-plan.md.
+   ===================================================================================================== */
+/* ---------- cases: dock, debrief, tree ---------- */
+.case-now { color: var(--ink); } .dock-list small { font-variant-numeric: tabular-nums; }
+.case-end { font: 15px/1.5 var(--book); max-width: 70ch; margin: 8px 0 4px; }
+.case-path { list-style: none; margin: 0; padding: 0; } .case-path li { display: flex; gap: 12px; padding: 5px 0; border-bottom: 1px dotted var(--line); }
+.case-path li > span { font: 700 12px var(--title); color: var(--olive-6); min-width: 38px; padding-top: 1px; } .case-path small { display: block; color: var(--muted); margin-top: 2px; }
+.case-issues { margin: 0 0 12px; padding-left: 22px; } .case-issues li { margin: 4px 0; font: 14px/1.45 var(--book); max-width: 76ch; }
+.tree { overflow-x: auto; padding-bottom: 4px; } .tree ul { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--line-2, #D9D6C6); } .tree > ul { border: 0; padding: 0; }
+.tree li { margin: 6px 0; padding-left: 8px; } .tree > ul > li { padding: 0; }
+.tr-edge { display: block; color: var(--muted); margin-bottom: 2px; } .tree li.on > .tr-edge { color: var(--ink); font-weight: 700; }
+.tr-node { display: block; width: fit-content; max-width: 62ch; padding: 3px 9px; border: 1px solid var(--line); background: #fff; } .tr-node small { display: block; font-weight: 400; color: var(--muted); }
+.tr-node.on { border-color: var(--olive-5); background: var(--sel); box-shadow: inset 3px 0 0 var(--olive-5); } .tr-node.ref { border-style: dashed; font-style: italic; color: var(--muted); }
+.tr-you { margin-left: 4px; font: 700 10px var(--ui); text-transform: uppercase; letter-spacing: .05em; color: var(--green); }
+
+/* ---------- the banner stage: time of day, the ruler, the two buildings and whatever is crossing ---------- */
+.banner > .spacer { align-self: stretch; min-width: 0; container-type: inline-size; }
+.wl { position: absolute; left: 8px; right: 8px; top: 0; bottom: -6px; overflow: hidden; image-rendering: pixelated; }
+@container (max-width: 380px) { .wl { display: none; } }
+.wl > * { position: absolute; }
+.wl-rule { left: 146px; right: 52px; top: 6px; height: 1px; background: rgba(18, 35, 63, .55); }
+.wl-tk { top: 6px; width: 1px; height: 3px; background: rgba(18, 35, 63, .6); } .wl-tk.big { height: 6px; }
+.wl-hr { top: 13px; transform: translateX(-50%); font: 700 9px/1 var(--ui); color: #12233F; opacity: .8; image-rendering: auto; }
+.wl-band { top: 3px; height: 3px; opacity: .85; } .wl-band.a { background: #F7C948; } .wl-band.b { background: #9CCFB1; } .wl-band.c { background: #C3B1E6; }
+.wl-pin { top: 2px; width: 7px; height: 7px; margin-left: -4px; transform: rotate(45deg); border: 1px solid #12233F; background: #F7C948; pointer-events: auto; cursor: pointer; }
+.wl-pin.k-crit { background: #E5372B; } .wl-pin.k-result { background: #6FA8E8; } .wl-pin.k-admit { background: #5DBB63; } .wl-pin:hover { outline: 2px solid #fff; }
+.wl-now { top: 10px; transform: translateX(-50%); padding: 1px 4px 2px; font: 700 10px/1 var(--title); color: #fff; background: #12233F; border-radius: 2px; image-rendering: auto; font-variant-numeric: tabular-nums; }
+.wl-now::before { content: ""; position: absolute; left: 50%; top: -5px; width: 1px; height: 5px; background: #12233F; } .wl-now.paused { background: #A8690A; } .wl-now.free::before { display: none; } .wl-now.free { opacity: .92; }
+.wl-night ~ .wl-hr { color: #E8ECF7; } .wl-night ~ .wl-rule, .wl-night ~ .wl-tk { background: rgba(232, 236, 247, .7); }
+.wl-orb { margin-left: -8px; } .wl-orb.sun { width: 17px; height: 17px; background: var(--wl-sun) 0 0 / 17px 17px no-repeat; } .wl-orb.moon { width: 13px; height: 13px; background: var(--wl-moon) 0 0 / 13px 13px no-repeat; }
+.wl-hosp { left: 62px; bottom: 6px; width: 36px; height: 32px; background: var(--wl-hosp) 0 0 / 36px 32px no-repeat; pointer-events: auto; }
+.wl-hosp b { position: absolute; left: 38px; bottom: 0; min-width: 14px; padding: 1px 3px; text-align: center; font: 700 9px/1 var(--ui); color: #12233F; background: #fff; border: 1px solid #12233F; border-radius: 2px; image-rendering: auto; }
+.wl-beacon { position: absolute; left: 15px; top: -4px; width: 6px; height: 6px; border-radius: 50%; background: #FF2A1A; box-shadow: 0 0 0 2px rgba(255, 42, 26, .4); animation: wl-blink .6s steps(1, end) infinite; }
+@keyframes wl-blink { 50% { opacity: 0; } }
+.wl-lab { right: 0; bottom: 6px; width: 30px; height: 26px; background: var(--wl-lab) 0 0 / 30px 26px no-repeat; pointer-events: auto; } .wl-lab.on { background-image: var(--wl-lab-on); }
+/* the lab is busy: it squashes and hops from its base for as long as any test is in process */
+.wl-lab.on { transform-origin: 50% 100%; animation: wl-busy .62s cubic-bezier(.3, 0, .4, 1) infinite; }
+@keyframes wl-busy { 0%, 100% { transform: translateY(0) scale(1); } 18% { transform: translateY(0) scale(1.12, .84); } 48% { transform: translateY(-5px) scale(.93, 1.1); } 74% { transform: translateY(0) scale(1.07, .92); } 88% { transform: translateY(-1px) scale(.98, 1.03); } }
+@media (prefers-reduced-motion: reduce) { .wl-lab.on { animation: none; } }
+.wl-act { animation-timing-function: linear; animation-fill-mode: both; }
+.wl-pig { width: 24px; height: 24px; } .wl-pig.out { animation-name: wl-out; } .wl-pig.back { animation-name: wl-back; }
+.wl-pig .gl { position: absolute; left: 0; top: 0; animation: flap-a .34s steps(1, end) infinite; image-rendering: auto; } .wl-pig .gl + .gl { animation-name: flap-b; } .wl-pig.back .gl { transform: scaleX(-1); }
+.wl-load { position: absolute; left: 10px; top: 19px; } .wl-load.tube { width: 5px; height: 10px; background: var(--wl-tube) 0 0 / 5px 10px no-repeat; }
+.wl-load.sheet { width: 8px; height: 10px; background: var(--wl-sheet) 0 0 / 8px 10px no-repeat; } .wl-load.sheet.crit { background-image: var(--wl-sheet-crit); }
+@keyframes wl-out { 0% { left: 84px; bottom: 26px; opacity: 0; } 8% { opacity: 1; } 50% { bottom: 40px; } 92% { opacity: 1; } 100% { left: calc(100% - 46px); bottom: 22px; opacity: 0; } }
+@keyframes wl-back { 0% { left: calc(100% - 46px); bottom: 22px; opacity: 0; } 8% { opacity: 1; } 50% { bottom: 40px; } 92% { opacity: 1; } 100% { left: 84px; bottom: 26px; opacity: 0; } }
+.wl-van { bottom: 5px; width: 30px; height: 16px; background: 0 0 / 30px 16px no-repeat; } .wl-van.amb { background-image: var(--wl-amb); transform: scaleX(-1); animation-name: wl-amb; } .wl-van.car { background-image: var(--wl-car); animation-name: wl-car; }
+@keyframes wl-amb { 0% { left: 100%; } 85% { left: 100px; opacity: 1; } 100% { left: 96px; opacity: 0; } }
+@keyframes wl-car { 0% { left: 92px; opacity: 0; } 12% { left: 102px; opacity: 1; } 100% { left: 100%; } }
+/* patients on foot: in from the left edge to the hospital door, and out the same way. Two frames, swapped like the pigs' wings. */
+.wl-person { bottom: 5px; width: 10px; height: 18px; } .wl-person.walk { animation-name: wl-walk; } .wl-person.leave { animation-name: wl-leave; transform: scaleX(-1); }
+.wl-person i { position: absolute; inset: 0; background: 0 0 / 10px 18px no-repeat; animation: flap-a .3s steps(1, end) infinite; } .wl-person i + i { animation-name: flap-b; }
+@keyframes wl-walk { 0% { left: -12px; } 90% { left: 70px; opacity: 1; } 100% { left: 76px; opacity: 0; } }
+@keyframes wl-leave { 0% { left: 76px; opacity: 0; } 10% { left: 70px; opacity: 1; } 100% { left: -12px; } }
+
+/* with the ruler off, what has already happened stands as small flags on the grass */
+.wl-flag { bottom: 5px; width: 8px; height: 12px; border-left: 1px solid #12233F; pointer-events: auto; cursor: pointer; } .wl-flag::after { content: ""; position: absolute; left: 0; top: 0; width: 7px; height: 5px; background: #F7C948; box-shadow: 0 0 0 1px #12233F; }
+.wl-flag.k-crit::after { background: #E5372B; } .wl-flag.k-result::after { background: #6FA8E8; } .wl-flag.k-admit::after { background: #5DBB63; } .wl-flag:hover::after { box-shadow: 0 0 0 1px #12233F, 0 0 0 3px #fff; }
+
+/* ---------- the cutscene window ---------- */
+.modal.cut { width: 660px; } .cut-b { padding: 10px; }
+.cut-stage { position: relative; height: 180px; overflow: hidden; border: 2px solid #fff; box-shadow: 0 0 0 1px #47571F; background: #10141C; image-rendering: pixelated; }
+.cut-sky { background-size: 8px 180px; background-repeat: repeat-x; } .cut-sky > * { position: absolute; }
+.cut-land { left: 0; right: 0; bottom: 0; height: 44px; background: var(--land-banner) 62% 100% / 4800px 44px no-repeat; } .cut-land.near { background-image: var(--land-banner-near); }
+.cut-hosp { left: 56px; bottom: 22px; width: 144px; height: 112px; background: var(--hospital) 0 0 / 144px 112px no-repeat; }
+.cut-van { bottom: 12px; width: 60px; height: 32px; background: 0 0 / 60px 32px no-repeat; }
+.cut-van.amb { background-image: var(--wl-amb2); transform: scaleX(-1); animation: cut-amb 3.4s cubic-bezier(.2, .7, .3, 1) both; } @keyframes cut-amb { from { left: 100%; } to { left: 214px; } }
+.cut-van.car { background-image: var(--wl-car2); left: 214px; animation: cut-car 4.2s cubic-bezier(.6, 0, .9, .6) 1s both; } @keyframes cut-car { from { left: 214px; } to { left: 105%; } }
+.cut-win { left: 154px; top: 110px; width: 6px; height: 9px; background: #FFE98A; animation: wl-blink .8s steps(1, end) infinite; }
+.cut-pager { right: 150px; top: 46px; transform-origin: 50% 100%; animation: cut-ring .42s steps(2, end) infinite; image-rendering: auto; } @keyframes cut-ring { 0% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+.cut-beacon { left: 124px; top: 36px; width: 9px; height: 9px; border-radius: 50%; background: #FF2A1A; box-shadow: 0 0 0 3px rgba(255, 42, 26, .4); animation: wl-blink .6s steps(1, end) infinite; }
+.cut-flash { inset: 0; background: rgba(255, 40, 20, .16); animation: wl-blink .6s steps(1, end) infinite; }
+.cut-dark { inset: 0; background-size: 8px 180px; background-repeat: repeat-x; opacity: 0; animation: cut-fade 5.5s steps(12, end) both; } @keyframes cut-fade { 30% { opacity: 0; } 45%, 72% { opacity: 1; } 100% { opacity: 0; } }
+.cut-orb.sun { width: 17px; height: 17px; background: var(--wl-sun) 0 0 / 17px 17px no-repeat; animation: cut-sun 5.5s linear both; }
+@keyframes cut-sun { 0% { left: 68%; top: 34px; } 34% { left: 94%; top: 150px; } 35%, 70% { left: 4%; top: 190px; } 100% { left: 20%; top: 46px; } }
+.cut-orb.sun.rise { animation: cut-rise 4s cubic-bezier(.2, .7, .4, 1) both; } @keyframes cut-rise { from { left: 62%; top: 170px; } to { left: 70%; top: 40px; } }
+.cut-orb.sun.set { animation: cut-set 4.5s cubic-bezier(.5, 0, .8, .5) both; } @keyframes cut-set { from { left: 66%; top: 34px; } to { left: 76%; top: 150px; } }
+.cut-stage.still .cut-orb.sun.rise { left: 70%; top: 40px; } .cut-stage.still .cut-orb.sun.set { left: 76%; top: 120px; }
+.cut-orb.moon { width: 13px; height: 13px; background: var(--wl-moon) 0 0 / 13px 13px no-repeat; opacity: 0; animation: cut-moon 5.5s linear both; }
+@keyframes cut-moon { 0%, 36% { left: 34%; top: 130px; opacity: 0; } 42% { opacity: 1; } 56% { left: 54%; top: 22px; } 72% { left: 74%; top: 120px; opacity: 1; } 78%, 100% { left: 78%; top: 150px; opacity: 0; } }
+.cut-stars { left: 0; top: 0; width: 1px; height: 1px; background: transparent; opacity: 0; animation: cut-fade 5.5s steps(12, end) both;
+  box-shadow: 40px 18px #fff, 96px 40px #fff, 150px 12px #fff, 230px 30px #fff, 290px 16px #fff, 356px 44px #fff, 410px 20px #fff, 468px 36px #fff, 520px 14px #fff, 580px 30px #fff, 318px 62px #fff, 610px 58px #fff, 20px 60px #fff; }
+.cut-stars.on { opacity: 1; animation: none; }
+.cut-stage.still *, .cut-stage.still { animation: none !important; } .cut-stage.still .cut-van.amb { left: 214px; }
+.cut-box { display: flex; gap: 10px; align-items: flex-end; min-height: 70px; margin-top: 10px; padding: 10px 12px; background: var(--note); border: 1px solid #000; border-radius: 4px; box-shadow: 2px 3px 0 rgba(0, 0, 0, .25); }
+#cut-text { flex: 1; margin: 0; align-self: flex-start; font: 700 15px/1.45 var(--book); color: var(--ink); } .cut-n { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.modal.cut .modal-h .cap .gl { filter: brightness(0) invert(1); }
+/* a consequence: the result of something the learner did. A picture or a video goes here; until there is one, a placeholder with the art brief. */
+.cut-stage.result { height: 250px; display: grid; image-rendering: auto; } .cut-media { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cut-ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px 44px; text-align: center; color: #fff; background: repeating-linear-gradient(45deg, #5B1F1A 0 8px, #69251F 8px 16px); }
+.cut-ph.amber { background: repeating-linear-gradient(45deg, #6B4A0E 0 8px, #7A5612 8px 16px); }
+.cut-ph.green { background: repeating-linear-gradient(45deg, #1F4D2C 0 8px, #265934 8px 16px); } .cut-ph-g .gl { display: block; }
+.cut-ph b { font: 700 24px/1.15 var(--book); } .cut-ph small { font: 700 10px var(--ui); text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border: 1px dashed rgba(255, 255, 255, .7); border-radius: 2px; }
+.cut-ph em { max-width: 52ch; font: italic 13px/1.4 var(--book); opacity: .92; }
+@media (prefers-reduced-motion: reduce) { .wl-act, .cut-stage * { animation: none !important; } .wl-act { display: none; } }

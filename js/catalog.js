@@ -30,6 +30,7 @@
     Hct: L('Hematocrit', '%', 36, 52, 1, 'Hematology'),
     Plt: L('Platelets', 'K/uL', 150, 400, 0, 'Hematology', 50, null),
     INR: L('INR', '', 0.8, 1.2, 1, 'Coagulation', null, 5.0),
+    Ddimer: L('D-dimer', 'mcg/mL FEU', 0, 0.5, 2, 'Coagulation'),
     Trop: L('Troponin I', 'ng/mL', 0, 0.04, 2, 'Cardiac'),
     BNP: L('BNP', 'pg/mL', 0, 100, 0, 'Cardiac'),
     pH: L('pH, venous', '', 7.32, 7.42, 2, 'Blood gas', 7.2, 7.6),
@@ -119,6 +120,15 @@
   // Other
   med('tamsulosin', 'tamsulosin (FLOMAX) capsule', '0.4 mg', 'PO', 'QHS');
   med('nicotine', 'nicotine transdermal patch', '21 mg', 'TD', 'Daily', { doses: ['7 mg', '14 mg', '21 mg'] });
+  // Added for the PBL cases (js/cases.js)
+  med('nitro_sl', 'nitroglycerin sublingual tablet', '0.4 mg', 'SL', 'Once', { prn: 1, tags: ['nitrate'] });
+  med('heparin_gtt', 'heparin infusion (weight-based protocol)', '18 units/kg/hr', 'IV', 'Continuous', { tags: ['anticoag'] });
+  med('dextrose50', 'dextrose 50% injection', '25 g', 'IV', 'Once', { doses: ['12.5 g', '25 g'] });
+  med('glipizide', 'glipiZIDE (GLUCOTROL) tablet', '10 mg', 'PO', 'BID', { tags: ['sulfonylurea', 'renal-caution'], doses: ['5 mg', '10 mg'] });
+  med('lorazepam', 'LORazepam (ATIVAN) injection', '1 mg', 'IV', 'Q4H', { prn: 1, tags: ['benzo'], doses: ['0.5 mg', '1 mg', '2 mg'] });
+  med('haloperidol', 'haloperidol (HALDOL) injection', '0.5 mg', 'IV', 'Q6H', { prn: 1, tags: ['antipsychotic'], doses: ['0.5 mg', '1 mg', '2 mg'] });
+  med('thiamine', 'thiamine injection', '100 mg', 'IV', 'Daily', { doses: ['100 mg', '500 mg'] });
+  med('diphenhydramine', 'diphenhydrAMINE (BENADRYL) capsule', '25 mg', 'PO', 'QHS', { prn: 1, tags: ['anticholinergic'], doses: ['25 mg', '50 mg'] });
   // IV fluids
   med('ns_bolus', 'sodium chloride 0.9% bolus', '1,000 mL', 'IV', 'Once', { group: FLUID, doses: ['500 mL', '1,000 mL', '2,000 mL'] });
   med('lr', "lactated Ringer's infusion", '125 mL/hr', 'IV', 'Continuous', { group: FLUID, doses: ['75 mL/hr', '100 mL/hr', '125 mL/hr', '150 mL/hr'] });
@@ -144,6 +154,7 @@
   lab('pct', 'Procalcitonin', ['PCT']);
   lab('vbg', 'Venous blood gas', ['pH', 'pCO2', 'HCO3']);
   lab('bhb', 'Beta-hydroxybutyrate', ['BHB']);
+  lab('ddimer', 'D-dimer', ['Ddimer']);
   lab('bcx', 'Blood culture ×2', null, 'PRELIMINARY: No growth to date.\nFinal report to follow at 5 days.\n\n(Sandbox auto-result.)');
   lab('ua', 'Urinalysis with reflex microscopy', null, 'Color: yellow. Clarity: clear.\nSpecific gravity 1.015, pH 6.0.\nProtein, glucose, ketones, blood: negative.\nLeukocyte esterase: negative. Nitrite: negative.\n\n(Sandbox auto-result.)');
   lab('ts', 'Type and screen', null, 'ABO/Rh: O positive.\nAntibody screen: negative.\n\n(Sandbox auto-result.)');
@@ -157,6 +168,8 @@
   img('usruq', 'US abdomen, right upper quadrant');
   img('echo', 'Echocardiogram, transthoracic (TTE)', { kind: 'Cardiology' });
   img('ecg', 'ECG 12-lead', { kind: 'Cardiology' });
+  img('vq', 'Nuclear medicine lung scan (V/Q)');
+  img('bladder', 'Bladder scan (post-void residual)', { kind: 'Microbiology / Other' });
 
   // Non-medication orders
   ord('code_full', 'Code Status', 'Full code', { code: 'Full Code' });
@@ -172,6 +185,9 @@
   ord('scd', 'Nursing', 'Sequential compression devices');
   ord('prbc', 'Nursing', 'Transfuse 1 unit packed red blood cells');
   ord('iso_droplet', 'Nursing', 'Droplet isolation precautions');
+  ord('foley', 'Nursing', 'Insert urinary catheter');
+  ord('ciwa', 'Nursing', 'Alcohol withdrawal scoring (CIWA-Ar) every 4 hours');
+  ord('neuro_chk', 'Nursing', 'Neurological checks every hour');
   ord('diet_reg', 'Diet & Activity', 'Diet: regular');
   ord('diet_cardiac', 'Diet & Activity', 'Diet: cardiac, 2 g sodium');
   ord('diet_carb', 'Diet & Activity', 'Diet: consistent carbohydrate');
@@ -188,6 +204,8 @@
   ord('c_pulm', 'Consults', 'Consult to Pulmonology');
   ord('c_ptot', 'Consults', 'Consult to Physical / Occupational Therapy');
   ord('c_sw', 'Consults', 'Consult to Social Work');
+  ord('c_neuro', 'Consults', 'Consult to Neurology');
+  ord('c_surg', 'Consults', 'Consult to General Surgery');
 
   E.cat = (id) => C.find((c) => c.id === id);
 

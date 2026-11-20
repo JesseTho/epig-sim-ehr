@@ -110,6 +110,11 @@
 
     if ((has('nsaid') || tags.some(ac)) && p.problems.some((pr) => pr.status === 'Active' && /GI bleed/i.test(pr.name)))
       add('high', 'Problem', 'Active gastrointestinal bleeding', `Problem list includes an active GI bleed. ${d.name} increases bleeding risk.`);
+    // older adults: sedatives and anticholinergics (the Beers list), and a sedative on top of an opioid at any age
+    const age = E.age(p.dob);
+    if (age >= 65 && has('benzo')) add('med', 'Age', 'Benzodiazepine in a patient aged 65 or over', `${p.name} is ${age}. Benzodiazepines cause confusion, falls and slowed breathing in older adults and can bring on or worsen delirium. Look for the cause of the agitation or sleeplessness first.`);
+    if (age >= 65 && has('anticholinergic')) add('med', 'Age', 'Anticholinergic in a patient aged 65 or over', `${p.name} is ${age}. ${d.name} can cause confusion and urinary retention in older adults, especially men with an enlarged prostate. Prefer a non-drug measure or a safer alternative.`);
+    if ((has('benzo') && ctx.has('opioid')) || (has('opioid') && ctx.has('benzo'))) add('med', 'Interaction', 'Sedative with an opioid', `Patient is on ${src.opioid || src.benzo}. Together a benzodiazepine and an opioid slow breathing more than either alone. If both are needed, order monitoring of breathing and alertness.`);
     return out;
   };
 

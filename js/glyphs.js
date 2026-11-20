@@ -32,6 +32,7 @@
     if (!cache[key]) { const cols = stops.map(rgb); cache[key] = across ? paint(len, 8, (x) => lerp(cols, x / (len - 1))) : paint(8, len, (x, y) => lerp(cols, len === 1 ? 0 : y / (len - 1))); }
     return cache[key];
   };
+  E.ramp = ramp;   // used by js/world.js for the sky at each time of day
   const prng = (s) => () => (s = (s * 16807) % 2147483647) / 2147483647;
   /** A cumulus cloud: a row of overlapping puffs on a flat base, white on top and shaded blue-grey
       underneath, with a one-pixel dithered edge. The seed picks the arrangement of puffs. */
