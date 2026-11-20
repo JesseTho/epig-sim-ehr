@@ -69,7 +69,7 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
    which puts the middle of the capital E on that same line. The tag block is as tall as the pig, so their
    tops and bottoms line up too. Everything in the banner sits 3px high to clear the hills. */
 .banner { padding-bottom: 6px; }   /* the level widget and user block ride the same line as the lockup */
-.bn-brand .gl + .wm { margin-left: -20.5px; transform: translateY(5px); }
+.bn-brand .wm { transform: translateY(3px); }   /* the banner has 6px of padding below; this puts the lettering on the banner's own centre line */
 .w-brand > .gl, .sp-in h1 > .gl { transform: translateY(-6px); } .w-brand .gl + .wm, .sp-in h1 .gl + .wm { margin-left: -20px; transform: translateY(10px); }
 /* What it is, said plainly beside the name: "EHR Simulator". Set in the book face so it reads as part of the
    title, not as a control. In the banner it sits above the edition sticker. */
@@ -266,6 +266,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 .skyfx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .skyfx .cl { position: absolute; left: 0; background-size: 100% 100%; background-repeat: no-repeat; animation: drift linear infinite; }
 .cl.a { width: 180px; height: 40px; background-image: var(--cloud-a); } .cl.b { width: 120px; height: 28px; background-image: var(--cloud-b); } .cl.c { width: 260px; height: 54px; background-image: var(--cloud-c); }
+.cl.d { width: 200px; height: 24px; background-image: var(--cloud-d); } .cl.e { width: 84px; height: 26px; background-image: var(--cloud-e); } .cl.f { width: 220px; height: 46px; background-image: var(--cloud-f); }
 @keyframes drift { from { transform: translateX(-270px); } to { transform: translateX(100vw); } }
 .skyfx .land { position: absolute; left: 0; right: 0; bottom: 0; image-rendering: pixelated; }
 .skyfx.bn .land { height: 44px; background: var(--land-banner) 0 100% / 4800px 44px no-repeat; }

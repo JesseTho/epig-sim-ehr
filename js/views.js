@@ -64,8 +64,8 @@
     // Back to front: clouds, the distant hills, the pigs, the nearest hill.
     const far = '<i class="land"></i>' + (big ? '<i class="hosp"></i>' : '');   // the pink hospital stands on the far hills, behind the pigs
     return `<div class="skyfx ${kind}" aria-hidden="true">${big
-      ? cl('c', '9%', 210, 20) + cl('a', '20%', 150, 95) + cl('b', '6%', 120, 50) + cl('a', '31%', 260, 170) + cl('b', '26%', 180, 10) + far + fly('pig', 'rl', 48, '8%', 58, 40) + fly('pig', 'lr', 48, '34%', 74, 8) + fly('pig', 'lr', 48, '18%', 97, 66)
-      : cl('a', '6px', 170, 60) + cl('b', '24px', 230, 150) + cl('b', '12px', 120, 20) + far + fly('pig', 'lr', 24, '8px', 140, 100) + fly('pig', 'rl', 24, '4px', 190, 30)}<i class="land near"></i></div>`;
+      ? cl('c', '9%', 210, 20) + cl('d', '15%', 300, 240) + cl('a', '20%', 150, 95) + cl('e', '6%', 120, 50) + cl('f', '31%', 260, 170) + cl('b', '26%', 180, 10) + cl('d', '38%', 340, 75) + cl('e', '42%', 230, 140) + far + fly('pig', 'rl', 48, '8%', 58, 40) + fly('pig', 'lr', 48, '34%', 74, 8) + fly('pig', 'lr', 48, '18%', 97, 66)
+      : cl('a', '6px', 170, 60) + cl('d', '30px', 280, 205) + cl('e', '22px', 230, 150) + cl('b', '12px', 120, 20) + far + fly('pig', 'lr', 24, '8px', 140, 100) + fly('pig', 'rl', 24, '4px', 190, 30)}<i class="land near"></i></div>`;
   };
 
   /* The tag set: the SIM + EHR bitmap over the Student Edition sticker. The sticker stretches to the width of
@@ -96,7 +96,7 @@
     const tool = (to, glyph, label, view, extra) => `<a class="tool${r.view === view ? ' on' : ''}${view === 'inbox' && unread ? ' unread' : ''}" href="${to}">${icon(glyph, 32)}<span>${label}</span>${extra || ''}</a>`;
     return `
     <div class="banner">${V.sky('bn')}
-      <a class="bn-brand" href="#/home" title="Patient Lists">${E.wordmark(44)}</a>
+      <a class="bn-brand" href="#/home" title="Patient Lists">${E.wordmark(52)}</a>
       <span class="spacer"></span>
       <span class="bn-tag">${tagSet()}</span>
       <a class="lvl" href="#/learning" title="Open Learning: ${g.xp} XP, ${g.earned.length} of ${E.BADGES.length} badges">${icon('star', 40)}<span class="lvl-t"><b>Level ${g.level} · ${esc(g.title)}</b><span class="xpbar" role="img" aria-label="${g.xp} experience points${g.next ? ', ' + (g.next - g.xp) + ' to the next level' : ''}"><i style="width:${g.pct}%"></i></span></span><span class="lvl-n">${g.xp} XP<br>${icon('medal', 16)}${g.earned.length}/${E.BADGES.length}</span></a>

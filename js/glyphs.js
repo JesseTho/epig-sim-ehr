@@ -250,8 +250,8 @@
     img.onerror = done;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   });
-  E.glyphsReady = Promise.all([E.glyphsReady, wmRaster(44), wmRaster(72), wmRaster(88)]);
-  /** The wordmark at 44px (banner), 88px (login and loading screens, where it stands alone) or 72px (certificate, beside the pig). */
+  E.glyphsReady = Promise.all([E.glyphsReady, wmRaster(52), wmRaster(72), wmRaster(88)]);
+  /** The wordmark at 52px (banner), 88px (login and loading screens, where it stands alone) or 72px (certificate, beside the pig). */
   E.wordmark = (h) => (WMB[h] ? `<img class="wm smooth" src="${WMB[h].src}" style="width:${WMB[h].w}px;height:${WMB[h].h}px" alt="Epig" draggable="false">` : wordmarkSvg(h).replace('<svg ', '<svg class="wm" role="img" aria-label="Epig" '));
 
   /* "SIM + EHR": the descriptor that stands over the Student Edition sticker. Book-face capitals, upright,
@@ -343,6 +343,7 @@
      the stylesheet that uses it. */
   const scene = (v, name, cuts, w) => set(v, new URL(`assets/scene/${name}-${cutFor(cuts, w)}.png`, document.baseURI).href);
   scene('--cloud-a', 'cloud-a', [180, 225, 270, 360], 180); scene('--cloud-b', 'cloud-b', [120, 150, 180, 240], 120); scene('--cloud-c', 'cloud-c', [260, 325, 390, 520], 260);
+  scene('--cloud-d', 'cloud-d', [200, 250, 300, 400], 200); scene('--cloud-e', 'cloud-e', [84, 105, 126, 168], 84); scene('--cloud-f', 'cloud-f', [220, 275, 330, 440], 220);   // d wisp, e small puff, f broken bank; all six are built by tools/make-clouds.py
   scene('--land', 'hills-far', [2400, 3000, 3600, 4800], 2400); scene('--land-near', 'hills-near', [2400, 3000, 3600, 4800], 2400);
   scene('--land-banner', 'hills-banner-far', [4800, 6000, 7200, 9600], 4800); scene('--land-banner-near', 'hills-banner-near', [4800, 6000, 7200, 9600], 4800);
   // end scenery artwork
