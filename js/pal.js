@@ -11,7 +11,7 @@
 (function () {
   const E = window.EHR;
   const NAME = 'Truffle';
-  const POSES = ['flap-a', 'flap-b', 'wave', 'think', 'idea', 'wait', 'cheer', 'worry'];
+  const POSES = ['flap-a', 'flap-b', 'wave', 'think', 'idea', 'wait', 'cheer', 'worry', 'unsure', 'gasp', 'yawn', 'smug', 'shy', 'sad', 'phew', 'wink'];   // rows 1 to 4 of the sheet; rows 5 and 6 are the blink and the glance
 
   /* Which practice tasks belong to which screen, so a tip is about what is in front of the learner. */
   const AREA = {
