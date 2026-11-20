@@ -25,7 +25,7 @@
     <div class="welcome">
       <div class="w-band"></div>
       <div class="w-mid">${V.sky('lg')}
-        <button class="music-btn" data-act="musicToggle" aria-pressed="${!!(E.music && E.music.wanted)}" title="Turn the login music ${E.music && E.music.wanted ? 'off' : 'on'}">${icon('music', 24)}<span>Music: ${E.music && E.music.wanted ? 'On' : 'Off'}</span></button>
+        <button class="music-btn" data-act="musicToggle" aria-pressed="${!(E.music && E.music.wanted)}" aria-label="${E.music && E.music.wanted ? 'Mute music' : 'Unmute music'}" title="${E.music && E.music.wanted ? 'Mute music' : 'Unmute music'}">${icon(E.music && E.music.wanted ? 'music' : 'mute', 24)}</button>
         <div class="w-left">
           <div class="scene">
             <div class="collage" aria-hidden="true">${[['results', 'c1'], ['mar', 'c2'], ['summary', 'c3'], ['learning', 'c4'], ['code', 'c5']].map(([g, c]) => `<span class="${c}">${icon(g, 96)}</span>`).join('')}</div>
@@ -44,7 +44,7 @@
           <button class="btn primary lg" data-act="login">Log in</button>
         </div>
       </div>
-      <div class="w-band foot">Every patient here is fictional. Never enter real patient information.</div>
+      <div class="w-band foot">${esc(E.QUIPS[E.ui.quip % E.QUIPS.length])} <b>Never enter real patient information.</b></div>
     </div>`;
 
   /* ================= the sky: drifting clouds, flyers and the land in front of them =================
@@ -59,10 +59,10 @@
     const fly = (name, cls, size, top, dur, offset) => {
       const key = kind + n++, left = dur - ((now + offset) % dur);
       if (popped[key] > now) return '';
-      return `<span class="fly ${cls}" data-act="pigPop" data-key="${key}" data-left="${left.toFixed(1)}" style="top:${top};width:${size}px;height:${size}px;${at(dur, offset)}"><i></i><i></i></span>`;   // Truffle's two wing frames
+      return `<span class="fly ${cls}" data-act="pigPop" data-key="${key}" data-left="${left.toFixed(1)}" style="top:${top};width:${size}px;height:${size}px;${at(dur, offset)}">${icon(name + '1', size)}${icon(name + '2', size)}</span>`;   // the hand-drawn pig, wing up and wing down
     };
     // Back to front: clouds, the distant hills, the pigs, the nearest hill.
-    const far = '<i class="land"></i>';
+    const far = '<i class="land"></i>' + (big ? '<i class="hosp"></i>' : '');   // the pink hospital stands on the far hills, behind the pigs
     return `<div class="skyfx ${kind}" aria-hidden="true">${big
       ? cl('c', '9%', 210, 20) + cl('a', '20%', 150, 95) + cl('b', '6%', 120, 50) + cl('a', '31%', 260, 170) + cl('b', '26%', 180, 10) + far + fly('pig', 'rl', 48, '8%', 58, 40) + fly('pig', 'lr', 48, '34%', 74, 8) + fly('pig', 'lr', 48, '18%', 97, 66)
       : cl('a', '6px', 170, 60) + cl('b', '24px', 230, 150) + cl('b', '12px', 120, 20) + far + fly('pig', 'lr', 24, '8px', 140, 100) + fly('pig', 'rl', 24, '4px', 190, 30)}<i class="land near"></i></div>`;
@@ -84,7 +84,7 @@
       <div class="sp-strip" aria-hidden="true">${['patients', 'summary', 'results', 'flowsheets', 'mar', 'notes', 'orders', 'learning'].map((n) => icon(n, 48)).join('')}</div>
       <div class="sp-fact">${icon('info', 48)}<div><b>Did you know?</b><span>${esc(fact)}</span></div></div>
       <div class="xpbar big sp-bar" role="progressbar" aria-label="Loading"><i></i></div>
-      <p class="sp-skip"><b>This is a simulation. Every patient is fictional; never enter real patient information.</b><br>Click anywhere or press a key to skip</p>
+      <p class="sp-skip">${esc(E.QUIPS[(E.ui.quip + 1) % E.QUIPS.length])} <b>Never enter real patient information.</b><br>Click anywhere or press a key to skip</p>
     </div>`;
   };
 
@@ -475,7 +475,7 @@
       const side = m.state === 'off' || m.state === 'error' ? `<div class="notice info">${icon('info', 24)}<span>${m.state === 'off' ? 'To turn this on, faculty set a video-visit server address in <code>js/config.js</code>. The file explains what the server needs to do.' : 'Check that the video-visit server in <code>js/config.js</code> is running and allows this page, then try again.'}</span></div>` : '';
       return modal('Video Visit — ' + p.name, `<div class="call-stage">${stage}</div>${side}
         ${E.db.user.role === 'physician' ? `<details class="call-brief"><summary>Faculty view: what this patient has been told to know (persona brief)</summary><pre class="doc">${esc(E.personaBrief(p))}</pre></details>` : ''}
-        <p class="fine">Simulated patient for practice. Nothing here is a real person or a real visit. Document the encounter in Notes when you finish.</p>`,
+        <p class="fine">Simulated patient. Any resemblance to a real person is a coincidence, and so is their patience with hold music. Document the encounter in Notes when you finish.</p>`,
         `${m.state === 'error' ? '<button class="btn" data-act="callOpen">Try again</button>' : ''}<button class="btn ${m.state === 'live' || m.state === 'connecting' ? 'danger' : 'primary'}" data-act="callEnd">${m.state === 'live' || m.state === 'connecting' ? 'End call' : 'Close'}</button>`, 'call');
     }
     if (m.type === 'help') return modal('Help — Epig SIM EHR', `

@@ -114,6 +114,7 @@
     logout: `${sh()}<path d="M7 4.5h13v23H7z" ${f('wood')}/><path d="M9.5 7l8 2.5v17l-8-2.5z" fill="#F0C98C" stroke="${O.wood}" stroke-width="1.2" stroke-linejoin="round"/><circle cx="15.3" cy="17" r="1.2" fill="${O.wood}"/><path d="M19 13.5h5.5V10l6 6-6 6v-3.5H19z" ${f('green')}/>`,
     call: `${sh(11)}<rect x="3" y="8" width="18.500" height="16" rx="3" ${f('blue')}/><path d="M21.500 13.500l7.500-4.500v14l-7.500-4.500z" ${f('steel')}/><path d="M5 12c0-1.600 1-2.400 2.400-2.400h9.800c1.400 0 2.400.8 2.400 2.400z" fill="url(#p-d50)"/><circle cx="8" cy="19.500" r="2.200" ${f('green')}/>`,
     music: `${sh(10)}<path d="M4.500 12h5l7-6.500v21l-7-6.500h-5z" ${f('steel')}/><path d="M6 13.500h3.500" stroke="#fff" stroke-width="1.500" stroke-linecap="round" opacity=".8"/>${line('M20 11c2 2.800 2 7.200 0 10M23.500 8c4 4.800 4 11.200 0 16', O.blue, 2.200)}`,
+    mute: `${sh(10)}<path d="M4.500 12h5l7-6.500v21l-7-6.500h-5z" ${f('steel')}/><path d="M6 13.500h3.500" stroke="#fff" stroke-width="1.500" stroke-linecap="round" opacity=".8"/>${line('M20.500 11.500l7 9M27.500 11.500l-7 9', '#C0241A', 2.600)}`,
     search: `${sh(9)}<path d="M19.5 19.5l8 8" stroke="${O.wood}" stroke-width="5.5" stroke-linecap="round"/><path d="M19.5 19.5l8 8" stroke="#C99555" stroke-width="2.8" stroke-linecap="round"/><circle cx="13" cy="13" r="8.8" fill="url(#g-glass)" stroke="${O.steel}" stroke-width="2.4"/><path d="M7.5 11.5c1-4 6-5.6 9-3.6-3.4.2-6.6 1.4-9 3.6z" fill="url(#p-d50)"/>`,
     summary: `${sh()}${board}<path d="M16 23.5c-5-3.6-6.4-6.4-5-8.6 1.3-2 3.8-1.6 5 .4 1.2-2 3.7-2.4 5-.4 1.4 2.2 0 5-5 8.6z" ${f('red')}/>`,
     review: `${sh(12)}<path d="M3.5 8.5a1.5 1.5 0 0 1 1.5-1.5h7l2.5 3h12a1.5 1.5 0 0 1 1.5 1.5V26H3.5z" ${f('manila', 'gold')}/><path d="M9 6h13v10H9z" ${f('paper')}/>${line('M11.5 9.5h8M11.5 12.5h8', '#8C9BB5', 1.2)}<path d="M2.5 14h22.5l3.5 12H5.5z" ${f('manila', 'gold')}/>`,
@@ -149,20 +150,26 @@
   G.pig2 = pig(`<path d="M12 15c-5.500 1.500-8 6.500-5.500 10.500 2.500-3 6-5.500 10-7.500z" ${f('cream')}/>${line('M9.500 19c.800 1 2.500 1.500 4 1M8 22c1.300.500 3 .300 4.500-.700', '#C79A70', 1)}`);
   /* The EPIG logo is Truffle: the first cell of the assistant's sprite sheet, cropped close, in the sheet's own
      direction (facing right, toward the wordmark), so the logo and the corner assistant are plainly the same pig.
-     File: assets/logo/epig-192.png. The assistant in the corner is the same sheet mirrored.
+     Files: assets/logo/epig-*.png. The assistant in the corner is the same sheet mirrored.
      EHR.icon('logo', size) shows the 48px bitmap, doubled with hard pixels above 56px, and the 32px one below 40px. */
-  /* The logo is Truffle cut at high resolution from the original art; the browser scales it down smoothly. */
-  const LOGO_SRC = 'assets/logo/epig-192.png';
+  /* The logo is Truffle, rough-cut from the original sprite art with hard edges (owner's choice "B"): at every
+     size it uses a cut made for the screen's real pixels (48 to 192px), so it keeps its pixel-art edges but is
+     never stretched, blurred or blown up into big blocks. */
+  const LOGO_CUTS = [48, 60, 72, 96, 120, 144, 192];
+  const cutFor = (cuts, css) => { const want = css * Math.max(1, window.devicePixelRatio || 1); return cuts.find((x) => x >= want - 0.5) || cuts[cuts.length - 1]; };
+  const logoImg = (d, label) => `<img class="gl" src="assets/logo/epig-${cutFor(LOGO_CUTS, d)}.png" width="${d}" height="${d}" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`;
+  /* Truffle's sprite sheet, cut the same way: cells made for a 96px pig at the screen's real pixels. */
+  // an absolute address: a url() held in a CSS variable resolves against the stylesheet that uses it, not this page
+  document.documentElement.style.setProperty('--pal-sheet', `url("${new URL(`assets/assistant/pig-sheet-${cutFor([96, 120, 144, 192], 96)}.png`, document.baseURI).href}")`);
   const GRID = {};   // glyphs drawn on a grid other than 32 (none at present)
   E.GLYPHS = Object.keys(G);
 
-  /* Resolution (owner's decision): at least Windows XP quality. XP icons were full-colour bitmaps with smooth
-     (alpha-blended) edges at 16, 24, 32 and 48px. Here every glyph is rasterised at the size it is shown times
-     the screen's pixel ratio, so it is sharp on a 100%, 125% or 150% display, and nothing is shown doubled.
-     EHR.icon(name, size) snaps to the nearest of these shown sizes. */
+  /* Resolution (owner's decision): Windows XP icon quality. Each glyph is a bitmap at the size it is shown
+     (16, 24, 32, 48, 64 or 96px), with soft edges, like XP's full-colour icons: neither enlarged pixels nor
+     screen-boosted detail. EHR.icon(name, size) snaps to the nearest of these sizes. */
   const DPR = Math.max(1, window.devicePixelRatio || 1), SIZES = [16, 24, 32, 48, 64, 96];
   const snapSize = (size) => SIZES.reduce((b, s) => (Math.abs(s - size) < Math.abs(b - size) ? s : b), SIZES[0]);
-  const NATIVE = SIZES.map((s) => Math.round(s * DPR));
+  const NATIVE = SIZES;
   const BMP = {};
   /** A self-contained SVG of one glyph at px pixels, carrying only the fills it uses, dithered for that size. */
   const svgFor = (name, px) => {
@@ -191,7 +198,8 @@
   /** A glyph as markup. Decorative by default; pass a label to expose it to assistive technology.
       If the browser cannot rasterise (BMP.failed), it falls back to drawing the vector directly. */
   E.icon = (name, size, label) => {
-    const d = snapSize(size || 16), px = Math.round(d * DPR), src = name === 'logo' ? LOGO_SRC : !BMP.failed && BMP[name] && BMP[name][px];
+    const d = snapSize(size || 16), px = d; if (name === 'logo') return logoImg(d, label);
+    const src = !BMP.failed && BMP[name] && BMP[name][px];
 
     if (src) return `<img class="gl" src="${src}" width="${d}" height="${d}" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`;
     return `<svg class="gl" width="${d}" height="${d}" viewBox="0 0 ${GRID[name] || 32} ${GRID[name] || 32}" ${label ? `role="img" aria-label="${E.esc(label)}"` : 'aria-hidden="true"'} focusable="false">${svgFor(name, d).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').replace(/id="([gpc]-[a-z0-9]+)"/g, `id="$1-${name}-${d}"`).replace(/url\(#([gpc]-[a-z0-9]+)\)/g, `url(#$1-${name}-${d})`)}</svg>`;
@@ -222,17 +230,40 @@
       </g></g></svg>`;
   };
   const WMB = {};
-  const wmRaster = (h) => new Promise((done) => {
-    // large: drawn at half size and doubled (the chunky login look). small: drawn at the screen's real
-    // resolution so a scaled display (125%, 150%) does not stretch it unevenly.
-    const dpr = Math.max(1, window.devicePixelRatio || 1), n = Math.round(h * dpr), k = h / n, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), img = new Image();
-    img.onload = () => { try { const cv = document.createElement('canvas'); cv.width = w; cv.height = n; cv.getContext('2d').drawImage(img, 0, 0, w, n); WMB[h] = { src: cv.toDataURL('image/png'), w: Math.round(w * k), smooth: true }; } catch (e) { /* fall back to the vector */ } done(); };
-    img.onerror = done;
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wordmarkSvg(n));
+  /* The wordmark is made the same way as the rough-cut pig logo, so the two match:
+       1. drawn as small pixel art, WM_ART pixels tall, hard-edged, its pink bands blended with an ordered dither;
+       2. blown up with hard pixels, then scaled down smoothly to the screen's real pixels, as the pig was cut
+          down from its sprite art;
+       3. its edge hard-cut again, so it keeps the rough pixel outline at any size and on any display scaling. */
+  const WM_ART = 36;
+  const wordmarkArt = () => new Promise((done) => {
+    const n = WM_ART, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), u = WM_BOX[3] / n;   // viewBox units per art pixel
+    const fill = ramp(['#FBB2CF', '#F7609A', '#E0488A'], Math.round(36 / u));
+    const svg = wordmarkSvg(n).replace(/<g clip-path="url\(#wmc\)">[\s\S]*?<\/g>/, `<g clip-path="url(#wmc)"><rect x="-20" y="-3" width="160" height="36" fill="url(#wmd)"/><rect x="-20" y="32.9" width="160" height="14" fill="#E0488A"/></g>`)
+      .replace('<defs>', `<defs><pattern id="wmd" patternUnits="userSpaceOnUse" x="-20" y="-3" width="${8 * u}" height="36"><image href="${fill}" width="${8 * u}" height="36" preserveAspectRatio="none" style="image-rendering:pixelated"/></pattern>`);
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = n;
+      const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, w, n);
+      const id = ctx.getImageData(0, 0, w, n); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] >= 128 ? 255 : 0; ctx.putImageData(id, 0, 0);
+      done(cv);
+    };
+    img.onerror = () => done(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   });
-  E.glyphsReady = Promise.all([E.glyphsReady, wmRaster(44), wmRaster(72)]);
+  const wmRaster = (art, h) => {
+    if (!art) return;
+    const dpr = Math.max(1, window.devicePixelRatio || 1), nd = Math.round(h * dpr), wd = Math.round((art.width * nd) / art.height);
+    const big = document.createElement('canvas'); big.width = art.width * 8; big.height = art.height * 8;
+    const b = big.getContext('2d'); b.imageSmoothingEnabled = false; b.drawImage(art, 0, 0, big.width, big.height);
+    const cv = document.createElement('canvas'); cv.width = wd; cv.height = nd;
+    const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(big, 0, 0, wd, nd);
+    const id = ctx.getImageData(0, 0, wd, nd); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] >= 128 ? 255 : 0; ctx.putImageData(id, 0, 0);
+    WMB[h] = { src: cv.toDataURL('image/png'), w: wd / dpr, h: nd / dpr };
+  };
+  E.glyphsReady = Promise.all([E.glyphsReady, wordmarkArt().then((art) => { wmRaster(art, 44); wmRaster(art, 72); })]);
   /** The wordmark at 44px (banner) or 72px (login and loading screens). */
-  E.wordmark = (h) => (WMB[h] ? `<img class="wm${WMB[h].smooth ? ' smooth' : ''}" src="${WMB[h].src}" width="${WMB[h].w}" height="${h}" alt="Epig" draggable="false">` : wordmarkSvg(h).replace('<svg ', '<svg class="wm" role="img" aria-label="Epig" '));
+  E.wordmark = (h) => (WMB[h] ? `<img class="wm smooth" src="${WMB[h].src}" style="width:${WMB[h].w}px;height:${WMB[h].h}px" alt="Epig" draggable="false">` : wordmarkSvg(h).replace('<svg ', '<svg class="wm" role="img" aria-label="Epig" '));
 
   /* "SIM + EHR": the descriptor that stands over the Student Edition sticker. Book-face capitals, upright,
      navy, with a green cross between the two words. It is a bitmap at the same pixel density as the Epig
@@ -317,4 +348,26 @@
   // --land has whole numbers of waves across its width, so it tiles left and right without a seam.
   set('--land', land(2400, 210, ridges(210).slice(0, 2)));
   set('--land-near', land(2400, 210, ridges(210).slice(2)));
+  /* The hospital on the hill: pixel art, 72 x 56 art pixels, shown doubled. Pink walls, a central tower with a
+     green-cross sign and a flag, rows of windows, a door with an awning. Drawn with rectangles, no image file. */
+  set('--hospital', (() => {
+    const cv = document.createElement('canvas'); cv.width = 72; cv.height = 56;
+    const x = cv.getContext('2d'), R = (c, a, b, w, h) => { x.fillStyle = c; x.fillRect(a, b, w, h); };
+    const LINE = '#8E2F55', WALL = '#F6B3C8', LIGHT = '#FBD3DF', SHADE = '#E58FAE', ROOF = '#C24F7C', GLASS = '#CFE8FF', DOOR = '#7A2C4E';
+    // wings
+    R(LINE, 7, 17, 58, 39); R(WALL, 8, 21, 56, 35); R(SHADE, 58, 21, 6, 35); R(ROOF, 8, 18, 56, 3);
+    // tower
+    R(LINE, 25, 5, 22, 51); R(LIGHT, 26, 9, 20, 47); R(SHADE, 43, 9, 3, 47); R(ROOF, 26, 6, 20, 3);
+    // flag
+    R(LINE, 36, 0, 1, 6); R('#E5487A', 37, 0, 4, 3);
+    // the sign: white plate, green cross
+    R(LINE, 30, 10, 12, 12); R('#FFFFFF', 31, 11, 10, 10); R('#1D5F12', 34, 12, 4, 8); R('#1D5F12', 32, 14, 8, 4); R('#3DAA2B', 35, 13, 2, 6); R('#3DAA2B', 33, 15, 6, 2);
+    // windows: frame, glass, a glint
+    const win = (a, b, w, h) => { R(LINE, a - 1, b - 1, w + 2, h + 2); R(GLASS, a, b, w, h); R('#FFFFFF', a, b, 1, 1); };
+    [25, 33, 41].forEach((y) => { [11, 17, 50, 56].forEach((xx) => win(xx, y, 3, 4)); });
+    [25, 33].forEach((y) => { [30, 39].forEach((xx) => win(xx, y, 3, 4)); });
+    // door and awning
+    R(ROOF, 30, 42, 12, 2); R(LINE, 31, 44, 10, 12); R(DOOR, 32, 45, 8, 11); R(GLASS, 33, 46, 2, 4); R(GLASS, 37, 46, 2, 4);
+    return cv.toDataURL('image/png');
+  })());
 })();

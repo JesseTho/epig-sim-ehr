@@ -105,6 +105,9 @@
     'Everyone in this hospital is made up, including the attending who always answers pages.',
     'These patients are fictional. Their potassium, sadly, still will not fix itself.',
     'Pigs fly here, so you can assume the patients are not real either.',
+    'Our patients are made of pixels and good intentions.',
+    'No one in this hospital exists, so nobody will mind if you take your time.',
+    'Every chart here is fiction. The handwriting, sadly, is realistic.',
   ];
 
   /* Shown on the loading screen. Each one is true of this sim and of EHRs generally. */

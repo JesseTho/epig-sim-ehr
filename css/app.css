@@ -57,7 +57,7 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
   background: var(--g-banner) 0 0 / 8px 72px repeat-x, #D6E9F9; }
 .banner > :not(.skyfx) { image-rendering: auto; position: relative; z-index: 1; } .w-mid > :not(.skyfx), .sp-in { position: relative; z-index: 1; }
 .bn-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #12233F; filter: drop-shadow(2px 3px 2px rgba(18, 35, 63, .3)); }
-.wm { flex: none; display: block; image-rendering: pixelated; } .wm.smooth, .gl.smooth { image-rendering: auto; }
+.wm { flex: none; display: block; image-rendering: pixelated; } .wm.smooth, .gl.smooth { image-rendering: auto; } .gl.px { image-rendering: pixelated; }
 /* the mascot sits tight against the wordmark: the wordmark bitmap carries its own left margin for the slant */
 /* The lockup: the pig flies in from the left with its nose tucked just behind the capital E, so pig and
    word read as one mark. The wordmark is drawn second, so it sits in front and stays fully legible. The
@@ -269,13 +269,14 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 @keyframes drift { from { transform: translateX(-270px); } to { transform: translateX(100vw); } }
 .skyfx .land { position: absolute; left: 0; right: 0; bottom: 0; image-rendering: pixelated; }
 .skyfx.bn .land { height: 44px; background: var(--land-banner) 0 100% / 4800px 44px no-repeat; }
+.skyfx .hosp { position: absolute; left: 4%; bottom: 58px; width: 144px; height: 112px; background: var(--hospital) 0 0 / 144px 112px no-repeat; image-rendering: pixelated; }
 .skyfx.lg .land { height: 210px; background: var(--land) 50% 100% / 2400px 210px repeat-x; }
 /* the nearest ridge is a separate layer drawn after the pigs, so they pass behind it but in front of the far hills */
 .skyfx.bn .land.near { background-image: var(--land-banner-near); } .skyfx.lg .land.near { background-image: var(--land-near); }
 .fly { position: absolute; left: 0; animation: linear infinite; } .fly.lr { animation-name: fly-lr; } .fly.rl { animation-name: fly-rl; }
-/* the flyer is Truffle: the first two cells of the sprite sheet (wing up, wing down), which face right */
-.fly i { position: absolute; inset: 0; background: url("../assets/assistant/pig-sheet-192.png") 0 0 / 400% 200% no-repeat; animation: flap-a .34s steps(1, end) infinite; }
-.fly i + i { background-position: 33.333% 0; animation-name: flap-b; } .fly.rl i { transform: scaleX(-1); }
+/* the flyer is the hand-drawn pig glyph, two frames (wing up, wing down), drawn heading right */
+.fly.rl .gl { transform: scaleX(-1); }
+.fly .gl { position: absolute; left: 0; top: 0; animation: flap-a .34s steps(1, end) infinite; } .fly .gl + .gl { animation-name: flap-b; }
 .skyfx .fly { pointer-events: auto; cursor: pointer; } .banner > .spacer { pointer-events: none; }
 /* caught: a puff of cloud bursts where the pig was, and the point floats up out of it */
 .poof { position: fixed; z-index: 120; pointer-events: none; width: 0; height: 0; }
@@ -328,7 +329,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 #pal { position: fixed; right: 12px; bottom: 8px; z-index: 55; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
 #pal[hidden], #pal-back[hidden] { display: none; }
 .pal-pig { pointer-events: auto; border: 0; padding: 0; background: none; cursor: pointer; filter: drop-shadow(3px 6px 4px rgba(20, 40, 70, .35)); }
-.pal-pig i { display: block; width: 96px; height: 96px; transform: scaleX(-1); background: url("../assets/assistant/pig-sheet-192.png") 0 0 / 384px 192px no-repeat; }
+.pal-pig i { display: block; width: 96px; height: 96px; transform: scaleX(-1); background: var(--pal-sheet) 0 0 / 384px 192px no-repeat; }   /* sheet chosen for the screen's pixels in js/glyphs.js */
 .pal-pig[data-pose="wave"] i { background-position: -192px 0; } .pal-pig[data-pose="think"] i { background-position: -288px 0; }
 .pal-pig[data-pose="idea"] i { background-position: 0 -96px; } .pal-pig[data-pose="wait"] i { background-position: -96px -96px; }
 .pal-pig[data-pose="cheer"] i { background-position: -192px -96px; } .pal-pig[data-pose="worry"] i { background-position: -288px -96px; }
@@ -344,7 +345,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 .pal-hide { display: block; margin: 7px 0 0 auto; border: 0; background: none; padding: 0; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
 /* the tab that brings Truffle back */
 #pal-back { position: fixed; right: 0; bottom: 14px; z-index: 55; display: flex; align-items: center; gap: 5px; padding: 3px 9px 3px 5px; border: 1px solid var(--olive-5); border-right: 0; border-radius: 12px 0 0 12px; background: var(--note); color: var(--ink); font: 700 12px var(--title); cursor: pointer; box-shadow: 1px 2px 4px rgba(0, 0, 0, .3); }
-#pal-back i { width: 32px; height: 32px; transform: scaleX(-1); background: url("../assets/assistant/pig-sheet-192.png") 0 0 / 128px 64px no-repeat; }
+#pal-back i { width: 32px; height: 32px; transform: scaleX(-1); background: var(--pal-sheet) 0 0 / 128px 64px no-repeat; }
 #pal-back:hover { background: #FFF6C4; }
 @media (max-width: 700px) { #pal, #pal-back { display: none; } }
 @media (prefers-reduced-motion: reduce) { .pal-pig.flutter, .pal-pig.flutter i { animation: none !important; } }
@@ -456,7 +457,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .w-band.foot { height: auto; min-height: 52px; display: grid; place-items: center; padding: 8px 16px; color: #F1F5E2; text-align: center; border-bottom: 0; border-top: 2px solid #F0B040; }
 .w-mid { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; gap: 44px; padding: 28px 32px;
   background: var(--g-sky) 0 0 / 8px 640px repeat-x, #E3F1FC; image-rendering: pixelated; position: relative; }
-.w-mid > .music-btn { position: absolute; top: 14px; right: 16px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 5px; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; font: 700 12px var(--ui); color: var(--ink); background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; box-shadow: 2px 3px 5px rgba(18, 35, 63, .3); }
+.w-mid > .music-btn { position: absolute; top: 14px; right: 16px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; font: 700 12px var(--ui); color: var(--ink); background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; box-shadow: 2px 3px 5px rgba(18, 35, 63, .3); }
 .music-btn[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #B4CB7C, 2px 3px 5px rgba(18, 35, 63, .3); } .music-btn:hover { box-shadow: inset 0 0 0 2px var(--hot-2), 2px 3px 5px rgba(18, 35, 63, .3); }
 .w-left { width: 480px; max-width: 100%; color: #14233A; }
 /* the left-hand scene: five icons scattered around the SIM EHR block, which sits in the middle */

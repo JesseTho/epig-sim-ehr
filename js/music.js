@@ -4,8 +4,9 @@
    a walking bass, brushed drums and a soft square-wave melody, eight bars in F major at 96 beats a minute.
    It is synthesised in the browser with the Web Audio API, so there is no audio file.
 
-   It plays only on the login screen, only after the learner turns it on (browsers block sound until someone
-   interacts with the page anyway), and the choice is remembered on this computer. */
+   It is on by default and plays only on the login screen. Browsers allow sound only after someone interacts
+   with the page, so it starts on the first click or key press. The mute button in the corner turns it off,
+   and that choice is remembered on this computer. */
 (function () {
   const E = window.EHR;
   const BPM = 96, STEP = 60 / BPM / 4, BAR = 16;        // 16th-note grid
@@ -35,7 +36,7 @@
   const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
   let ctx = null, out = null, noise = null, timer = null, next = 0, step = 0, on = false, wanted = false;
-  const readPref = () => { try { return localStorage.getItem(PREF) === '1'; } catch (e) { return false; } };
+  const readPref = () => { try { return localStorage.getItem(PREF) !== '0'; } catch (e) { return true; } };   // on unless muted
   const writePref = (v) => { try { localStorage.setItem(PREF, v ? '1' : '0'); } catch (e) { /* not remembered */ } };
 
   function graph() {
