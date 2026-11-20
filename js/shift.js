@@ -582,7 +582,7 @@
     return { harmEvents: s.events.filter((e) => e.kind === 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order, what: e.title, outcome: e.outcome === 'rescued' ? 'rescued' : e.outcome === 'icu' ? 'transferred to intensive care' : 'unresolved', duringShift: e.shift })),
       nearMisses: s.events.filter((e) => e.kind !== 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order, what: e.title, stoppedBy: e.by })),
       debriefsCompleted: (s.debriefs || []).map((d) => ({ at: iso(d.at), wrongAnswersBeforeFinishing: d.wrong })),
-      suspensions: (s.suspensions || []).map((x) => ({ at: iso(x.at), after: x.after, liftedAt: iso(x.unlockedAt), remediationAttempts: x.attempts })), currentlySuspended: !!s.suspended, debriefOwed: !!s.debriefDue };
+      suspensions: (s.suspensions || []).map((x) => ({ at: iso(x.at), after: x.after, liftedAt: iso(x.unlockedAt), remediationAttempts: x.attempts, startedOverWithoutRemediation: !!x.startedOver })), currentlySuspended: !!s.suspended, debriefOwed: !!s.debriefDue };
   };
   function announce(before, text, title) {
     const g = E.game(E.progress()), extra = [], gained = g.xp - before.xp;
@@ -676,7 +676,7 @@
     if (!s || !(s.events.length || s.suspensions.length)) return '';
     const rows = [...s.events].sort((x, y) => y.ts - x.ts).map((e) => `<tr><td class="nowrap">${E.fmtDT(e.ts)}</td><td>${e.kind === 'harm' ? chip('Harm', 'red') : chip('Near miss', 'amber')}</td><td>${esc(e.patient)}</td><td><b>${esc(e.order)}</b><div class="muted">${esc(e.title)}</div></td><td>${e.kind === 'harm' ? (e.outcome === 'rescued' ? 'Stabilised after the learner responded' : e.outcome === 'icu' ? 'Transferred to intensive care' : 'Not yet resolved') : `Stopped by ${esc(e.by || '')} before it reached the patient`}</td></tr>`).join('');
     return `<section class="card"><header class="card-h"><h3>${icon('warn', 24)}Safety record</h3><span class="muted">${own ? 'Kept when progress is reset' : esc(who.name)}</span></header><div class="card-b">
-      ${s.suspensions.map((x) => `<p class="notice warn">${icon('warn', 24)}<span><b>Privileges suspended ${E.fmtDT(x.at)}</b> after ${esc(x.after)}. ${x.unlockedAt ? `Lifted ${E.fmtDT(x.unlockedAt)} after ${x.attempts} remediation attempt${x.attempts === 1 ? '' : 's'}.` : 'Not yet lifted.'}</span></p>`).join('')}
+      ${s.suspensions.map((x) => `<p class="notice warn">${icon('warn', 24)}<span><b>Privileges suspended ${E.fmtDT(x.at)}</b> after ${esc(x.after)}. ${x.unlockedAt && x.startedOver ? `Lifted ${E.fmtDT(x.unlockedAt)} by starting over, without remediation.` : x.unlockedAt ? `Lifted ${E.fmtDT(x.unlockedAt)} after ${x.attempts} remediation attempt${x.attempts === 1 ? '' : 's'}.` : 'Not yet lifted.'}</span></p>`).join('')}
       ${rows ? `<table class="tbl compact"><thead><tr><th>When</th><th>Kind</th><th>Patient</th><th>Order</th><th>Outcome</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
       <p class="fine">Harm events and near misses come from the sim’s harm rules (js/shift.js). Patients are fictional; the record is for teaching.</p></div></section>`;
   };
@@ -690,7 +690,9 @@
         <p>${c.strikes} patients have been harmed by orders you signed, so your ordering privileges are suspended. The gift shop is short of someone to restock the balloons, and nobody there can be given the wrong one.</p>
         <table class="tbl compact"><thead><tr><th>Patient</th><th>Order</th><th>What happened</th></tr></thead><tbody>${harm.map((e) => `<tr><td>${esc(e.patient)}</td><td>${esc(e.order)}</td><td>${esc(e.title)}${e.outcome === 'icu' ? ' · intensive care' : ''}</td></tr>`).join('')}</tbody></table>
         <p>To get your badge back, pass the remediation round: ${c.remediationQuestions} questions, ${c.remediationPass} right. It is not timed, and you can take it as often as you need. The suspension stays on your safety record either way.</p>
-        <div class="lock-acts"><button class="btn" data-act="logout">Log off</button><button class="btn primary lg" data-act="remStart">Start the remediation round</button></div>`;
+        ${E.ui.lockOver ? `<p class="notice warn">${icon('warn', 24)}<span><b>Start over?</b> Every patient goes back to how they were on admission, any shift or mission in progress ends, and your badge is returned without the remediation round. Your XP, badges and safety record are kept, and the record will show that you started over.</span></p>
+        <div class="lock-acts"><button class="btn" data-act="lockOverNo">Keep my place</button><button class="btn primary lg" data-act="lockOverDo">Start over</button></div>`
+        : `<div class="lock-acts"><button class="btn" data-act="logout">Log off</button><button class="btn" data-act="lockOver">Start over</button><button class="btn primary lg" data-act="remStart">Start the remediation round</button></div>`}`;
     } else if (!L.done) {
       body = `<p class="lock-lead">Remediation round</p><p class="muted">${c.remediationPass} of ${L.qs.length} to pass. Not timed.</p>
         ${L.qs.map((q, i) => `<div class="quiz"><p><b>${i + 1}.</b> ${esc(q.q)}</p>${q.options.map((o, j) => `<button class="qopt${L.answers[i] === j ? ' picked' : ''}" data-act="remPick" data-q="${i}" data-i="${j}" aria-pressed="${L.answers[i] === j}">${esc(o)}</button>`).join('')}</div>`).join('')}
@@ -758,7 +760,7 @@
   E.shiftActions = {
     shiftAsk(d) {
       const pr = E.progress(), sh = shiftDef(d.id), c = CFG();
-      if (pr.active) { E.app.status(`Finish ${pr.active.type === 'shift' ? 'your shift' : pr.active.type === 'exam' ? 'the proficiency check' : 'your mission'} first.`); return; }
+      if (pr.active) { E.app.status(`Finish ${pr.active.type === 'shift' ? 'your shift' : pr.active.type === 'exam' ? 'the proficiency check' : pr.active.type === 'case' ? 'your case' : 'your mission'} first.`); return; }
       if (!E.can('order.sign') && !E.can('order.pend')) return E.app.status('Shifts involve entering orders, so they are for the Medical Student and Physician roles.');
       E.ui.modal = { type: 'confirm', title: `Start shift ${sh.n}: ${sh.title}?`, text: `The ward is reset to its starting state first: every order, note and result entered on this device so far is erased. Your learning progress and safety record are kept. The hospital clock runs from ${hhmm(c.startHour)} to ${hhmm(c.endHour)} in about ${c.minutes} minutes. You can pause it, and it pauses itself if you switch to another tab.`, yes: 'shiftStart', yesLabel: 'Start the shift', id: sh.id };
       E.app.render();
@@ -835,6 +837,20 @@
       E.audit(`Remediation round: ${L.score} of ${L.qs.length}${L.passed ? ', passed' : ''}`);
       E.save(); E.app.render();
       const sc = document.querySelector('.lockout'); if (sc) sc.scrollTop = 0;
+    },
+    lockOver() { E.ui.lockOver = true; E.app.render(); },
+    lockOverNo() { E.ui.lockOver = false; E.app.render(); },
+    /* Game over, new game: the ward is put back as it was and the badge returned. The record keeps the suspension. */
+    lockOverDo() {
+      const s = E.safety(); if (!s.suspended) return;
+      const cur = s.suspensions[s.suspensions.length - 1]; if (cur) { cur.unlockedAt = Date.now(); cur.startedOver = true; }
+      s.suspended = null; s.strikes = 0; s.debriefDue = null; E.ui.lock = null; E.ui.lockOver = false; last = Date.now();
+      delete E.progress().active;
+      E.reset(); E.db.openTabs = [];
+      E.audit('Started over after a suspension: sim data reset, privileges restored without remediation');
+      E.save();
+      if (location.hash !== '#/home') location.hash = '#/home'; else E.app.render();
+      say('A fresh ward and a clean badge. The suspension is still on your safety record.', 'Started over', 'info');
     },
     remDone() {
       const L = E.ui.lock, s = E.safety(); if (!L || !L.passed || !s.suspended) return;
