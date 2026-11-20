@@ -14,13 +14,16 @@ Corporation and is not for clinical use.
 
 ## What's inside
 
-- Six fictional inpatients with charts, results, flowsheets, a medication record, notes and orders
+- Seven fictional inpatients with charts, results, flowsheets, a medication record, notes and orders
 - Order entry with allergy, interaction and lab-based advisories, and student cosign
 - Learning objectives mapped to the AAMC Core Entrustable Professional Activities, with practice
   tasks that check themselves off and a short knowledge check
 - Missions: short patient cases scored bronze, silver or gold, one with a live deterioration event
 - A timed proficiency check with a printable certificate
-- Mini-games: Spot the Unsafe Order and Note Doctor, whose results can be sent into the chart
+- Shifts: a 16-minute hospital day with rounds, pages and a deteriorating patient, ending in a shift report
+- Consequences: harmful orders hurt the simulated patient, and three harm events suspend your privileges
+- Mini-games: Spot the Unsafe Order, Note Doctor, Triage the Pages and Right Patient
+- Patient messages in the Inbox
 - Roles: Medical Student, Physician and Nurse
 
 ## Running it yourself

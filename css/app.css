@@ -548,15 +548,55 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
   .printonly { display: block; margin-top: 14px; } .card { break-inside: avoid; }
 }
 
-/* ---------- note blanks, inbox actions, text interview ---------- */
+/* ---------- note blanks, inbox actions ---------- */
 .blanks { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 6px; background: #FFF6D6; border: 1px solid #C9A227; font-size: 12px; }
 .blanks span { flex: 1; } .blanks code { background: #fff; border: 1px solid #C9A227; padding: 0 3px; font-weight: 700; } .blanks kbd, .btn kbd { font: 700 10px var(--ui); border: 1px solid currentColor; border-radius: 2px; padding: 0 3px; margin-left: 4px; opacity: .8; }
 .doc-acts { display: flex; gap: 6px; align-items: center; flex: none; }
-.talk { display: grid; grid-template-columns: 150px minmax(0, 1fr) 270px; gap: 12px; min-height: 340px; }
-.talk-who { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding-top: 8px; } .talk-who b { font: 700 16px var(--book); }
-.talk-log { background: #fff; border: 1px solid #919B76; padding: 8px 10px; overflow-y: auto; max-height: 52vh; font-size: 13px; line-height: 19px; }
-.talk-log p { margin: 0 0 8px; } .talk-log .you { color: #33401A; } .talk-log .pt { background: #EEF4FB; border: 1px solid #B9CDE6; padding: 6px 8px; }
-.talk-q { display: flex; flex-direction: column; gap: 5px; } .talk-q .btn { justify-content: flex-start; text-align: left; white-space: normal; height: auto; min-height: 26px; padding: 4px 8px; line-height: 16px; } .talk-q .btn.asked { opacity: .65; }
-@media (max-width: 900px) { .talk { grid-template-columns: 1fr; } .talk-who { flex-direction: row; } }
-.modal.talkm { width: 940px; max-width: calc(100vw - 32px); }
-.modal.talkm { width: 940px; max-width: calc(100vw - 32px); }
+
+/* ---------- patient messages: a thread in the Inbox ---------- */
+.sidebar .btn.call.wide { margin-bottom: 6px; } .sidebar .msg-pt { width: 100%; margin-bottom: 11px; min-height: 26px; font-weight: 700; }
+.call-alt { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 10px; margin-bottom: 10px; background: #fff; border: 1px solid var(--line); }
+.thread { display: flex; flex-direction: column; gap: 8px; max-height: 38vh; overflow-y: auto; padding: 10px; background: #fff; border: 1px solid #919B76; }
+.thread:empty::before { content: 'No messages yet. Choose one to send.'; color: var(--muted); }
+.thread .msg { max-width: 78%; padding: 6px 9px; border: 1px solid #B9CDE6; background: #EEF4FB; font-size: 13px; line-height: 19px; } .thread .msg p { margin: 2px 0 0; }
+.thread .msg b { margin-right: 6px; } .thread .msg.you { align-self: flex-end; background: #F1F6E2; border-color: #B4BF95; }
+.thread-send { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-top: 10px; } .thread-send > .muted { margin-bottom: 3px; }
+.thread-send .btn { justify-content: flex-start; text-align: left; white-space: normal; height: auto; min-height: 24px; padding: 3px 9px; line-height: 16px; } .thread-send .btn.asked { opacity: .65; }
+
+/* ---------- shifts ---------- */
+.shift-debrief { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--olive-2); }
+.shelf-p { max-width: 150ch; line-height: 1.5; margin: -2px 0 10px; }
+.shift-best { color: var(--muted); } .shift-best b { font: 700 17px var(--book); color: var(--olive-6); }
+.dock-shift .dock-timer { font-variant-numeric: tabular-nums; letter-spacing: .03em; } .dock-shift.paused .dock-timer { background: #8A5A00; }
+.ph-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 4px; }
+.ph-strip span { padding: 1px 0 2px; text-align: center; font-size: 10px; white-space: nowrap; overflow: hidden; color: var(--muted); background: #fff; border: 1px solid #C9C7BA; }
+.ph-strip .done { background: var(--olive-0); border-color: var(--olive-2); color: #3F501B; } .ph-strip .on { background: var(--hot-2); border-color: var(--hot); color: var(--ink); text-shadow: .5px 0 0 currentColor; }
+.xpbar.shift-bar { width: 100%; height: 9px; margin-bottom: 6px; } .xpbar.shift-bar i { transition: width 1s linear; }
+.shift-paused, .shift-now { display: flex; align-items: flex-start; gap: 5px; margin: 0 0 5px; padding: 3px 5px; border: 1px solid; }
+.shift-paused { background: var(--amber-bg); border-color: #E3C36A; color: #4F3300; } .shift-now { background: var(--red-bg); border-color: #E0A19C; font-weight: 700; } .shift-now a { color: var(--red); }
+.linkish { padding: 0; border: 0; background: none; color: var(--red); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; }
+.dock-shift .dock-list a { color: var(--ink); } .dock-shift .dock-score { flex-wrap: wrap; gap: 4px; }
+.notice.harm { background: var(--red-bg); border-color: #D98D85; color: #4A0E0A; } .notice > span { flex: 1; min-width: 0; } .notice > .btn { flex: none; align-self: center; } p.notice { margin-top: 0; }
+.rounds-q { font-size: 16px; margin: 10px 0; } .rounds-dots { margin-top: 10px; } .rounds-dots button { width: 22px; height: 22px; font-size: 11px; }
+.ph-tag { font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 4px; }
+.modal-b .result-score small { text-transform: lowercase; }
+
+/* ---------- suspension: the gift shop ---------- */
+.lockout { flex: 1; min-height: 0; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 36px 16px; background: var(--g-sky) 0 0 / 8px 640px repeat-x, #E3F1FC; image-rendering: pixelated; }
+.lockout > * { image-rendering: auto; }
+.lock-card { width: 680px; max-width: 100%; padding: 0 3px 3px; background: #4A5D26; border: 1px solid #2C3814; border-radius: 8px 8px 2px 2px; box-shadow: 4px 6px 16px rgba(0, 0, 0, .4); }
+.lock-card .modal-h { border-radius: 7px 7px 0 0; } .lock-b { padding: 16px 18px 14px; background: var(--face); }
+.lock-top { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); } .lock-top h2 { margin: 2px 0; color: var(--red); }
+.lock-lead { font: 700 20px/1.2 var(--book); color: var(--olive-6); margin-bottom: 6px; } .lock-b > p { max-width: 68ch; line-height: 1.5; } .lock-b .tbl { border: 1px solid var(--line); margin: 4px 0 12px; }
+.lock-b .quiz { max-width: none; } .lock-b .quiz:first-of-type { border-top: 0; margin-top: 0; }
+.lock-acts { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+/* ---------- mini-games: Triage the Pages, Right Patient ---------- */
+.tr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tr-page { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; background: #fff; border: 1px solid var(--line); }
+.tr-page.right { border-color: #9CCFB1; background: #F6FCF8; } .tr-page.wrong { border-color: #D98D85; background: #FFF6F5; }
+.tr-n { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--olive-5); color: #fff; font: 700 13px var(--title); }
+.tr-main { flex: 1; min-width: 0; } .tr-main > b { display: block; font-weight: 700; } .tr-main .g-why { margin-top: 5px; }
+.tr-move { flex: none; display: flex; gap: 4px; } .tr-move .btn { min-width: 48px; }
+.rp-req { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--note); border: 1px solid var(--line); } .rp-req p { margin: 0; font: 700 14px/1.45 var(--book); }
+.rp-list td { padding-top: 6px; padding-bottom: 6px; } .modal-b .dock-list.wide + .rp-list { margin-top: 10px; }

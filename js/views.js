@@ -139,7 +139,7 @@
         <table class="tbl hover"><thead><tr><th>Bed</th><th>Patient</th><th>Age / Sex</th><th>MRN</th><th>Attending</th><th>Principal problem</th><th>LOS</th><th>Code</th><th>Allergies</th><th>To do</th></tr></thead><tbody>
         ${rows.map((p) => {
           const pend = p.orders.filter((o) => o.status === 'Pended').length, cos = p.notes.filter((n) => n.status === 'Cosign needed').length;
-          return `<tr data-act="openPt" data-id="${p.id}" tabindex="0"><td>${esc(p.bed)}</td><td><b>${esc(p.name)}</b>${p.isolation ? ' ' + chip(p.isolation, 'amber') : ''}</td><td>${E.age(p.dob)} ${p.sex}</td><td>${p.mrn}</td><td>${esc(p.attending)}</td><td>${esc(p.dx)}</td><td class="nowrap">Day ${Math.max(1, Math.ceil((Date.now() - p.admitTs) / (24 * H)))}</td><td>${chip(p.codeStatus, p.codeStatus === 'Full Code' ? 'grey' : 'purple')}</td><td class="${E.allergiesOf(p).length ? 'allergy-cell' : 'muted'}">${esc(allergyText(p))}</td><td>${pend ? chip(pend + ' pended order' + (pend > 1 ? 's' : ''), 'amber') : ''} ${cos ? chip(cos + ' cosign', 'amber') : ''}</td></tr>`;
+          return `<tr data-act="openPt" data-id="${p.id}" tabindex="0"><td>${esc(p.bed)}</td><td><b>${esc(p.name)}</b>${p.nameAlert ? ' ' + chip('Name alert', 'purple') : ''}${p.isolation ? ' ' + chip(p.isolation, 'amber') : ''}${p.icu ? ' ' + chip('Intensive care', 'red') : ''}</td><td>${E.age(p.dob)} ${p.sex}</td><td>${p.mrn}</td><td>${esc(p.attending)}</td><td>${esc(p.dx)}</td><td class="nowrap">Day ${Math.max(1, Math.ceil((Date.now() - p.admitTs) / (24 * H)))}</td><td>${chip(p.codeStatus, p.codeStatus === 'Full Code' ? 'grey' : 'purple')}</td><td class="${E.allergiesOf(p).length ? 'allergy-cell' : 'muted'}">${esc(allergyText(p))}</td><td>${pend ? chip(pend + ' pended order' + (pend > 1 ? 's' : ''), 'amber') : ''} ${cos ? chip(cos + ' cosign', 'amber') : ''}</td></tr>`;
         }).join('')}
         </tbody></table>
       </section></div>`;
@@ -150,8 +150,9 @@
     const v = E.lastVitals(p), bmi = (p.weight / Math.pow(p.height / 100, 2)).toFixed(1);
     const vit = (k, label, val) => `<div class="${E.vitalAbn(k, v[k]) ? 'abn' : ''}"><span>${label}</span>${val}</div>`;
     return `<aside class="taskpane sidebar">
-      <div class="pt-head"><div class="avatar">${icon('user', 56)}</div><div><div class="pt-name">${esc(p.name)}</div><div>${E.age(p.dob)} y.o. ${p.sex === 'M' ? 'male' : 'female'}</div><div>MRN ${p.mrn}</div></div></div>
+      <div class="pt-head"><div class="avatar">${icon('user', 56)}</div><div><div class="pt-name">${esc(p.name)}</div><div>${E.age(p.dob)} y.o. ${p.sex === 'M' ? 'male' : 'female'}</div><div>MRN ${p.mrn}</div>${p.nameAlert ? `<div>${chip('Name alert', 'purple')}</div>` : ''}</div></div>
       <button class="btn call wide" data-act="callOpen">${icon('call', 28)}Call patient</button>
+      <button class="btn wide msg-pt" data-act="msgOpen" data-id="${p.id}">${icon('inbox', 16)}Message patient</button>
       ${pane('s-code', 'Code Status', `<div class="sb-line">${icon('code', 28)}<b>${esc(p.codeStatus)}</b></div>`, p.codeStatus === 'Full Code' ? '' : 'limited')}
       ${pane('s-allergy', 'Allergies', E.allergiesOf(p).length ? E.allergiesOf(p).map((a) => `<div class="sb-line">${icon('alert', 24)}<span><b>${esc(a.agent)}</b><br>${esc(a.reaction)}</span></div>`).join('') : '<div>No known allergies</div>', E.allergiesOf(p).length ? 'danger' : '')}
       ${p.isolation ? pane('s-iso', 'Isolation', `<div class="sb-line">${icon('iso', 28)}<b>${esc(p.isolation)}</b></div>`, 'caution') : ''}
@@ -162,7 +163,7 @@
   };
   V.chart = (p, act) => `<div class="chartwrap">${V.sidebar(p)}<section class="chart">
       <nav class="acts">${E.ACTS.map(([id, label]) => `<a href="#/pt/${p.id}/${id}" class="${id === act ? 'on' : ''}">${icon(ACT_GLYPH[id], 24)}${label}</a>`).join('')}</nav>
-      <div class="activity" id="activity">${V.act[act](p)}</div></section></div>`;
+      <div class="activity" id="activity">${V.chartBanner ? V.chartBanner(p) : ''}${V.act[act](p)}</div></section></div>`;
 
   /* ================= trend chart ================= */
   V.trend = (pts, lo, hi, dec) => {
@@ -321,15 +322,15 @@
       <label class="grow">Comments / indication<input ${f('comment')} value="${esc(d.comment)}" maxlength="200"></label></div></div>`;
   };
   V.act.orders = (p) => {
-    const canOrder = E.can('order.sign') || E.can('order.pend');
+    const canOrder = E.can('order.sign') || E.can('order.pend'), locked = E.orderLock ? E.orderLock(p) : '';
     const hist = E.ui.showHistory, list = p.orders.filter((o) => (hist ? true : ['Active', 'In process'].includes(o.status)));
     const pend = p.orders.filter((o) => o.status === 'Pended');
-    const row = (o) => `<tr><td><b>${esc(o.name)}</b><div class="muted">${esc(E.orderDetail(o))}</div>${(o.overrides || []).map((x) => `<div class="fine">Advisory overridden: ${esc(x.title)} — ${esc(x.reason)}</div>`).join('')}</td><td>${statusChip(o.status)}</td><td class="muted">${esc(o.by)}<br>${E.fmtDT(o.ts)}</td><td>${o.status === 'Active' && E.can('order.dc') ? `<button class="btn xs" data-act="orderDc" data-id="${o.id}">Discontinue</button>` : ''}</td></tr>`;
+    const row = (o) => `<tr><td><b>${esc(o.name)}</b><div class="muted">${esc(E.orderDetail(o))}</div>${(o.overrides || []).map((x) => `<div class="fine">Advisory overridden: ${esc(x.title)} — ${esc(x.reason)}</div>`).join('')}</td><td>${statusChip(o.status)}</td><td class="muted">${esc(o.by)}<br>${E.fmtDT(o.ts)}</td><td>${V.orderExtra ? V.orderExtra(p, o) : ''}${o.status === 'Active' && E.can('order.dc') ? `<button class="btn xs" data-act="orderDc" data-id="${o.id}">Discontinue</button>` : ''}</td></tr>`;
     let active = '';
     E.GROUPS.forEach((g) => { const rows = list.filter((o) => o.group === g); if (rows.length) active += `<tr class="grp"><th colspan="4">${g}</th></tr>` + rows.map(row).join(''); });
     const left = `${pend.length ? card(`Pended — awaiting physician signature (${pend.length})`, `<table class="tbl compact"><tbody>${pend.map((o) => `<tr><td><b>${esc(o.name)}</b><div class="muted">${esc(E.orderDetail(o))}</div>${(o.overrides || []).map((x) => `<div class="fine">Advisory overridden: ${esc(x.title)} — ${esc(x.reason)}</div>`).join('')}</td><td class="muted">${esc(o.by)}<br>${E.fmtDT(o.ts)}</td><td class="nowrap">${E.can('order.sign') ? `<button class="btn primary xs" data-act="orderCosign" data-id="${o.id}">Sign</button> <button class="btn xs" data-act="orderDecline" data-id="${o.id}">Decline</button>` : chip('Pended', 'amber')}</td></tr>`).join('')}</tbody></table>`) : ''}
       ${card(hist ? 'All orders' : 'Active orders', active ? `<table class="tbl compact"><tbody>${active}</tbody></table>` : empty('No orders'), `<button class="btn xs" data-act="toggleHistory">${hist ? 'Show active only' : 'Show order history'}</button>`)}`;
-    const right = canOrder ? card('New orders', `<input id="orderSearch" class="wide" data-input="orderSearch" placeholder="Search medications, labs, imaging, nursing orders…" value="${esc(E.ui.orderQuery)}" autocomplete="off">
+    const right = locked ? `<div class="notice warn">${icon('warn', 24)}<span>${esc(locked)}</span></div>` : canOrder ? card('New orders', `<input id="orderSearch" class="wide" data-input="orderSearch" placeholder="Search medications, labs, imaging, nursing orders…" value="${esc(E.ui.orderQuery)}" autocomplete="off">
         <div id="orderRes" class="res-list">${V.orderResults(E.ui.orderQuery)}</div>
         <div class="sets"><span class="muted">Order sets:</span> ${E.ORDER_SETS.map((s) => `<button class="btn xs" data-act="setOpen" data-id="${s.id}">${icon('set', 16)}${esc(s.name)}</button>`).join(' ')}</div>
         <h4>Unsigned orders (${p.drafts.length})</h4>
@@ -409,8 +410,17 @@
     const list = E.myInbox().sort((a, b) => b.ts - a.ts), m = list.find((x) => x.id === E.ui.inboxSel);
     const p = m && m.patientId && E.pt(m.patientId);
     return `<div class="page"><h2>Inbox</h2><div class="split"><div class="pane list">
-      ${list.map((x) => `<button class="list-row${m && m.id === x.id ? ' sel' : ''}${x.read ? '' : ' unread'}" data-act="inboxSel" data-id="${x.id}"><b>${esc(x.subject)}</b><span class="muted">${chip(x.type, x.critical ? 'red' : x.type === 'Result' ? 'blue' : x.type.startsWith('Cosign') ? 'amber' : 'grey')} ${esc(x.from)} · ${E.fmtDT(x.ts)}</span></button>`).join('') || empty('No messages')}</div>
-      <div class="pane">${m ? `<div class="doc-h"><div><h3>${esc(m.subject)}</h3><div class="muted">${esc(m.type)} · from ${esc(m.from)} · ${E.fmtDT(m.ts)}</div></div><span class="doc-acts">${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}<button class="btn xs" data-act="inboxDone" data-id="${m.id}" title="Remove this message from your Inbox">${icon('check', 16)}Done</button></span></div><pre class="doc">${esc(m.body)}</pre>` : empty('Select a message.')}</div></div></div>`;
+      ${list.map((x) => `<button class="list-row${m && m.id === x.id ? ' sel' : ''}${x.read ? '' : ' unread'}" data-act="inboxSel" data-id="${x.id}"><b>${esc(x.subject)}</b><span class="muted">${chip(x.type, x.critical ? 'red' : x.type === 'Result' ? 'blue' : x.type === 'Patient Message' ? 'purple' : x.type.startsWith('Cosign') ? 'amber' : 'grey')} ${esc(x.from)} · ${E.fmtDT(x.ts)}</span></button>`).join('') || empty('No messages')}</div>
+      <div class="pane">${m ? `<div class="doc-h"><div><h3>${esc(m.subject)}</h3><div class="muted">${esc(m.type)} · from ${esc(m.from)} · ${E.fmtDT(m.ts)}</div></div><span class="doc-acts">${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}<button class="btn xs" data-act="inboxDone" data-id="${m.id}" title="Remove this message from your Inbox">${icon('check', 16)}Done</button></span></div>${m.thread ? V.thread(m, p) : `<pre class="doc">${esc(m.body)}</pre>`}` : empty('Select a message.')}</div></div></div>`;
+  };
+
+  /** A patient-message thread in the Inbox reading pane: the conversation, oldest first, then the messages that can be sent. */
+  V.thread = (m, p) => {
+    const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1];
+    return `<div class="thread" id="threadLog">${m.thread.map((t) => `<div class="msg ${t.who === 'you' ? 'you' : 'pt'}"><b>${t.who === 'you' ? 'You' : esc(fn)}</b><span class="muted">${E.fmtDT(t.ts)}</span><p>${esc(t.text)}</p></div>`).join('')}</div>
+      <div class="thread-send"><b>Choose a message to send</b><span class="muted">Replies are picked from this list. There is no free-text box, because nothing here reads free text.</span>
+        ${iv.map((x) => `<button class="btn${asked.includes(x.i) ? ' asked' : ''}" data-act="msgAsk" data-id="${m.id}" data-i="${x.i}">${asked.includes(x.i) ? icon('check', 16) : ''}${esc(x.q)}</button>`).join('')}</div>
+      <p class="fine">Simulated patient; any resemblance to a real person is a coincidence. Anything you learn here belongs in a note.</p>`;
   };
 
   /* ================= Activity log ================= */
@@ -433,9 +443,10 @@
         <div class="rank-main"><div class="rank-lv">Level ${g.level} of ${E.LEVELS.length}</div><div class="rank-title">${esc(g.title)}</div>
           <div class="xpbar big" role="img" aria-label="${g.xp} of ${g.max} experience points"><i style="width:${g.pct}%"></i></div>
           <div class="muted">${g.xp} XP${g.next ? ` · ${g.next - g.xp} XP to ${esc(E.LEVELS[g.level][1])}` : ' · every objective complete'}</div></div>
-        <dl class="rank-stats"><dt>Learner</dt><dd>${esc(who.name)}, ${esc(E.roleLabel(who.role))}</dd><dt>Practice tasks</dt><dd>${s.tasksDone} of ${s.tasks} · ${E.XP.task} XP each</dd><dt>Knowledge check</dt><dd>${s.quizCorrect} of ${s.quiz} correct · ${E.XP.quizRight} XP each, first answer counts</dd><dt>Missions</dt><dd>${E.missionStars(who)} of ${(E.MISSIONS || []).length * 3} stars · ${E.XP.star} XP per star · <a href="#/missions">Missions</a></dd><dt>Proficiency check</dt><dd>${who.exam && who.exam.passed ? `passed, ${who.exam.passedScore} of ${E.EXAM.questions}` : `${(who.exam || { attempts: [] }).attempts.length} of ${E.EXAM.attempts} attempts used`}${instructor && !own && who.exam && who.exam.attempts.length ? ` <button class="btn xs" data-act="examReset" data-id="${esc(E.ui.learnWho)}">Reset attempts</button>` : ''}</dd>${E.pigs(who) ? `<dt>Flying pigs</dt><dd>${E.pigs(who)} caught · ${E.pigs(who) * E.XP.pig >= E.XP.pigMax ? 'maximum bonus reached' : E.pigs(who) * E.XP.pig + ' bonus XP'}</dd>` : ''}</dl>
+        <dl class="rank-stats"><dt>Learner</dt><dd>${esc(who.name)}, ${esc(E.roleLabel(who.role))}</dd><dt>Practice tasks</dt><dd>${s.tasksDone} of ${s.tasks} · ${E.XP.task} XP each</dd><dt>Knowledge check</dt><dd>${s.quizCorrect} of ${s.quiz} correct · ${E.XP.quizRight} XP each, first answer counts</dd><dt>Missions</dt><dd>${E.missionStars(who)} of ${(E.MISSIONS || []).length * 3} stars · ${E.XP.star} XP per star · <a href="#/missions">Missions</a></dd><dt>Proficiency check</dt><dd>${who.exam && who.exam.passed ? `passed, ${who.exam.passedScore} of ${E.EXAM.questions}` : `${(who.exam || { attempts: [] }).attempts.length} of ${E.EXAM.attempts} attempts used`}${instructor && !own && who.exam && who.exam.attempts.length ? ` <button class="btn xs" data-act="examReset" data-id="${esc(E.ui.learnWho)}">Reset attempts</button>` : ''}</dd>${V.learnStats ? V.learnStats(who) : ''}${E.pigs(who) ? `<dt>Flying pigs</dt><dd>${E.pigs(who)} caught · ${E.pigs(who) * E.XP.pig >= E.XP.pigMax ? 'maximum bonus reached' : E.pigs(who) * E.XP.pig + ' bonus XP'}</dd>` : ''}</dl>
       </div>
       <div class="badges">${E.BADGES.map((b) => { const got = g.earned.includes(b.id); return `<div class="badge-tile${got ? ' got' : ''}" title="${esc(b.how)}"><span class="badge-art">${icon(b.glyph, 64)}${got ? `<span class="badge-pin">${icon('medal', 32)}</span>` : ''}</span><b>${esc(b.name)}</b><small>${got ? 'Earned' : esc(b.how)}</small></div>`; }).join('')}</div>
+      ${V.learnCards ? V.learnCards(who, own) : ''}
       ${instructor && all.length > 1 ? `<div class="card noprint"><header class="card-h"><h3>All learners on this device</h3></header><div class="card-b"><table class="tbl compact hover"><thead><tr><th>Learner</th><th>Role</th><th>Tasks</th><th>Knowledge check</th></tr></thead><tbody>${all.map(([k, pr]) => { const x = E.progressSummary(pr); return `<tr class="${pr === who ? 'sel' : ''}" data-act="learnWho" data-id="${esc(k)}" tabindex="0"><td><b>${esc(pr.name)}</b></td><td>${esc(E.roleLabel(pr.role))}</td><td>${x.tasksDone} / ${x.tasks}</td><td>${x.quizCorrect} / ${x.quiz}</td></tr>`; }).join('')}</tbody></table></div></div>` : ''}
       ${E.LEARNING.map((lo, i) => { const b = s.byLo[i]; return `<section class="card lo"><header class="card-h"><h3>${icon(LO_GLYPH[lo.id], 40)}${chip(lo.epa, 'blue')} ${esc(lo.epaTitle)}</h3><span class="muted">${b.tasksDone}/${b.tasks} tasks · ${b.quizCorrect}/${b.quiz} correct</span></header><div class="card-b">
         <p class="lo-obj"><b>Objective:</b> ${esc(lo.objective)}</p>
@@ -474,22 +485,12 @@
         <label class="grow">How do you know? (required)<input id="rmComment" maxlength="200" placeholder="e.g., Patient reports taking amoxicillin in 2024 without a reaction"></label></div>`,
       `${cancel}<button class="btn danger" data-act="allergyRemoveSave">${student ? 'Request removal' : 'Remove allergy'}</button>`); }
     if (m.type === 'debrief') return modal('Learning moment', `<div class="debrief">${icon('learning', 48)}<div>${m.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div></div>`, '<button class="btn primary" data-act="closeModal">Got it</button>', 'lg');
-    if (m.type === 'call' && m.state === 'off') {
-      const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1];
-      return modal('Patient interview — ' + p.name, `<div class="talk">
-          <div class="talk-who"><span class="call-face">${icon('user', 96)}</span><b>${esc(p.name)}</b><span class="muted">${E.age(p.dob)} y.o. · ${esc(p.bed)}</span></div>
-          <div class="talk-log" id="talkLog">${asked.length ? asked.map((i) => `<p class="you"><b>You:</b> ${esc(iv[i].q)}</p><p class="pt"><b>${esc(fn)}:</b> ${esc(iv[i].a)}</p>`).join('') : `<p class="muted">Choose a question to start. ${esc(fn)} answers the way a patient would: in everyday words, and only what you ask.</p>`}</div>
-          <div class="talk-q"><b>Ask ${esc(fn)}</b>${iv.map((x) => `<button class="btn${asked.includes(x.i) ? ' asked' : ''}" data-act="callAsk" data-i="${x.i}">${asked.includes(x.i) ? icon('check', 16) : ''}${esc(x.q)}</button>`).join('')}</div>
-        </div>
-        <p class="fine">Video visits are not connected on this copy of the sim yet, so this is a text interview. ${E.db.user.role === 'physician' ? 'Faculty: set a video-visit server address in <code>js/config.js</code> to turn on live video. ' : ''}Simulated patient; any resemblance to a real person is a coincidence. Document the encounter in Notes when you finish.</p>`,
-        `<span class="muted">${asked.length} of ${iv.length} asked</span><button class="btn primary" data-act="callEnd">End interview</button>`, 'lg talkm');
-    }
     if (m.type === 'call') {
       const stage = m.state === 'live' ? `<iframe class="call-frame" src="${esc(m.url)}" title="Video visit with ${esc(p.name)}" allow="camera; microphone; autoplay; fullscreen; display-capture"></iframe>`
         : `<div class="call-wait"><span class="call-face">${icon('user', 120)}</span><b>${esc(p.name)}</b>${m.state === 'connecting' ? `<span>Calling…</span><div class="xpbar big call-bar" role="progressbar" aria-label="Connecting"><i></i></div>`
             : m.state === 'error' ? `<span class="call-msg">The call could not be connected. ${esc(m.msg)}</span>`
             : `<span class="call-msg">Video visits are not connected on this copy of the sim yet.</span>`}</div>`;
-      const side = m.state === 'off' || m.state === 'error' ? `<div class="notice info">${icon('info', 24)}<span>${m.state === 'off' ? 'To turn this on, faculty set a video-visit server address in <code>js/config.js</code>. The file explains what the server needs to do.' : 'Check that the video-visit server in <code>js/config.js</code> is running and allows this page, then try again.'}</span></div>` : '';
+      const side = m.state === 'off' || m.state === 'error' ? `<div class="notice info">${icon('info', 24)}<span>${m.state === 'off' ? 'To turn this on, faculty set a video-visit server address in <code>js/config.js</code>. The file explains what the server needs to do.' : 'Check that the video-visit server in <code>js/config.js</code> is running and allows this page, then try again.'}</span></div>${m.state === 'off' ? `<div class="call-alt"><span>You can message this patient instead.</span><button class="btn" data-act="msgOpen" data-id="${p.id}">${icon('inbox', 16)}Message patient</button></div>` : ''}` : '';
       return modal('Video Visit — ' + p.name, `<div class="call-stage">${stage}</div>${side}
         ${E.db.user.role === 'physician' ? `<details class="call-brief"><summary>Faculty view: what this patient has been told to know (persona brief)</summary><pre class="doc">${esc(E.personaBrief(p))}</pre></details>` : ''}
         <p class="fine">Simulated patient. Any resemblance to a real person is a coincidence, and so is their patience with hold music. Document the encounter in Notes when you finish.</p>`,
@@ -498,7 +499,7 @@
     if (m.type === 'help') return modal('Help — SIM+EHR', `
         <p><b>SIM+EHR</b> is the simulation. Inside it you work in <b>Epig</b>, a made-up hospital record (a parody of the systems you will meet on the wards), with Truffle the flying pig as your guide.</p>
         <h4>Getting around</h4>
-        <ul><li><b>Patient Lists</b> shows the census. Select a patient to open the chart; open charts stay as tabs under the toolbar.</li><li>The left <b>sidebar</b> of a chart always shows identity, code status, allergies and the latest vitals.</li><li>Activity tabs across the chart: Summary, Chart Review, Results, Flowsheets, MAR, Notes, Orders, Problems &amp; Allergies.</li><li>Lab and imaging orders result on their own about 15–25 seconds after they are signed, and a message arrives in the Inbox.</li><li><b>Learning</b> lists the objectives, tracks practice tasks, and holds the knowledge check.</li></ul>
+        <ul><li><b>Patient Lists</b> shows the census. Select a patient to open the chart; open charts stay as tabs under the toolbar.</li><li>The left <b>sidebar</b> of a chart always shows identity, code status, allergies and the latest vitals.</li><li>Activity tabs across the chart: Summary, Chart Review, Results, Flowsheets, MAR, Notes, Orders, Problems &amp; Allergies.</li><li>Lab and imaging orders result on their own about 15–25 seconds after they are signed, and a message arrives in the Inbox.</li><li><b>Learning</b> lists the objectives, tracks practice tasks, and holds the knowledge check.</li><li><b>Missions</b> holds the shifts (a whole day on the ward against a clock you can pause), the single-patient missions, the mini-games and the proficiency check.</li><li><b>Message patient</b> in the chart sidebar opens a message thread with the patient in your Inbox. <b>Call patient</b> is for video visits.</li></ul>
         <h4>Roles</h4>
         <ul>${Object.values(E.ROLES).map((r) => `<li><b>${esc(r.label)}:</b> ${esc(r.desc)}</li>`).join('')}</ul><p class="muted">Log out and back in to switch roles, for example to cosign your own student orders as a physician.</p>
         <h4>${esc(E.pal.name)} the guide</h4>

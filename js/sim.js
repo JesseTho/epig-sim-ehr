@@ -25,6 +25,7 @@
     p3: R('Lungs are clear. Heart size is at the upper limit of normal. No effusion or pneumothorax. Degenerative change of the thoracic spine.', 'No acute cardiopulmonary process.'),
     p4: R('Lungs are clear. Heart size normal. No effusion, pneumothorax or free air beneath the diaphragm.', 'No acute cardiopulmonary process.'),
     p5: R('Lungs are clear. Heart size normal. Coronary stent noted. No free intraperitoneal air beneath the diaphragm.', '1. No acute cardiopulmonary process.\n2. No free air.'),
+    p7: R('Lungs are clear. Heart size normal. No effusion or pneumothorax.', 'No acute cardiopulmonary process.'),
     p6: R('Hyperinflated lungs with flattened hemidiaphragms and increased retrosternal air space. No focal consolidation. No pneumothorax. No effusion.', '1. Emphysematous changes of COPD.\n2. No pneumonia or pneumothorax.'),
   };
   const ECG = {
@@ -33,6 +34,7 @@
     p3: 'Atrial fibrillation with controlled ventricular response, rate 78. Normal axis. No acute ST-T changes.\n\nIMPRESSION: Atrial fibrillation, rate controlled. No acute changes.',
     p4: 'Sinus tachycardia, rate 108. Normal intervals. T waves upright and not peaked.\n\nIMPRESSION: Sinus tachycardia. No changes of hyperkalemia.',
     p5: 'Sinus tachycardia, rate 104. Old inferior Q waves. No new ST-segment changes.\n\nIMPRESSION: Sinus tachycardia. Old inferior infarct. No acute ischemia.',
+    p7: 'Sinus rhythm, rate 84. Normal axis and intervals. No ST-segment changes.\n\nIMPRESSION: Normal ECG.',
     p6: 'Sinus tachycardia, rate 106. Right axis deviation. Peaked P waves in lead II (P pulmonale). Low voltage.\n\nIMPRESSION: Sinus tachycardia with findings of chronic lung disease.',
   };
   const ECHO = {
@@ -163,20 +165,41 @@
   };
   const nursingReply = (p, o) => (NURSING[o.catId] ? NURSING[o.catId](p) : o.group === 'Diet & Activity' ? `Diet changed to: ${o.name}. Kitchen notified for the next tray.` : `${o.name}: acknowledged and carried out.`);
 
+  /* Orders that are harmless but make no sense. The nurse says so, drily, and nobody is marked down.
+     Returns { subject, body } or null. */
+  function sillyOrder(p, o) {
+    const twin = p.orders.find((x) => x !== o && x.catId === o.catId && x.status === 'Active');
+    const fn = p.name.split(', ').reverse().join(' ');
+    if (/^diet_/.test(o.catId) && p.orders.some((x) => x.catId === 'npo' && x.status === 'Active'))
+      return { subject: `Question: ${o.name} and NPO — ${p.name}`, body: `${fn} now has "${o.name}" and "NPO" active at the same time. I cannot feed someone and not feed them. Until I hear otherwise the NPO order wins, and the kitchen is sending a tray of nothing, which they do very well.\n\nIf you mean for the patient to eat, the NPO order has to be discontinued first. A physician can do that.` };
+    if (o.catId === 'npo' && twin) return { subject: `Question: NPO, twice — ${p.name}`, body: `${fn} was already NPO. I have noted the second order. The patient cannot eat any less than nothing.` };
+    if (twin && o.catId === 'vs_q4') return { subject: `Question: vital signs every 4 hours, twice — ${p.name}`, body: `${fn} already had vital signs every 4 hours ordered. I will keep taking them every 4 hours, once each time. Taking them twice does not make them better.\n\nOne of the two orders can be discontinued.` };
+    if (twin && (o.group === 'Nursing' || o.group === 'Diet & Activity') && o.catId !== 'prbc' && o.catId !== 'poc_glu')
+      return { subject: `Question: ${o.name}, twice — ${p.name}`, body: `"${o.name}" was already ordered for ${fn}, and it is already being done. I have filed the second order next to the first, where they can keep each other company.\n\nOne of the two can be discontinued.` };
+    return null;
+  }
+
   /* ================= 6. the attending reviews student work ================= */
+  const RESIDENT = 'Covering resident (PGY-2)';
   function reviewOrders(p, list, out) {
-    const ok = [], no = [];
+    const ok = [], no = [], rushed = [];
     list.forEach((o) => {
       const high = E.checkDraft(p, o, []).filter((a) => a.level === 'high');
-      if (high.length) { o.status = 'Declined'; o.declinedBy = p.attending; o.declineReason = high[0].title; no.push({ o, a: high[0] }); auditAs(p.attending, `Declined pended order: ${o.name} (${high[0].title})`, p.id); }
+      // an order that would harm this patient (js/shift.js) is stopped here too, and counted as a near miss
+      const rule = E.harmRule ? E.harmRule(p, o) : null, stop = high[0] || (rule && { title: rule.title, detail: rule.why(p, o) });
+      // during a shift's Day work the attending is busy: an order whose advisory the student overrode is
+      // cosigned by a hurried resident and reaches the patient
+      if (stop && o.overrides && o.overrides.length && E.shiftRushed && E.shiftRushed()) { E.activate(p, o, RESIDENT); o.rushed = true; rushed.push(o); auditAs(RESIDENT, `Cosigned order without review: ${o.name} (entered by ${o.by}, advisory overridden)`, p.id); }
+      else if (stop) { o.status = 'Declined'; o.declinedBy = p.attending; o.declineReason = stop.title; no.push({ o, a: stop }); auditAs(p.attending, `Declined pended order: ${o.name} (${stop.title})`, p.id); if (E.nearMiss) E.nearMiss(p, o, stop.title, p.attending); }
       else { E.activate(p, o, p.attending); ok.push(o); auditAs(p.attending, `Cosigned order: ${o.name} (entered by ${o.by})`, p.id); }
     });
     const body = [
       ok.length ? `Cosigned and now active:\n${ok.map((o) => `- ${o.name} ${E.orderDetail(o)}`).join('\n')}` : '',
+      rushed.length ? `I am in a procedure. The covering resident cosigned these between pages, without the usual review, because you had overridden the advisory:\n${rushed.map((o) => `- ${o.name} ${E.orderDetail(o)}`).join('\n')}\nThey are active now. You own what happens next.` : '',
       no.length ? `Declined:\n${no.map(({ o, a }) => `- ${o.name}: ${a.title}. ${a.detail}${o.overrides && o.overrides.length ? ` You overrode this advisory ("${o.overrides[0].reason}"); it was a hard stop for me.` : ''}`).join('\n')}\n\nCome find me and we will pick a safer alternative together.` : '',
       ok.some((o) => o.type === 'lab' || o.type === 'img') ? 'Tests are in process. Watch your Inbox for the results and follow them up.' : '',
     ].filter(Boolean).join('\n\n');
-    E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'orders', critical: !!no.length && !ok.length, subject: `${no.length ? (ok.length ? 'Some orders declined' : 'Orders declined') : 'Orders cosigned'} — ${p.name}`, body });
+    E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'orders', critical: !!no.length && !ok.length && !rushed.length, subject: `${no.length ? (ok.length || rushed.length ? 'Some orders declined' : 'Orders declined') : 'Orders cosigned'} — ${p.name}`, body });
     out.push(`${p.attending} reviewed your orders — ${p.name}`);
   }
   function reviewNote(p, n, out) {
@@ -204,11 +227,14 @@
         p.notes.filter((n) => n.status === 'Cosign needed' && n.role === 'student' && now - n.ts >= c.noteDelay * 1000).forEach((n) => reviewNote(p, n, out));
       }
       const act = p.orders.filter((o) => o.status === 'Active');
-      const vit = act.filter((o) => VIT_RULES[o.catId] && !o.simVit && fresh(o, c.vitalsDelay));
+      // an order that is harming the patient (js/shift.js) gets its vital signs from the harm rule, not from here
+      const vit = act.filter((o) => VIT_RULES[o.catId] && !o.simVit && fresh(o, c.vitalsDelay) && !(E.db.crises || []).some((x) => x.orderId === o.id));
       if (vit.length) { vit.forEach((o) => { o.simVit = true; }); if (vitalsAfter(p, vit)) out.push(`New vital signs — ${p.name}`); }
       act.filter((o) => CONSULT[o.catId] && fresh(o, c.consultDelay)).forEach((o) => out.push(consultNote(p, o)));
       act.filter((o) => o.type === 'other' && !CONSULT[o.catId] && !o.simAck && o.group !== 'Code Status' && fresh(o, c.nursingDelay)).forEach((o) => {
         o.simAck = true;
+        const silly = sillyOrder(p, o);
+        if (silly) { E.message(Object.assign({ type: 'Nursing', from: p.rn, patientId: p.id, act: 'orders' }, silly)); auditAs(p.rn, `Questioned order: ${o.name}`, p.id); out.push(`${p.rn.split(',')[0]} RN has a question — ${p.name}`); return; }
         E.message({ type: 'Nursing', from: p.rn, patientId: p.id, act: o.catId === 'poc_glu' ? 'results' : o.catId === 'vs_q4' || o.catId === 'o2' ? 'flowsheets' : 'orders', subject: `Done: ${o.name} — ${p.name}`, body: nursingReply(p, o) });
         out.push(`${p.rn.split(',')[0]} RN: ${o.name} — ${p.name}`);
       });
@@ -223,6 +249,7 @@
     p3: ['I am here for my new hip. They did the operation yesterday. The pain is there but I can manage it, mostly it hurts when I try to stand.', 'I live alone in a second-floor walk-up, which I am a bit worried about. My daughter can stay with me for the first week.', 'I want to know when I restart my blood thinner. I take it for my irregular heartbeat and nobody has told me the plan.'],
     p4: ['I have been throwing up since yesterday and my stomach really hurts. I am so thirsty and I keep peeing. My breathing feels fast and weird.', 'I am a nursing student, I live with roommates. My insulin pump site got kinked two days ago during finals and I did not notice until my sugars were sky high.', 'I am embarrassed. I should know better. Am I going to have to stay long? I have an exam on Friday.'],
     p5: ['My stools turned black, like tar, a few days ago. Then this morning I stood up and got so lightheaded I had to sit on the floor.', 'I live with my wife; she keeps my pills straight because my memory is not what it was. I have been taking ibuprofen every day for my knees, three or four of them.', 'I do not want any heroics. We talked about it with my doctor. But I would like to stop feeling so weak.'],
+    p7: ['My leg. I scratched it gardening and a few days later it went red and hot and the red kept spreading. Then I got a fever.', 'I live with my husband. I do not smoke. I have sugar diabetes and I take a pill for it, and one for my blood pressure.', 'People here keep calling me Maria. That is the other lady down the hall. I am Marie. Please check my wristband.'],
     p6: ['My breathing got bad over three days. More wheezing, more coughing, and the phlegm changed colour. My inhaler stopped helping and I could not finish a sentence.', 'I live alone with my cat. I use oxygen at home, two litres. I still smoke a few a day, I am down from a pack. I get very anxious when I cannot breathe.', 'I am afraid of ending up on a breathing machine. And who is feeding my cat?'],
   };
   /** Questions a student can ask, with the patient's answers written from the chart in everyday words. */

@@ -309,6 +309,7 @@
         <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} stars</b></div></div>
       ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions involve entering orders, so they are written for the Medical Student and Physician roles. The proficiency check below is open to every role.</span></div>`}
       ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress. Finish or abandon it from the mission panel in the corner before starting another.</span></div>` : ''}
+      ${V.shiftShelf ? V.shiftShelf() : ''}
       <div class="mission-grid">${cards}</div>${V.gameShelf ? V.gameShelf() : ''}${boss}</div>`;
   };
 
@@ -317,6 +318,7 @@
     if (!E.db.user) return '';
     const pr = E.progress(), a = pr.active;
     if (!a) return '';
+    if (a.type === 'shift') return V.shiftDock ? V.shiftDock(a) : '';   // js/shift.js
     const min = !!E.ui.dockMin;
     let title, body, timer = '', glyph;
     if (a.type === 'mission') {
@@ -364,7 +366,7 @@
   });
 
   /* ---------- actions (merged into the app's action table by js/app.js) ---------- */
-  const busyWith = (pr) => pr.active && (pr.active.type === 'exam' ? 'the proficiency check' : 'a mission');
+  const busyWith = (pr) => pr.active && (pr.active.type === 'exam' ? 'the proficiency check' : pr.active.type === 'shift' ? 'your shift' : 'a mission');
   E.missionActions = {
     missionStart(d) {
       const pr = E.progress(), m = mission(d.id);

@@ -19,6 +19,8 @@
     const root = $('#root');
     if (E.music) E.music.scene(E.db.user ? null : 'login');   // the login music plays on the login screen only
     if (!E.db.user) { root.innerHTML = V.login(); $('#modal').innerHTML = ''; if (E.pal) E.pal.sync(null, false); return; }
+    // privileges suspended after repeated harm (js/shift.js): nothing but the lockout until remediation is passed
+    if (E.suspended && E.suspended()) { ui.modal = null; root.innerHTML = V.lockout(); $('#modal').innerHTML = ''; $('#toast').innerHTML = ''; lastHash = null; document.title = 'SIM+EHR'; if (E.pal) E.pal.sync('sad', true); return; }
     const r = route(), sc = $('#activity') || $('.main');
     const keep = sc && lastHash === location.hash ? sc.scrollTop : 0;
     root.innerHTML = V.shell(r, r.view === 'chart' ? V.chart(E.pt(r.pid), r.act) : V[r.view]());
@@ -190,7 +192,7 @@
     const s = E.progressSummary(pr), ev = E.evidence(pr), g = E.game(pr);
     const report = {
       title: 'SIM+EHR Student Edition — learner report', framework: E.EPA_SOURCE, exportedAt: new Date().toISOString(),
-      learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), proficiencyCheck: E.examReport(pr), miniGames: E.GAMES.map((g) => { const r = (pr.games || {})[g.id] || {}; return { game: g.name, plays: r.plays || 0, bestPercent: r.best || 0, perfectRounds: r.perfect || 0 }; }), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
+      learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), shifts: E.shiftReport ? E.shiftReport(pr) : [], safetyRecord: E.safetyReport ? E.safetyReport(pr) : null, proficiencyCheck: E.examReport(pr), miniGames: E.GAMES.map((g) => { const r = (pr.games || {})[g.id] || {}; return { game: g.name, plays: r.plays || 0, bestPercent: r.best || 0, perfectRounds: r.perfect || 0 }; }), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
       objectives: E.LEARNING.map((lo) => ({
         epa: lo.epa, epaTitle: lo.epaTitle, objective: lo.objective,
         tasks: lo.tasks.map((t) => ({ task: t.text, completedAt: pr.events[t.event] ? new Date(pr.events[t.event]).toISOString() : null })),
@@ -240,7 +242,7 @@
     },
     closeTabDo(d) { d = d && d.id ? d : { id: ui.closing }; ui.closing = null; ui.modal = null; E.db.openTabs = E.db.openTabs.filter((id) => id !== d.id); E.save(); if (route().pid === d.id) go('#/home'); else render(); },
     resetAsk() { ui.modal = { type: 'confirm', title: 'Reset sim data?', text: 'All patients return to their starting state and the timeline is regenerated from the current time. Orders, notes and documentation entered by anyone on this device are erased. Learning progress is kept.', yes: 'resetDo', yesLabel: 'Reset', danger: true }; render(); },
-    resetDo() { const act = E.progress().active; if (act && act.type === 'mission') delete E.progress().active; E.reset(); E.db.openTabs = []; Object.assign(ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0 }); E.audit('Reset sim data'); E.save(); toast('Sim data reset'); go('#/home'); },
+    resetDo() { const act = E.progress().active; if (act && (act.type === 'mission' || act.type === 'shift')) delete E.progress().active; E.reset(); E.db.openTabs = []; Object.assign(ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0 }); E.audit('Reset sim data'); E.save(); toast('Sim data reset'); go('#/home'); },
 
     /* video visit */
     callOpen() {
@@ -259,8 +261,28 @@
         })
         .catch((e) => { if (still()) { m.state = 'error'; m.msg = e.message === 'Failed to fetch' ? 'The video-visit server could not be reached.' : e.message; render(); } });
     },
-    callAsk(d) { const m = ui.modal, i = Number(d.i); m.asked = m.asked || []; if (!m.asked.includes(i)) { m.asked.push(i); if (m.asked.length === 1) E.audit('Interviewed the patient (text)', m.pid); E.save(); } render(); const log = $('#talkLog'); if (log) log.scrollTop = log.scrollHeight; },
-    callEnd() { const m = ui.modal; if (m && m.asked && m.asked.length) toast('Write up what the patient told you in Notes while it is fresh.', 'Interview ended', 'notes'); if (m && m.state === 'live') { E.audit('Ended a video visit', m.pid); E.save(); toast('Write up the encounter in Notes while it is fresh.', 'Video visit ended', 'notes'); } ui.modal = null; render(); },
+    callEnd() { const m = ui.modal; if (m && m.state === 'live') { E.audit('Ended a video visit', m.pid); E.save(); toast('Write up the encounter in Notes while it is fresh.', 'Video visit ended', 'notes'); } ui.modal = null; render(); },
+
+    /* patient messages: a thread per patient, kept in the Inbox */
+    msgOpen(d) {
+      const p = E.pt(d.id) || curPt();
+      let m = E.db.inbox.find((x) => x.type === 'Patient Message' && x.patientId === p.id);
+      if (!m) { E.message({ type: 'Patient Message', from: p.name + ' (patient)', patientId: p.id, act: 'summary', subject: 'Message thread with ' + p.name, body: '', read: true, thread: [], asked: [] }); m = E.db.inbox[0]; E.audit('Started a message thread with the patient', p.id); }
+      ui.modal = null; ui.inboxSel = m.id; if (!m.read) { m.read = true; E.audit('Read message: ' + m.subject, p.id); }
+      E.save(); go('#/inbox');
+    },
+    msgAsk(d) {
+      const m = E.db.inbox.find((x) => x.id === d.id); if (!m || !m.thread) return;
+      const p = E.pt(m.patientId), i = Number(d.i), q = E.interview(p)[i]; if (!q) return;
+      m.asked = m.asked || [];
+      if (!m.asked.includes(i)) m.asked.push(i);
+      m.thread.push({ who: 'you', ts: Date.now(), text: q.q }, { who: 'patient', ts: Date.now(), text: q.a });
+      m.read = true; m.ts = Date.now();
+      E.audit('Messaged the patient', p.id);
+      if (m.thread.filter((t) => t.who === 'you').length === 1) toast('Write up what the patient told you in Notes while it is fresh.', 'Message sent', 'notes');
+      commit();
+      const log = $('#threadLog'); if (log) log.scrollTop = log.scrollHeight;
+    },
 
     /* results / flowsheets / chart review */
     selLab(d) { ui.selLab = d.comp && ui.selLab !== d.comp ? d.comp : null; if (ui.selLab) track('results.trend'); render(); },
@@ -337,12 +359,13 @@
     },
 
     /* orders */
-    addDraft(d) { const p = curPt(); p.drafts.push(E.newOrder(d.cat)); ui.orderQuery = ''; commit(); const s = $('#orderSearch'); if (s) s.focus(); },
+    addDraft(d) { const p = curPt(); if (E.orderLock && E.orderLock(p)) return status(E.orderLock(p)); p.drafts.push(E.newOrder(d.cat)); ui.orderQuery = ''; commit(); const s = $('#orderSearch'); if (s) s.focus(); },
     removeDraft(d) { const p = curPt(); p.drafts = p.drafts.filter((x) => x.id !== d.id); commit(); },
     clearDrafts() { curPt().drafts = []; commit(); },
     setOpen(d) { ui.modal = { type: 'set', pid: curPt().id, id: d.id }; render(); },
     setAdd() {
       const p = curPt(), ids = $$('#modal input[type=checkbox]:checked').map((c) => c.value);
+      if (E.orderLock && E.orderLock(p)) return modalErr(E.orderLock(p));
       if (!ids.length) return modalErr('Select at least one order.');
       ids.forEach((id) => p.drafts.push(E.newOrder(id)));
       E.audit(`Opened order set: ${E.ORDER_SETS.find((s) => s.id === ui.modal.id).name}`, p.id); track('order.set');
@@ -351,6 +374,8 @@
     signDrafts() {
       const p = curPt();
       if (!p.drafts.length) return;
+      if (E.orderLock && E.orderLock(p)) return status(E.orderLock(p));
+      if (E.safetyGate && E.safetyGate(p)) return;   // a debrief is owed before more orders are signed (js/shift.js)
       const alerts = p.drafts.flatMap((d) => E.checkDraft(p, d, p.drafts));
       if (alerts.length) { ui.modal = { type: 'alerts', pid: p.id, alerts }; render(); } else finalize(p, [], {});
     },
@@ -431,8 +456,8 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       toast((right ? 'Correct on the first try.' : 'Read the explanation, it will come up again on the wards.') + (extra.length ? ' ' + extra.join(' ') : ''), `+${right ? E.XP.quizRight : E.XP.quizTried} XP · Knowledge check`, extra.length ? 'medal' : right ? 'star' : 'info');
       commit();
     },
-    progressAsk() { const g = E.game(E.progress()); ui.modal = { type: 'confirm', title: 'Reset your progress?', text: `This erases your ${g.xp} XP, your level, your badges, every completed practice task, all of your knowledge-check answers, your mission stars and your proficiency check results, so you can start over from Level 1. Notes and orders you entered in the charts are kept. This cannot be undone.`, yes: 'progressDo', yesLabel: 'Reset my progress', danger: true }; render(); },
-    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; delete pr.bonus; delete pr.missions; delete pr.exam; delete pr.active; delete pr.games; award = null; ui.modal = null; E.audit('Reset own learning progress'); status('Progress reset. You are back at Level 1.'); commit(); },
+    progressAsk() { const g = E.game(E.progress()); ui.modal = { type: 'confirm', title: 'Reset your progress?', text: `This erases your ${g.xp} XP, your level, your badges, every completed practice task, all of your knowledge-check answers, your mission stars, your shift results and your proficiency check results, so you can start over from Level 1. Notes and orders you entered in the charts are kept, and so is your safety record. This cannot be undone.`, yes: 'progressDo', yesLabel: 'Reset my progress', danger: true }; render(); },
+    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; delete pr.bonus; delete pr.missions; delete pr.exam; delete pr.active; delete pr.games; delete pr.shifts; award = null; ui.modal = null; E.audit('Reset own learning progress'); status('Progress reset. You are back at Level 1.'); commit(); },
     learnPrint() { window.print(); },
     learnExport() { exportReport(viewedLearner()); },
   };
@@ -490,7 +515,9 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
   const busy = () => ui.modal || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
   setInterval(() => {
     if (!E.db || !E.db.user) return;
+    if (E.suspended && E.suspended()) return;   // the ward goes on without a suspended learner: nothing arrives until they are back
     if (E.missionsTick && E.missionsTick()) { E.save(); pendingRender = true; }
+    if (E.shiftTick && E.shiftTick()) { E.save(); pendingRender = true; }
     const done = E.processResults();
     if (done.length) { E.save(); toast(done.map((x) => `${x.o.name} — ${x.p.name}`).join('; '), 'New result', 'results'); pendingRender = true; }
     const sim = E.simTick ? E.simTick() : [];
@@ -499,8 +526,8 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
   }, 2000);
 
   // Missions and the proficiency check (js/missions.js) add their actions here and borrow a few helpers.
-  E.app = { commit, render, toast, status, go, curPt };
-  Object.assign(A, E.missionActions || {}, E.gameActions || {});
+  E.app = { commit, render, toast, status, go, curPt, busy, track };
+  Object.assign(A, E.missionActions || {}, E.shiftActions || {}, E.gameActions || {});
 
   // Glyph bitmaps are drawn first; the screen is built from them.
   (E.glyphsReady || Promise.resolve()).then(() => { E.load(); onRoute(); splash('boot'); });

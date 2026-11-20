@@ -184,6 +184,30 @@
       encounters: [enc(75, 'Office Visit', 'Pulmonary Clinic', 'Aldana, Rafael MD', 'COPD follow-up'), enc(130, 'Hospital Encounter', '5 West Medicine', VAS, 'COPD exacerbation')],
     }, -16, VAS, [['code_full'], ['duoneb'], ['albuterol'], ['prednisone'], ['azithromycin'], ['enoxaparin'], ['nicotine'], ['o2', { comment: 'Target SpO2 88-92%' }], ['iso_droplet'], ['vs_q4'], ['diet_reg']]));
 
+    /* 7 — cellulitis. A sound-alike for Santos, Maria: same surname, a first name one letter away, and a date
+       of birth and MRN with two digits swapped. She has no drug allergies, so mixing the two charts up matters. */
+    patients.push(mk({
+      id: 'p7', mrn: '10051787', name: 'Santos, Marie', dob: '1972-02-07', sex: 'F', unit: '5 West Medicine', bed: '5W-506', rn: RN1, nameAlert: true,
+      cc: 'Red, painful, swollen left lower leg', dx: 'Cellulitis of the left lower leg', codeStatus: 'Full Code', isolation: '', height: 163, weight: 82.5,
+      allergies: [],
+      problems: [prob('Cellulitis of the left lower leg', 1), prob('Type 2 diabetes mellitus', 2200), prob('Hypertension', 2800)],
+      vitals: vitals(-28, 4, { t: 38.3, hr: 102, rr: 18, s: 142, d: 84, o: 98, o2: 'Room air', p: 6 }, { t: 37.3, hr: 84, rr: 16, s: 132, d: 78, o: 98, o2: 'Room air', p: 3 }, RN1),
+      labs: labs([
+        [-27, 'CBC, BMP, Lactate, A1c', { WBC: 13.4, Hgb: 13.1, Hct: 39.4, Plt: 286, Na: 138, K: 4.1, Cl: 102, CO2: 24, BUN: 15, Cr: 0.8, Glu: 186, Ca: 9.1, Lactate: 1.2, A1c: 7.9 }],
+        [-4, 'CBC, BMP', { WBC: 11.8, Hgb: 12.8, Hct: 38.5, Plt: 279, Na: 139, K: 4.0, Cl: 103, CO2: 25, BUN: 14, Cr: 0.8, Glu: 162, Ca: 9.0 }],
+      ]),
+      reports: [
+        rep(-26, 'Imaging', 'XR left tibia and fibula', 'FINDINGS: Soft tissue swelling of the lower leg. No fracture. No soft tissue gas. No radiopaque foreign body. No periosteal reaction.\n\nIMPRESSION: Soft tissue swelling without gas or bony abnormality.'),
+        rep(-20, 'Microbiology / Other', 'Blood culture ×2', 'PRELIMINARY: No growth at 12 hours. Final report to follow.', 'Microbiology'),
+      ],
+      notes: [
+        note(-26, 'H&P', PARK, 'physician', 'HISTORY & PHYSICAL\n\nCHIEF COMPLAINT: Red, painful left lower leg for 3 days.\n\nHPI: 54 y.o. woman with type 2 diabetes and hypertension presenting with 3 days of spreading redness, warmth and pain of the left lower leg after a scratch from gardening. Fever to 38.5 at home. No drainage. No chest pain or shortness of breath. No recent travel or immobility.\n\nALLERGIES: No known drug allergies. NOTE: another patient on this unit has a very similar name (Santos, Maria). Check two identifiers.\n\nEXAM: T 38.3, HR 102, BP 142/84, SpO2 98% on room air. Left lower leg: a warm, tender, red area from ankle to mid-shin with a clear border (marked with a pen). No fluctuance, crepitus or blistering. Pulses intact. Calf soft.\n\nDATA: WBC 13.4, lactate 1.2, glucose 186, A1c 7.9. X-ray: no gas, no bony change.\n\nASSESSMENT & PLAN:\n1. Cellulitis of the left lower leg without abscess, failed to improve at home: IV cefazolin. Elevate the leg. Mark the border and recheck daily. Blood cultures sent.\n2. Type 2 diabetes: continue metformin, consistent carbohydrate diet, glucose checks.\n3. Hypertension: continue amlodipine.\n4. VTE prophylaxis: enoxaparin.\nCode status: Full.'),
+        note(-7, 'Nursing Note', RN1, 'nurse', 'NURSING NOTE\n\nAfebrile this shift. Redness has pulled back about 2 cm inside the pen line. Pain 3/10 with acetaminophen. Leg elevated on two pillows. Walking to the bathroom independently. Name-alert sticker on the chart and the door: SANTOS, MARIE and SANTOS, MARIA are both on 5 West. Two identifiers checked with every medication.'),
+      ],
+      encounters: [enc(120, 'Office Visit', 'Primary Care', 'Iwasaki, Glenn MD', 'Diabetes follow-up')],
+    }, -28, PARK, [['code_full'], ['cefazolin'], ['acetaminophen'], ['metformin'], ['amlodipine'], ['enoxaparin'], ['poc_glu'], ['vs_q4'], ['diet_carb']]));
+    patients.find((p) => p.id === 'p2').nameAlert = true;
+
     /* Back-fill the MAR: scheduled doses due before ~50 minutes ago were given by the assigned nurse. */
     patients.forEach((p) => {
       for (let day = E.dayStart(-3); day <= E.dayStart(0); day += 24 * E.HOUR) {
@@ -205,6 +229,10 @@
         body: 'Potassium 5.1 mmol/L (reference 3.5-5.0).\nCreatinine 2.1 mg/dL (reference 0.6-1.3).' },
       { type: 'Staff Message', from: RN2, subject: 'Santos, Maria — potassium 3.3 this morning', patientId: 'p2', act: 'orders', ts: T(-2.5),
         body: 'Hi team, Ms. Santos has a potassium of 3.3 on morning labs. Would you like to replace it? She is tolerating oral intake. Thanks, Hana' },
+      // a message a patient started, so the Inbox shows patient threads from the first visit
+      { type: 'Patient Message', from: 'Whitfield, James (patient)', subject: 'Message from Whitfield, James', patientId: 'p3', act: 'summary', ts: T(-0.7), asked: [],
+        body: 'Hello, this is James Whitfield in 417. Nobody has told me the plan for my blood thinner. I take it for my irregular heartbeat and I would like to know when I start it again. Thank you.',
+        thread: [{ who: 'patient', ts: T(-0.7), text: 'Hello, this is James Whitfield in 417. Nobody has told me the plan for my blood thinner. I take it for my irregular heartbeat and I would like to know when I start it again. Thank you.' }] },
     ].map((m) => Object.assign({ id: E.uid('m'), ts: T(-1), read: false, roles: null }, m));
 
     return { version: E.SEED_VERSION, createdAt: now, user: null, openTabs: [], patients, inbox, audit: [], progress: {} };

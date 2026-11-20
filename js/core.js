@@ -4,7 +4,7 @@
   const E = (window.EHR = {});
   const KEY = 'ome-ehr-sandbox';
   E.HOUR = 3600e3;
-  E.SEED_VERSION = 2;
+  E.SEED_VERSION = 3;
 
   E.esc = (s) =>
     String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
