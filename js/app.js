@@ -486,7 +486,7 @@
       const student = u.role === 'student';
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
       if (d.source) n.source = d.source;   // started in a mini-game
-      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id;
+      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id; ui.npTab = 'read';
       E.audit(`Signed note: ${n.type}${n.source ? ` (started in ${n.source})` : ''}`, p.id);
       if (student) E.message({ type: 'Cosign Note', roles: ['physician'], from: u.name, patientId: p.id, act: 'notes', subject: `${n.type} needs cosign — ${p.name}`, body: `${u.name} (Medical Student) signed a ${n.type} that needs your review and cosignature.` });
       track('note.sign'); if (d.type.startsWith('Handoff')) track('note.handoff');
@@ -506,7 +506,8 @@
       else { const m = d.id === 'b' ? '**' : '_', word = sel || (d.id === 'b' ? 'bold' : 'italic'); t.value = v.slice(0, s) + m + word + m + v.slice(e); t.setSelectionRange(s + m.length, s + m.length + word.length); }
       t.focus(); I.noteText(t, true);
     },
-    noteSel(d) { ui.noteSel = d.id; render(); },
+    noteSel(d) { ui.noteSel = d.id; ui.notePane = true; ui.npTab = 'read'; render(); },
+    npTab(d) { ui.npTab = d.id; render(); if (d.id === 'mine') { const t = $('#noteText'); if (t) t.focus(); } },
     noteCosign(d) {
       const p = curPt(), n = p.notes.find((x) => x.id === d.id);
       Object.assign(n, { status: 'Signed', cosignedBy: E.db.user.name, cosignedTs: Date.now() });

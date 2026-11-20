@@ -313,17 +313,22 @@
         <textarea id="noteText" class="note-edit" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
         <div class="np-foot"><button class="btn primary" data-act="noteSign">${icon('check', 16)}${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button><button class="btn" data-act="noteCancel">Cancel note</button><span class="fine">SmartLinks: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> then a space</span></div>`
       : `<div class="np-empty"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button><p>Your note stays open here while you look through the chart, so you can write from what is in front of you. Signed notes are read in the Notes activity.</p></div>`;
-    // One job only: writing. Reading signed notes stays in the Notes activity, so notes are not shown in two places.
-    return `<aside class="notepane" aria-label="My note"><nav class="np-tabs"><span class="np-title">${icon('notes', 24)}My Note</span><span class="spacer"></span><button class="np-hide" data-act="notePane" title="Hide the note pane" aria-label="Hide the note pane"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l6 5-6 5z" fill="currentColor"/></svg></button></nav>
-      <div class="np-b${d ? ' edit' : ''}">${mine}</div></aside>`;
+    // Reading and writing share the pane (owner's request): one tab for the chart's notes, one for the learner's own.
+    const notes = [...p.notes].sort((a, b) => b.ts - a.ts), sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
+    const tab = E.ui.npTab === 'read' ? 'read' : 'mine';
+    const read = notes.length ? `<div class="np-list">${notes.map((n) => `<button class="list-row${sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('')}</div><div class="np-doc">${V.noteDoc(p, sel)}</div>`
+      : empty('No notes yet');
+    const tb = (id, label) => `<button class="${tab === id ? 'on' : ''}" data-act="npTab" data-id="${id}" aria-pressed="${tab === id}">${label}</button>`;
+    return `<aside class="notepane" aria-label="Notes"><nav class="np-tabs">${tb('read', `${icon('notes', 16)}Notes (${notes.length})`)}${tb('mine', `My Note${d ? ' <i class="np-dot" title="Unsigned note"></i>' : ''}`)}<span class="spacer"></span><button class="np-hide" data-act="notePane" title="Hide the note pane" aria-label="Hide the note pane"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l6 5-6 5z" fill="currentColor"/></svg></button></nav>
+      <div class="np-b${tab === 'mine' && d ? ' edit' : ''}">${tab === 'read' ? read : mine}</div></aside>`;
   };
   V.act.notes = (p) => {
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), d = p.noteDraft;
-    const sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
-    return `<div class="split"><div class="pane list"><div class="toolbar"><b>Notes (${notes.length})</b><span class="spacer"></span><button class="btn xs" data-act="noteNew"${d ? ' disabled' : ''}>${icon('add', 16)}New note</button></div>
+    // An index only: a note opens in the note pane on the right, where it is read and written.
+    const sel = E.ui.npTab === 'read' && noteOpen(p) ? (notes.find((n) => n.id === E.ui.noteSel) || notes[0]) : null;
+    return `<div class="pane list"><div class="toolbar"><b>Notes (${notes.length})</b><span class="muted">Open one to read it in the note pane on the right.</span><span class="spacer"></span><button class="btn xs" data-act="noteNew"${d ? ' disabled' : ''}>${icon('add', 16)}New note</button></div>
         ${d ? `<button class="list-row draft" data-act="notePaneOpen"><b>Draft: ${esc(d.type)}</b><span class="muted">Unsigned · autosaved · open in the note pane on the right</span></button>` : ''}
-        ${notes.map((n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('')}</div>
-      <div class="pane">${sel ? V.noteDoc(p, sel) : empty('No notes yet')}</div></div>`;
+        ${notes.map((n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('') || empty('No notes yet')}</div>`;
   };
 
   /* ================= Orders ================= */
