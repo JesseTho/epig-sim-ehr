@@ -616,7 +616,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .np-tabs .spacer { flex: 1; } .np-hide { align-self: center; width: 22px; height: 22px; padding: 3px; border: 1px solid transparent; background: none; color: var(--olive-6); cursor: pointer; } .np-hide:hover { border-color: #919B76; background: #fff; }
 .np-b { flex: 1; min-height: 0; overflow: auto; padding: 10px; background: #fff; } .np-b.edit { display: flex; flex-direction: column; overflow: hidden; }
 .np-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; } .np-row select { max-width: 230px; }
-.np-my { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; } .np-my select { max-width: 200px; } .np-my b { font: 700 16px var(--book); color: #2F5E9E; } .np-my span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-my { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; } .np-my select { max-width: 200px; } .np-my b { font-weight: 700; } .np-my span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-tools { display: flex; align-items: center; gap: 3px; margin-bottom: 6px; flex-wrap: wrap; }
 .np-t { width: 24px; height: 24px; padding: 3px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 2px; background: none; cursor: pointer; font: 14px Georgia, serif; color: var(--ink); } .np-t:hover { border-color: #919B76; background: var(--olive-0); } .np-t svg { width: 16px; height: 16px; }
 .np-smart { flex: 1; min-width: 110px; height: 24px; margin: 0 4px; }
@@ -631,6 +631,8 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 @media (max-width: 1600px) { .chartwrap:has(.notepane:not(.shut)) .grid3, .chartwrap:has(.notepane:not(.shut)) .grid2 { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .chartwrap { position: relative; } .notepane:not(.shut) { position: absolute; right: 0; top: 0; bottom: 0; z-index: 30; width: min(400px, 92vw); box-shadow: -4px 0 14px rgba(0, 0, 0, .3); } }
 @media print { .notepane { display: none; } }
-@media (max-width: 1940px) { .chartwrap:has(.notepane:not(.shut)) .acts a .gl { display: none; } .chartwrap:has(.notepane:not(.shut)) .acts a { padding-left: 9px; padding-right: 9px; } }
+@media (max-width: 1800px) { .chartwrap:has(.notepane:not(.shut)) .acts a .gl { display: none; } .chartwrap:has(.notepane:not(.shut)) .acts a { padding-left: 9px; padding-right: 9px; } }
 .np-foot { justify-content: flex-start; align-items: center; padding-right: 100px; } .np-foot .fine { margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the helper pig lives in the bottom-right corner */
 .notepane.shut { background: var(--g-pane) 0 0 / 8px 640px repeat-x, #C9D8AC; } .notepane.shut > button { flex: none; background: none; border-bottom: 1px solid #A3B580; }   /* only the top of the rail is a button, so the helper pig keeps its corner */
+.np-title { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid #919B76; border-bottom: 0; border-radius: 3px 3px 0 0; background: #fff; margin-bottom: -1px; box-shadow: inset 0 3px 0 #7B4FA8; font-weight: 700; }
+.np-title { padding: 5px 11px; text-shadow: .5px 0 0 currentColor; font-weight: 400; } @media (max-width: 1800px) { .np-title .gl { display: none; } }   /* same height as the chart tabs beside it, with or without icons */

@@ -194,7 +194,7 @@
     const s = E.progressSummary(pr), ev = E.evidence(pr), g = E.game(pr);
     const report = {
       title: 'SIM+EHR Student Edition — learner report', framework: E.EPA_SOURCE, exportedAt: new Date().toISOString(),
-      learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), shifts: E.shiftReport ? E.shiftReport(pr) : [], safetyRecord: E.safetyReport ? E.safetyReport(pr) : null, proficiencyCheck: E.examReport(pr), miniGames: E.GAMES.map((g) => { const r = (pr.games || {})[g.id] || {}; return { game: g.name, plays: r.plays || 0, bestPercent: r.best || 0, perfectRounds: r.perfect || 0 }; }), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
+      learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), shifts: E.shiftReport ? E.shiftReport(pr) : [], cases: E.caseReport ? E.caseReport(pr) : [], safetyRecord: E.safetyReport ? E.safetyReport(pr) : null, proficiencyCheck: E.examReport(pr), miniGames: E.GAMES.map((g) => { const r = (pr.games || {})[g.id] || {}; return { game: g.name, plays: r.plays || 0, bestPercent: r.best || 0, perfectRounds: r.perfect || 0 }; }), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
       objectives: E.LEARNING.map((lo) => ({
         epa: lo.epa, epaTitle: lo.epaTitle, objective: lo.objective,
         tasks: lo.tasks.map((t) => ({ task: t.text, completedAt: pr.events[t.event] ? new Date(pr.events[t.event]).toISOString() : null })),
@@ -210,6 +210,24 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
   const viewedLearner = () => (E.db.user.role === 'physician' && ui.learnWho && E.db.progress[ui.learnWho]) || E.progress();
+
+  /* Undo and redo for the note editor. The browser's own history is lost whenever the screen is redrawn or a
+     button changes the text, so the editor keeps its own: one step per pause in typing, and one per button. */
+  const noteHist = (p) => { const h = ui.noteHist || (ui.noteHist = {}); return h[p.id] || (h[p.id] = { undo: [], redo: [], at: 0, caret: 0 }); };
+  function noteStep(p, was, force) {
+    const h = noteHist(p), now = Date.now();
+    if (force || now - h.at > 700 || !h.undo.length) { h.undo.push({ text: was, caret: h.caret }); if (h.undo.length > 200) h.undo.shift(); }
+    h.at = force ? 0 : now; h.redo = [];
+  }
+  function noteUndo(redo) {
+    const t = $('#noteText'), p = curPt(), d = p && p.noteDraft; if (!t || !d) return;
+    const h = noteHist(p), from = redo ? h.redo : h.undo, to = redo ? h.undo : h.redo, s = from.pop();
+    if (!s) return toast(redo ? 'Nothing to redo.' : 'Nothing to undo.');
+    to.push({ text: t.value, caret: t.selectionStart }); h.at = 0;
+    t.value = s.text; d.text = s.text; d.pristine = false; E.save();
+    const c = Math.min(s.caret, s.text.length); t.focus(); t.setSelectionRange(c, c); h.caret = c;
+    const bar = $('#blankBar'); if (bar) bar.innerHTML = V.blankBar(t.value);
+  }
 
   /** Select the next *** blank in the note so typing replaces it. */
   function nextBlank(t, say, back) {
@@ -244,7 +262,7 @@
     },
     closeTabDo(d) { d = d && d.id ? d : { id: ui.closing }; ui.closing = null; ui.modal = null; E.db.openTabs = E.db.openTabs.filter((id) => id !== d.id); E.save(); if (route().pid === d.id) go('#/home'); else render(); },
     resetAsk() { ui.modal = { type: 'confirm', title: 'Reset sim data?', text: 'All patients return to their starting state and the timeline is regenerated from the current time. Orders, notes and documentation entered by anyone on this device are erased. Learning progress is kept.', yes: 'resetDo', yesLabel: 'Reset', danger: true }; render(); },
-    resetDo() { const act = E.progress().active; if (act && (act.type === 'mission' || act.type === 'shift')) delete E.progress().active; E.reset(); E.db.openTabs = []; Object.assign(ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0 }); E.audit('Reset sim data'); E.save(); toast('Sim data reset'); go('#/home'); },
+    resetDo() { const act = E.progress().active; if (act && (act.type === 'mission' || act.type === 'shift' || act.type === 'case')) delete E.progress().active; E.reset(); E.db.openTabs = []; Object.assign(ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0 }); E.audit('Reset sim data'); E.save(); toast('Sim data reset'); go('#/home'); },
 
     /* video visit */
     callOpen() {
@@ -333,12 +351,13 @@
     noteNew() {
       const p = curPt(), type = E.db.user.role === 'nurse' ? 'Nursing Note' : 'Progress Note';
       p.noteDraft = { type, text: E.expandTemplate(E.NOTE_TEMPLATES[type], p), pristine: true };
+      if (ui.noteHist) delete ui.noteHist[p.id];
       ui.notePane = true; ui.npTab = 'mine';
       track('note.template'); commit();
       const ta = $('#noteText'); if (ta) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
     },
     noteCancel() { ui.modal = { type: 'confirm', title: 'Discard this note?', text: 'The unsigned note will be deleted.', yes: 'noteCancelDo', yesLabel: 'Discard', danger: true }; render(); },
-    noteCancelDo() { curPt().noteDraft = null; ui.modal = null; ui.notePane = null; commit(); },
+    noteCancelDo() { curPt().noteDraft = null; ui.modal = null; commit(); },
     noteSign() {
       const p = curPt(), d = p.noteDraft, u = E.db.user, text = d.text.trim();
       if (!text) return toast('The note is empty.');
@@ -347,7 +366,7 @@
       const student = u.role === 'student';
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
       if (d.source) n.source = d.source;   // started in a mini-game
-      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id; ui.notePane = null;
+      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id;
       E.audit(`Signed note: ${n.type}${n.source ? ` (started in ${n.source})` : ''}`, p.id);
       if (student) E.message({ type: 'Cosign Note', roles: ['physician'], from: u.name, patientId: p.id, act: 'notes', subject: `${n.type} needs cosign — ${p.name}`, body: `${u.name} (Medical Student) signed a ${n.type} that needs your review and cosignature.` });
       track('note.sign'); if (d.type.startsWith('Handoff')) track('note.handoff');
@@ -355,16 +374,17 @@
     },
     noteNext() { nextBlank($('#noteText'), true); },
     notePrev() { nextBlank($('#noteText'), true, true); },
-    notePane() { const p = curPt(); ui.notePane = !(ui.notePane == null ? !!p.noteDraft : ui.notePane); render(); },
+    noteUndo() { noteUndo(false); },
+    noteRedo() { noteUndo(true); },
+    notePane() { ui.notePane = !E.noteOpen(curPt()); render(); },
     notePaneOpen() { ui.notePane = true; ui.npTab = 'mine'; render(); const t = $('#noteText'); if (t) t.focus(); },
-    npTab(d) { ui.npTab = d.id; render(); },
     /* Bold and Italic wrap the selection in plain marks; List starts each selected line with "- ". */
     noteFmt(d) {
       const t = $('#noteText'); if (!t) return;
       const s = t.selectionStart, e = t.selectionEnd, v = t.value, sel = v.slice(s, e);
       if (d.id === 'l') { const ls = v.lastIndexOf('\n', s - 1) + 1, block = v.slice(ls, e).replace(/^(?!- )/gm, '- '); t.value = v.slice(0, ls) + block + v.slice(e); t.setSelectionRange(ls + block.length, ls + block.length); }
       else { const m = d.id === 'b' ? '**' : '_', word = sel || (d.id === 'b' ? 'bold' : 'italic'); t.value = v.slice(0, s) + m + word + m + v.slice(e); t.setSelectionRange(s + m.length, s + m.length + word.length); }
-      t.focus(); I.noteText(t);
+      t.focus(); I.noteText(t, true);
     },
     noteSel(d) { ui.noteSel = d.id; render(); },
     noteCosign(d) {
@@ -485,16 +505,18 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       box.innerHTML = q ? (hits.map((p) => `<button data-act="openPt" data-id="${p.id}"><b>${E.esc(p.name)}</b><span>${E.age(p.dob)} ${p.sex} · MRN ${p.mrn} · ${E.esc(p.bed)}</span></button>`).join('') || '<div class="empty">No matching patient</div>') : '';
     },
     orderSearch(el) { ui.orderQuery = el.value; $('#orderRes').innerHTML = V.orderResults(el.value); },
-    noteText(el) {
-      const p = curPt(), d = p.noteDraft;
+    noteText(el, step) {
+      const p = curPt(), d = p.noteDraft, was = d.text;
       // expand ".phrase" when followed by whitespace
       const pos = el.selectionStart, m = el.value.slice(0, pos).match(/(^|\s)\.([a-z]+)(\s)$/i);
       if (m && E.DOT[m[2].toLowerCase()]) {
         const rep = E.DOT[m[2].toLowerCase()](p), start = pos - m[2].length - 2;
         el.value = el.value.slice(0, start) + rep + m[3] + el.value.slice(pos);
         el.setSelectionRange(start + rep.length + 1, start + rep.length + 1);
-        track('note.dot');
+        track('note.dot'); step = true;
       }
+      if (was !== el.value) noteStep(p, was, step === true);
+      noteHist(p).caret = el.selectionStart;
       d.text = el.value; d.pristine = false; E.save();
       const bar = $('#blankBar'); if (bar) bar.innerHTML = V.blankBar(el.value);
     },
@@ -506,9 +528,9 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       if (!t || !E.DOT[k]) return;
       const rep = E.DOT[k](p), s = t.selectionStart;
       t.value = t.value.slice(0, s) + rep + t.value.slice(t.selectionEnd); t.setSelectionRange(s + rep.length, s + rep.length); t.focus();
-      track('note.dot'); I.noteText(t);
+      track('note.dot'); I.noteText(t, true);
     },
-    noteType(el) { const p = curPt(), d = p.noteDraft; d.type = el.value; if (d.pristine) d.text = E.expandTemplate(E.NOTE_TEMPLATES[d.type], p); commit(); },
+    noteType(el) { const p = curPt(), d = p.noteDraft; d.type = el.value; if (d.pristine && ui.noteHist) delete ui.noteHist[p.id]; if (d.pristine) d.text = E.expandTemplate(E.NOTE_TEMPLATES[d.type], p); commit(); },
   };
 
   /* ---------- event wiring ---------- */
@@ -530,6 +552,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (e.key === 'Enter' && t.id === 'loginName') return A.login();
     if (e.key === 'Enter' && t.matches && t.matches('tr[data-act]')) return t.click();
     if (e.key === 'F2' && t.id === 'noteText') { e.preventDefault(); nextBlank(t, true, e.shiftKey); }
+    if (t.id === 'noteText' && (e.ctrlKey || e.metaKey) && !e.altKey && /^[zy]$/i.test(e.key)) { e.preventDefault(); noteUndo(e.key.toLowerCase() === 'y' || e.shiftKey); }
   });
   window.addEventListener('hashchange', onRoute);
 
@@ -540,6 +563,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (E.suspended && E.suspended()) return;   // the ward goes on without a suspended learner: nothing arrives until they are back
     if (E.missionsTick && E.missionsTick()) { E.save(); pendingRender = true; }
     if (E.shiftTick && E.shiftTick()) { E.save(); pendingRender = true; }
+    if (E.caseTick && E.caseTick()) { E.save(); pendingRender = true; }   // PBL cases (js/cases.js)
     const done = E.processResults();
     if (done.length) { E.save(); toast(done.map((x) => `${x.o.name} — ${x.p.name}`).join('; '), 'New result', 'results'); pendingRender = true; }
     const sim = E.simTick ? E.simTick() : [];
@@ -549,7 +573,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
 
   // Missions and the proficiency check (js/missions.js) add their actions here and borrow a few helpers.
   E.app = { commit, render, toast, status, go, curPt, busy, track };
-  Object.assign(A, E.missionActions || {}, E.shiftActions || {}, E.gameActions || {});
+  Object.assign(A, E.missionActions || {}, E.shiftActions || {}, E.gameActions || {}, E.caseActions || {}, E.worldActions || {});
 
   // Glyph bitmaps are drawn first; the screen is built from them.
   (E.glyphsReady || Promise.resolve()).then(() => { E.load(); onRoute(); splash('boot'); });

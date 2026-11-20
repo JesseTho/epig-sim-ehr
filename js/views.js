@@ -97,7 +97,7 @@
     return `
     <div class="banner">${V.sky('bn')}
       <a class="bn-brand" href="#/home" title="Patient Lists">${E.wordmark(52)}</a>
-      <span class="spacer"></span>
+      <span class="spacer">${E.world ? E.world.banner() : ''}</span>
       <span class="bn-tag">${tagSet()}</span>
       <a class="lvl" href="#/learning" title="Open Learning: ${g.xp} XP, ${g.earned.length} of ${E.BADGES.length} badges">${icon('star', 40)}<span class="lvl-t"><b>Level ${g.level} · ${esc(g.title)}</b><span class="xpbar" role="img" aria-label="${g.xp} experience points${g.next ? ', ' + (g.next - g.xp) + ' to the next level' : ''}"><i style="width:${g.pct}%"></i></span></span><span class="lvl-n">${g.xp} XP<br>${icon('medal', 16)}${g.earned.length}/${E.BADGES.length}</span></a>
       <span class="bn-user" title="The role you are playing. Log out to switch."><b>${esc(db.user.name)}</b>Playing: ${esc(E.roleLabel(db.user.role))}</span>
@@ -139,7 +139,7 @@
         <table class="tbl hover"><thead><tr><th>Bed</th><th>Patient</th><th>Age / Sex</th><th>MRN</th><th>Attending</th><th>Principal problem</th><th>LOS</th><th>Code</th><th>Allergies</th><th>To do</th></tr></thead><tbody>
         ${rows.map((p) => {
           const pend = p.orders.filter((o) => o.status === 'Pended').length, cos = p.notes.filter((n) => n.status === 'Cosign needed').length;
-          return `<tr data-act="openPt" data-id="${p.id}" tabindex="0"><td>${esc(p.bed)}</td><td><b>${esc(p.name)}</b>${p.nameAlert ? ' ' + chip('Name alert', 'purple') : ''}${p.isolation ? ' ' + chip(p.isolation, 'amber') : ''}${p.icu ? ' ' + chip('Intensive care', 'red') : ''}</td><td>${E.age(p.dob)} ${p.sex}</td><td>${p.mrn}</td><td>${esc(p.attending)}</td><td>${esc(p.dx)}</td><td class="nowrap">Day ${Math.max(1, Math.ceil((Date.now() - p.admitTs) / (24 * H)))}</td><td>${chip(p.codeStatus, p.codeStatus === 'Full Code' ? 'grey' : 'purple')}</td><td class="${E.allergiesOf(p).length ? 'allergy-cell' : 'muted'}">${esc(allergyText(p))}</td><td>${pend ? chip(pend + ' pended order' + (pend > 1 ? 's' : ''), 'amber') : ''} ${cos ? chip(cos + ' cosign', 'amber') : ''}</td></tr>`;
+          return `<tr data-act="openPt" data-id="${p.id}" tabindex="0"><td>${esc(p.bed)}</td><td><b>${esc(p.name)}</b>${p.nameAlert ? ' ' + chip('Name alert', 'purple') : ''}${p.isolation ? ' ' + chip(p.isolation, 'amber') : ''}${p.icu ? ' ' + chip('Intensive care', 'red') : ''}${p.isNew ? ' ' + chip('New', 'blue') : ''}${p.discharged ? ' ' + chip('Discharged', 'green') : ''}</td><td>${E.age(p.dob)} ${p.sex}</td><td>${p.mrn}</td><td>${esc(p.attending)}</td><td>${esc(p.dx)}</td><td class="nowrap">Day ${Math.max(1, Math.ceil((Date.now() - p.admitTs) / (24 * H)))}</td><td>${chip(p.codeStatus, p.codeStatus === 'Full Code' ? 'grey' : 'purple')}</td><td class="${E.allergiesOf(p).length ? 'allergy-cell' : 'muted'}">${esc(allergyText(p))}</td><td>${pend ? chip(pend + ' pended order' + (pend > 1 ? 's' : ''), 'amber') : ''} ${cos ? chip(cos + ' cosign', 'amber') : ''}</td></tr>`;
         }).join('')}
         </tbody></table>
       </section></div>`;
@@ -295,26 +295,27 @@
     return n ? `<span><b>${n} blank${n > 1 ? 's' : ''} to fill.</b> Each <code>***</code> is waiting for your words: jump to it, then type.</span>`
       : `${icon('check', 16)}<span><b>No blanks left.</b> Read it through once, then sign.</span>`;
   };
-  const noteOpen = (p) => (E.ui.notePane == null ? !!p.noteDraft : !!E.ui.notePane);
+  /* Open unless the learner has hidden it. On a narrow window, where the pane would cover the chart, it starts shut unless a note is in progress. */
+  const noteOpen = (p) => (E.ui.notePane == null ? !!p.noteDraft || window.innerWidth > 1100 : !!E.ui.notePane);
+  E.noteOpen = noteOpen;
   /* The note pane: a third column docked on the right of the chart, as in Epic, so a note can be written
      while the rest of the chart is read. It stays put as the learner moves between activities. */
   V.notePane = (p) => {
-    const d = p.noteDraft, notes = [...p.notes].sort((a, b) => b.ts - a.ts);
-    if (!noteOpen(p)) return `<aside class="notepane shut"><button data-act="notePane" title="Open the note pane" aria-label="Open the note pane">${icon('notes', 24)}<span>Notes</span>${d ? '<i class="np-dot" title="Unsigned note"></i>' : ''}</button></aside>`;
-    const tab = E.ui.npTab === 'review' ? 'review' : 'mine';
-    const sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
+    const d = p.noteDraft;
+    if (!noteOpen(p)) return `<aside class="notepane shut"><button data-act="notePane" title="Open the note pane" aria-label="Open the note pane">${icon('notes', 24)}<span>My Note</span>${d ? '<i class="np-dot" title="Unsigned note"></i>' : ''}</button></aside>`;
     const tool = (act, id, title, inner) => `<button class="np-t" data-act="${act}"${id ? ` data-id="${id}"` : ''} title="${title}" aria-label="${title}">${inner}</button>`;
-    const mine = d ? `<div class="np-my"><b>My Note</b><select data-change="noteType" aria-label="Note type">${opts(Object.keys(E.NOTE_TEMPLATES), d.type)}</select><span>unsigned · autosaved</span></div>
+    const mine = d ? `<div class="np-my"><b>Type</b><select data-change="noteType" aria-label="Note type">${opts(Object.keys(E.NOTE_TEMPLATES), d.type)}</select><span>unsigned · autosaved</span></div>
         <div class="np-tools" role="toolbar" aria-label="Note tools">${tool('noteFmt', 'b', 'Bold', '<b>B</b>')}${tool('noteFmt', 'i', 'Italic', '<i>I</i>')}${tool('noteFmt', 'l', 'Bulleted list', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h2v2H2zM6 4.500h8v1H6zM2 10h2v2H2zM6 10.500h8v1H6z" fill="currentColor"/></svg>')}
+          ${tool('noteUndo', '', 'Undo (Ctrl+Z)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3L2 7l4 4V8.500h3.500a2.500 2.500 0 0 1 0 5H7v1.500h2.500a4 4 0 0 0 0-8H6z" fill="#2F5E9E"/></svg>')}${tool('noteRedo', '', 'Redo (Ctrl+Y)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3l4 4-4 4V8.500H6.500a2.500 2.500 0 0 0 0 5H9v1.500H6.500a4 4 0 0 1 0-8H10z" fill="#2F5E9E"/></svg>')}
           <select class="np-smart" data-change="noteInsert" aria-label="Insert SmartText"><option value="">Insert SmartText…</option>${Object.keys(E.DOT).map((k) => `<option value="${k}">.${k}</option>`).join('')}</select>
           ${tool('notePrev', '', 'Previous blank (Shift+F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3L3 8l6 5v-3h4V6H9z" fill="#C98A00" stroke="#7A5200"/></svg>')}${tool('noteNext', '', 'Next blank (F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 3l6 5-6 5v-3H3V6h4z" fill="#C98A00" stroke="#7A5200"/></svg>')}</div>
         <div class="blanks" id="blankBar" aria-live="polite">${V.blankBar(d.text)}</div>
         <textarea id="noteText" class="note-edit" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
         <div class="np-foot"><button class="btn primary" data-act="noteSign">${icon('check', 16)}${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button><button class="btn" data-act="noteCancel">Cancel note</button><span class="fine">SmartLinks: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> then a space</span></div>`
-      : `<div class="np-empty"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button><p>The note stays open here while you look through the chart, so you can write from what is in front of you.</p></div>`;
-    const review = notes.length ? `<div class="np-list">${notes.map((n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span></button>`).join('')}</div><div class="np-doc">${sel ? V.noteDoc(p, sel) : ''}</div>` : empty('No notes yet');
-    return `<aside class="notepane" aria-label="Notes"><nav class="np-tabs"><button class="${tab === 'mine' ? 'on' : ''}" data-act="npTab" data-id="mine">${icon('notes', 24)}Notes</button><button class="${tab === 'review' ? 'on' : ''}" data-act="npTab" data-id="review">Review (${notes.length})</button><span class="spacer"></span><button class="np-hide" data-act="notePane" title="Hide the note pane" aria-label="Hide the note pane"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l6 5-6 5z" fill="currentColor"/></svg></button></nav>
-      <div class="np-b${tab === 'mine' && d ? ' edit' : ''}">${tab === 'mine' ? mine : review}</div></aside>`;
+      : `<div class="np-empty"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button><p>Your note stays open here while you look through the chart, so you can write from what is in front of you. Signed notes are read in the Notes activity.</p></div>`;
+    // One job only: writing. Reading signed notes stays in the Notes activity, so notes are not shown in two places.
+    return `<aside class="notepane" aria-label="My note"><nav class="np-tabs"><span class="np-title">${icon('notes', 24)}My Note</span><span class="spacer"></span><button class="np-hide" data-act="notePane" title="Hide the note pane" aria-label="Hide the note pane"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l6 5-6 5z" fill="currentColor"/></svg></button></nav>
+      <div class="np-b${d ? ' edit' : ''}">${mine}</div></aside>`;
   };
   V.act.notes = (p) => {
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), d = p.noteDraft;
