@@ -636,3 +636,25 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .notepane.shut { background: var(--g-pane) 0 0 / 8px 640px repeat-x, #C9D8AC; } .notepane.shut > button { flex: none; background: none; border-bottom: 1px solid #A3B580; }   /* only the top of the rail is a button, so the helper pig keeps its corner */
 .np-title { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid #919B76; border-bottom: 0; border-radius: 3px 3px 0 0; background: #fff; margin-bottom: -1px; box-shadow: inset 0 3px 0 #7B4FA8; font-weight: 700; }
 .np-title { padding: 5px 11px; text-shadow: .5px 0 0 currentColor; font-weight: 400; } @media (max-width: 1800px) { .np-title .gl { display: none; } }   /* same height as the chart tabs beside it, with or without icons */
+
+/* ---------- Inbox: folders, message table, reading pane (markup: V.inbox) ---------- */
+.main > .page.ib { display: flex; gap: 0; padding: 0; height: 100%; max-width: none; }
+.ib-folders { width: 214px; flex: none; padding: 12px 10px; overflow: auto; background: var(--g-pane) 0 0 / 8px 640px repeat-x, #C9D8AC; image-rendering: pixelated; border-right: 1px solid #A3B580; } .ib-folders > * { image-rendering: auto; }
+.ib-folders h2 { font-size: 26px; margin: 0 0 10px 4px; } .ib-folders h5 { margin: 0 0 4px 4px; font: 700 11px var(--ui); text-transform: uppercase; letter-spacing: .05em; color: var(--olive-6); }
+.ib-f { display: flex; align-items: center; gap: 7px; width: 100%; padding: 5px 7px; margin-bottom: 2px; border: 1px solid transparent; background: none; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
+.ib-f span { flex: 1; } .ib-f i { font-style: normal; min-width: 20px; padding: 0 5px; text-align: center; font-size: 11px; color: var(--muted); }
+.ib-f:hover { background: rgba(255, 255, 255, .5); } .ib-f.on { background: #fff; border-color: #919B76; box-shadow: inset 3px 0 0 var(--hot); } .ib-f.un span { font-weight: 700; } .ib-f.un i { background: #B3261E; color: #fff; font-weight: 700; border-radius: 8px; }
+.ib-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--page); }
+.ib-list { flex: 0 1 auto; max-height: 44%; min-height: 120px; overflow: auto; background: #fff; border-bottom: 2px solid #919B76; }
+.ib-head, .ib-row { display: grid; grid-template-columns: 14px 128px minmax(0, 3fr) minmax(0, 1.2fr) minmax(0, 1.3fr) 96px; gap: 10px; align-items: center; padding: 4px 12px; }
+.ib-head { position: sticky; top: 0; z-index: 1; background: var(--g-tab) 0 0 / 8px 26px repeat-x, #ECEADB; border-bottom: 1px solid #919B76; font: 700 11px var(--ui); color: var(--olive-6); }
+.list-row.ib-row { display: grid; padding: 5px 12px; } .ib-row > * { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ib-row b { font-weight: 400; } .ib-row.unread b { font-weight: 700; color: var(--link); }
+.ib-row .ib-pt, .ib-row .ib-from, .ib-row .ib-ts { color: var(--muted); font-size: 12px; } .ib-row.unread .ib-pt { color: var(--ink); }
+.ib-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #B9B6A4; } .ib-row.unread .ib-dot { background: #2F6FCB; border-color: #1D4E96; }
+.ib-crit { display: inline-block; width: 15px; margin-right: 5px; text-align: center; font-style: normal; font-weight: 700; color: #fff; background: #B3261E; }
+.ib-read { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.ib-bar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--face); border-bottom: 1px solid #C9C7BA; flex: none; position: sticky; top: 0; } .ib-bar .btn { display: inline-flex; align-items: center; gap: 4px; }
+.ib-who { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); } .ib-who b { color: var(--ink); }
+.ib-msg { padding: 14px 16px; max-width: 900px; } .ib-msg pre.doc { max-width: none; }
+.ib-none { margin: auto; text-align: center; color: var(--muted); padding: 30px; } .ib-none p { margin: 8px 0 0; }
+@media (max-width: 1000px) { .ib-folders { width: 160px; } .ib-head, .ib-row { grid-template-columns: 14px 100px minmax(0, 1fr) 96px; } .ib-head > :nth-child(4), .ib-head > :nth-child(5), .ib-row .ib-pt, .ib-row .ib-from { display: none; } }

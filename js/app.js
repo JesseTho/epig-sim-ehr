@@ -473,6 +473,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     problemResolve(d) { const p = curPt(), x = p.problems.find((y) => y.id === d.id); x.status = 'Resolved'; E.audit(`Resolved problem: ${x.name}`, p.id); commit(); },
 
     /* inbox */
+    inboxFolder(d) { ui.inboxFolder = d.id; ui.inboxSel = null; render(); },
     inboxSel(d) { const m = E.db.inbox.find((x) => x.id === d.id); ui.inboxSel = m.id; if (!m.read) E.audit(`Read message: ${m.subject}`, m.patientId); m.read = true; if (m.critical) track('critical.read'); commit(); },
     inboxDone(d) { const m = E.db.inbox.find((x) => x.id === d.id); E.db.inbox = E.db.inbox.filter((x) => x !== m); ui.inboxSel = null; E.audit(`Marked message done: ${m.subject}`, m.patientId); commit(); },
     inboxChart(d) { const m = E.db.inbox.find((x) => x.id === d.id); if (m.type === 'Result') track('result.read'); go(`#/pt/${m.patientId}/${m.act || 'summary'}`); },

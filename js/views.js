@@ -425,15 +425,26 @@
   };
 
   /* ================= Inbox ================= */
+  /* The Inbox, laid out like Epic's In Basket: folders with unread counts on the left, the folder's messages
+     as a table, and the open message underneath with its actions and the patient it is about. */
+  const FOLDERS = [['all', 'All messages', () => true, 'inbox'], ['Page', 'Pages', (x) => x.type === 'Page', 'alert'], ['Result', 'Results', (x) => x.type === 'Result', 'results'],
+    ['Cosign', 'Cosign', (x) => x.type.startsWith('Cosign'), 'orders'], ['Patient Message', 'Patient messages', (x) => x.type === 'Patient Message', 'user'],
+    ['Staff', 'Staff messages', (x) => !['Page', 'Result', 'Patient Message'].includes(x.type) && !x.type.startsWith('Cosign'), 'notes']];
   V.inbox = () => {
-    const list = E.myInbox().sort((a, b) => b.ts - a.ts), m = list.find((x) => x.id === E.ui.inboxSel);
-    const p = m && m.patientId && E.pt(m.patientId);
-    return `<div class="page"><h2>Inbox</h2><div class="split"><div class="pane list">
-      ${list.map((x) => `<button class="list-row${m && m.id === x.id ? ' sel' : ''}${x.read ? '' : ' unread'}" data-act="inboxSel" data-id="${x.id}"><b>${esc(x.subject)}</b><span class="muted">${chip(x.type, x.critical ? 'red' : x.type === 'Result' ? 'blue' : x.type === 'Patient Message' ? 'purple' : x.type.startsWith('Cosign') ? 'amber' : 'grey')} ${esc(x.from)} · ${E.fmtDT(x.ts)}</span></button>`).join('') || empty('No messages')}</div>
-      <div class="pane">${m ? `<div class="doc-h"><div><h3>${esc(m.subject)}</h3><div class="muted">${esc(m.type)} · from ${esc(m.from)} · ${E.fmtDT(m.ts)}</div></div><span class="doc-acts">${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}<button class="btn xs" data-act="inboxDone" data-id="${m.id}" title="Remove this message from your Inbox">${icon('check', 16)}Done</button></span></div>${m.thread ? V.thread(m, p) : `<pre class="doc">${esc(m.body)}</pre>`}` : empty('Select a message.')}</div></div></div>`;
+    const all = E.myInbox().sort((a, b) => b.ts - a.ts), m = all.find((x) => x.id === E.ui.inboxSel);
+    let f = FOLDERS.find((x) => x[0] === E.ui.inboxFolder) || FOLDERS[0];
+    if (m && !f[2](m)) f = FOLDERS[0];   // a message opened from elsewhere is always shown
+    const list = all.filter(f[2]), p = m && m.patientId && E.pt(m.patientId);
+    const tone = (x) => (x.critical ? 'red' : x.type === 'Result' ? 'blue' : x.type === 'Patient Message' ? 'purple' : x.type.startsWith('Cosign') ? 'amber' : 'grey');
+    const folders = FOLDERS.map(([id, label, test, g]) => { const mine = all.filter(test), un = mine.filter((x) => !x.read).length; return id !== 'all' && !mine.length ? '' : `<button class="ib-f${f[0] === id ? ' on' : ''}${un ? ' un' : ''}" data-act="inboxFolder" data-id="${id}">${icon(g, 16)}<span>${label}</span><i>${un ? un : mine.length}</i></button>`; }).join('');
+    const rows = list.map((x) => { const q = x.patientId && E.pt(x.patientId); return `<button class="list-row ib-row${m && m.id === x.id ? ' sel' : ''}${x.read ? '' : ' unread'}" data-act="inboxSel" data-id="${x.id}"><i class="ib-dot" title="${x.read ? 'Read' : 'Unread'}"></i><span class="ib-type">${chip(x.type, tone(x))}</span><b>${x.critical ? '<em class="ib-crit" title="Critical">!</em>' : ''}${esc(x.subject)}</b><span class="ib-pt">${q ? esc(q.name) : ''}</span><span class="ib-from">${esc(x.from)}</span><span class="ib-ts">${E.fmtDT(x.ts)}</span></button>`; }).join('');
+    const read = m ? `<div class="ib-bar"><button class="btn xs" data-act="inboxDone" data-id="${m.id}" title="Remove this message from your Inbox">${icon('check', 16)}Done</button>${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}<span class="spacer"></span>${p ? `<span class="ib-who">${icon('user', 16)}<b>${esc(p.name)}</b> ${E.age(p.dob)} ${esc(p.sex)} · MRN ${esc(p.mrn)} · ${esc(p.bed)}</span>` : ''}</div>
+        <div class="ib-msg"><div class="doc-h"><div><h3>${esc(m.subject)}</h3><div class="muted">${esc(m.type)} · from ${esc(m.from)} · ${E.fmtDT(m.ts)}</div></div></div>${m.thread ? V.thread(m, p) : `<pre class="doc">${esc(m.body)}</pre>`}</div>`
+      : `<div class="ib-none">${icon('inbox', 48)}<p>${list.length ? 'Select a message.' : 'Nothing here. Enjoy it while it lasts.'}</p></div>`;
+    return `<div class="page ib"><aside class="ib-folders"><h2>Inbox</h2><h5>My messages</h5>${folders}</aside>
+      <section class="ib-main"><div class="ib-list"><div class="ib-head"><i></i><span>Type</span><span>Subject</span><span>Patient</span><span>From</span><span>Received</span></div>${rows || empty('No messages')}</div>
+      <div class="ib-read">${read}</div></section></div>`;
   };
-
-  /** A patient-message thread in the Inbox reading pane: the conversation, oldest first, then the messages that can be sent. */
   V.thread = (m, p) => {
     const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1];
     return `<div class="thread" id="threadLog">${m.thread.map((t) => `<div class="msg ${t.who === 'you' ? 'you' : 'pt'}"><b>${t.who === 'you' ? 'You' : esc(fn)}</b><span class="muted">${E.fmtDT(t.ts)}</span><p>${esc(t.text)}</p></div>`).join('')}</div>
