@@ -22,10 +22,12 @@
     // privileges suspended after repeated harm (js/shift.js): nothing but the lockout until remediation is passed
     if (E.suspended && E.suspended()) { ui.modal = null; root.innerHTML = V.lockout(); $('#modal').innerHTML = ''; $('#toast').innerHTML = ''; lastHash = null; document.title = 'SIM+EHR'; if (E.pal) E.pal.sync('sad', true); return; }
     const r = route(), sc = $('#activity') || $('.main');
+    const nt = $('#noteText'), typing = nt && { on: document.activeElement === nt, a: nt.selectionStart, b: nt.selectionEnd, top: nt.scrollTop };   // the note pane survives a redraw: caret, selection and scroll
     const keep = sc && lastHash === location.hash ? sc.scrollTop : 0;
     root.innerHTML = V.shell(r, r.view === 'chart' ? V.chart(E.pt(r.pid), r.act) : V[r.view]());
     const sc2 = $('#activity') || $('.main');
     if (sc2) sc2.scrollTop = keep;
+    const nt2 = $('#noteText'); if (typing && nt2) { nt2.setSelectionRange(typing.a, typing.b); nt2.scrollTop = typing.top; if (typing.on && !ui.modal) nt2.focus(); }
     lastHash = location.hash;
     document.title = (r.pid ? E.pt(r.pid).name + ' — ' : '') + 'SIM+EHR';
     $('#modal').innerHTML = ui.modal ? V.modal(ui.modal) : '';
@@ -210,10 +212,10 @@
   const viewedLearner = () => (E.db.user.role === 'physician' && ui.learnWho && E.db.progress[ui.learnWho]) || E.progress();
 
   /** Select the next *** blank in the note so typing replaces it. */
-  function nextBlank(t, say) {
+  function nextBlank(t, say, back) {
     if (!t) return;
-    let i = t.value.indexOf('***', t.selectionEnd);
-    if (i < 0) i = t.value.indexOf('***');
+    let i = back ? (t.selectionStart > 0 ? t.value.lastIndexOf('***', t.selectionStart - 1) : -1) : t.value.indexOf('***', t.selectionEnd);
+    if (i < 0) i = back ? t.value.lastIndexOf('***') : t.value.indexOf('***');
     if (i >= 0) { t.focus(); t.setSelectionRange(i, i + 3); const line = t.value.slice(0, i).split('\n').length; t.scrollTop = Math.max(0, (line - 6) * 19); } else if (say) toast('Every blank is filled. You can sign.');
   }
 
@@ -331,11 +333,12 @@
     noteNew() {
       const p = curPt(), type = E.db.user.role === 'nurse' ? 'Nursing Note' : 'Progress Note';
       p.noteDraft = { type, text: E.expandTemplate(E.NOTE_TEMPLATES[type], p), pristine: true };
+      ui.notePane = true; ui.npTab = 'mine';
       track('note.template'); commit();
       const ta = $('#noteText'); if (ta) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
     },
     noteCancel() { ui.modal = { type: 'confirm', title: 'Discard this note?', text: 'The unsigned note will be deleted.', yes: 'noteCancelDo', yesLabel: 'Discard', danger: true }; render(); },
-    noteCancelDo() { curPt().noteDraft = null; ui.modal = null; commit(); },
+    noteCancelDo() { curPt().noteDraft = null; ui.modal = null; ui.notePane = null; commit(); },
     noteSign() {
       const p = curPt(), d = p.noteDraft, u = E.db.user, text = d.text.trim();
       if (!text) return toast('The note is empty.');
@@ -344,13 +347,25 @@
       const student = u.role === 'student';
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
       if (d.source) n.source = d.source;   // started in a mini-game
-      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id;
+      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id; ui.notePane = null;
       E.audit(`Signed note: ${n.type}${n.source ? ` (started in ${n.source})` : ''}`, p.id);
       if (student) E.message({ type: 'Cosign Note', roles: ['physician'], from: u.name, patientId: p.id, act: 'notes', subject: `${n.type} needs cosign — ${p.name}`, body: `${u.name} (Medical Student) signed a ${n.type} that needs your review and cosignature.` });
       track('note.sign'); if (d.type.startsWith('Handoff')) track('note.handoff');
       toast(student ? 'Note signed and routed for cosign' : 'Note signed'); commit();
     },
     noteNext() { nextBlank($('#noteText'), true); },
+    notePrev() { nextBlank($('#noteText'), true, true); },
+    notePane() { const p = curPt(); ui.notePane = !(ui.notePane == null ? !!p.noteDraft : ui.notePane); render(); },
+    notePaneOpen() { ui.notePane = true; ui.npTab = 'mine'; render(); const t = $('#noteText'); if (t) t.focus(); },
+    npTab(d) { ui.npTab = d.id; render(); },
+    /* Bold and Italic wrap the selection in plain marks; List starts each selected line with "- ". */
+    noteFmt(d) {
+      const t = $('#noteText'); if (!t) return;
+      const s = t.selectionStart, e = t.selectionEnd, v = t.value, sel = v.slice(s, e);
+      if (d.id === 'l') { const ls = v.lastIndexOf('\n', s - 1) + 1, block = v.slice(ls, e).replace(/^(?!- )/gm, '- '); t.value = v.slice(0, ls) + block + v.slice(e); t.setSelectionRange(ls + block.length, ls + block.length); }
+      else { const m = d.id === 'b' ? '**' : '_', word = sel || (d.id === 'b' ? 'bold' : 'italic'); t.value = v.slice(0, s) + m + word + m + v.slice(e); t.setSelectionRange(s + m.length, s + m.length + word.length); }
+      t.focus(); I.noteText(t);
+    },
     noteSel(d) { ui.noteSel = d.id; render(); },
     noteCosign(d) {
       const p = curPt(), n = p.notes.find((x) => x.id === d.id);
@@ -486,6 +501,13 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
   };
   const C = {
     draft(el) { const d = curPt().drafts.find((x) => x.id === el.dataset.id); if (d) { d[el.dataset.field] = el.type === 'checkbox' ? el.checked : el.value; E.save(); } },
+    noteInsert(el) {
+      const t = $('#noteText'), p = curPt(), k = el.value; el.value = '';
+      if (!t || !E.DOT[k]) return;
+      const rep = E.DOT[k](p), s = t.selectionStart;
+      t.value = t.value.slice(0, s) + rep + t.value.slice(t.selectionEnd); t.setSelectionRange(s + rep.length, s + rep.length); t.focus();
+      track('note.dot'); I.noteText(t);
+    },
     noteType(el) { const p = curPt(), d = p.noteDraft; d.type = el.value; if (d.pristine) d.text = E.expandTemplate(E.NOTE_TEMPLATES[d.type], p); commit(); },
   };
 
@@ -507,7 +529,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (e.key === 'Escape' && ui.modal) return A.closeModal();
     if (e.key === 'Enter' && t.id === 'loginName') return A.login();
     if (e.key === 'Enter' && t.matches && t.matches('tr[data-act]')) return t.click();
-    if (e.key === 'F2' && t.id === 'noteText') { e.preventDefault(); nextBlank(t, true); }
+    if (e.key === 'F2' && t.id === 'noteText') { e.preventDefault(); nextBlank(t, true, e.shiftKey); }
   });
   window.addEventListener('hashchange', onRoute);
 

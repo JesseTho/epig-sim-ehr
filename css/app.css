@@ -604,3 +604,33 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .rp-req { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--note); border: 1px solid var(--line); } .rp-req p { margin: 0; font: 700 14px/1.45 var(--book); }
 .rp-list td { padding-top: 6px; padding-bottom: 6px; } .modal-b .dock-list.wide + .rp-list { margin-top: 10px; }
 .tick1 { flex: none; position: relative; width: 14px; height: 14px; margin: 1px 1px 0; border: 1px solid #2F6B1A; background: #4E9A2E; } .tick1::after { content: ''; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+
+/* ---------- the note pane: a third column on the right of the chart (markup: V.notePane) ---------- */
+.notepane { width: 400px; flex: none; min-height: 0; display: flex; flex-direction: column; background: var(--face); border-left: 1px solid #919B76; box-shadow: inset 1px 0 0 #fff; }
+.notepane.shut { width: 34px; } .notepane.shut > button { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 0; border: 0; background: var(--g-pane) 0 0 / 8px 640px repeat-x, #C9D8AC; image-rendering: pixelated; cursor: pointer; color: var(--ink); }
+.notepane.shut > button > * { image-rendering: auto; } .notepane.shut span { writing-mode: vertical-rl; font: 700 12px var(--title); letter-spacing: .04em; } .notepane.shut > button:hover { box-shadow: inset 3px 0 0 var(--hot-2); }
+.np-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--hot); border: 1px solid #7A5200; }
+.np-tabs { display: flex; align-items: flex-end; gap: 2px; padding: 12px 6px 0 10px; border-bottom: 1px solid #919B76; flex: none; }
+.np-tabs > button:not(.np-hide) { display: flex; align-items: center; gap: 6px; padding: 3px 11px 4px; border: 1px solid #919B76; border-bottom: 0; border-radius: 3px 3px 0 0; background: var(--g-tab) 0 0 / 8px 26px repeat-x, #ECEADB; color: var(--ink); cursor: pointer; white-space: nowrap; font: inherit; }
+.np-tabs > button.on { background: #fff; text-shadow: .5px 0 0 currentColor; padding-top: 5px; padding-bottom: 5px; margin-bottom: -1px; box-shadow: inset 0 3px 0 #7B4FA8; }   /* Epic marks its Notes tab in purple */
+.np-tabs .spacer { flex: 1; } .np-hide { align-self: center; width: 22px; height: 22px; padding: 3px; border: 1px solid transparent; background: none; color: var(--olive-6); cursor: pointer; } .np-hide:hover { border-color: #919B76; background: #fff; }
+.np-b { flex: 1; min-height: 0; overflow: auto; padding: 10px; background: #fff; } .np-b.edit { display: flex; flex-direction: column; overflow: hidden; }
+.np-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; } .np-row select { max-width: 230px; }
+.np-my { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; } .np-my b { font: 700 16px var(--book); color: #2F5E9E; } .np-my span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-tools { display: flex; align-items: center; gap: 3px; margin-bottom: 6px; flex-wrap: wrap; }
+.np-t { width: 24px; height: 24px; padding: 3px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 2px; background: none; cursor: pointer; font: 14px Georgia, serif; color: var(--ink); } .np-t:hover { border-color: #919B76; background: var(--olive-0); } .np-t svg { width: 16px; height: 16px; }
+.np-smart { flex: 1; min-width: 110px; height: 24px; margin: 0 4px; }
+.notepane .blanks { padding: 4px 7px; font-size: 11px; line-height: 1.35; } .notepane .note-edit { flex: 1; height: auto; min-height: 160px; resize: none; margin-bottom: 6px; border: 2px solid #5B8FD6; }
+.np-hint { margin: 0 0 8px; } .np-foot { display: flex; justify-content: flex-end; gap: 6px; flex: none; } .np-foot .btn { display: inline-flex; align-items: center; gap: 4px; }
+.np-empty { padding: 26px 14px; text-align: center; } .np-empty p { margin: 12px auto 0; max-width: 34ch; color: var(--muted); line-height: 1.5; }
+.np-list { max-height: 34%; overflow: auto; border: 1px solid #A9B38B; margin-bottom: 10px; } .np-doc pre.doc { max-width: none; } .np-doc .doc-h { flex-wrap: wrap; }
+.list-row.draft { background: #FFF6D6; }
+/* With the pane open the activity is narrower, so its multi-column layouts step down. */
+.chartwrap:has(.notepane:not(.shut)) .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1500px) { .chartwrap:has(.notepane:not(.shut)) .split, .chartwrap:has(.notepane:not(.shut)) .g-split { grid-template-columns: 1fr; } }
+@media (max-width: 1340px) { .chartwrap:has(.notepane:not(.shut)) .grid3, .chartwrap:has(.notepane:not(.shut)) .grid2 { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .chartwrap { position: relative; } .notepane:not(.shut) { position: absolute; right: 0; top: 0; bottom: 0; z-index: 30; width: min(400px, 92vw); box-shadow: -4px 0 14px rgba(0, 0, 0, .3); } }
+@media print { .notepane { display: none; } }
+@media (max-width: 1640px) { .chartwrap:has(.notepane:not(.shut)) .acts a .gl { display: none; } .chartwrap:has(.notepane:not(.shut)) .acts a { padding-left: 9px; padding-right: 9px; } }
+.np-foot { justify-content: flex-start; } .np-hint { padding-right: 96px; }   /* the helper pig lives in the bottom-right corner */
+.notepane.shut { background: var(--g-pane) 0 0 / 8px 640px repeat-x, #C9D8AC; } .notepane.shut > button { flex: none; background: none; border-bottom: 1px solid #A3B580; }   /* only the top of the rail is a button, so the helper pig keeps its corner */

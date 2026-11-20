@@ -163,7 +163,7 @@
   };
   V.chart = (p, act) => `<div class="chartwrap">${V.sidebar(p)}<section class="chart">
       <nav class="acts">${E.ACTS.map(([id, label]) => `<a href="#/pt/${p.id}/${id}" class="${id === act ? 'on' : ''}">${icon(ACT_GLYPH[id], 24)}${label}</a>`).join('')}</nav>
-      <div class="activity" id="activity">${V.chartBanner ? V.chartBanner(p) : ''}${V.act[act](p)}</div></section></div>`;
+      <div class="activity" id="activity">${V.chartBanner ? V.chartBanner(p) : ''}${V.act[act](p)}</div></section>${V.notePane(p)}</div>`;
 
   /* ================= trend chart ================= */
   V.trend = (pts, lo, hi, dec) => {
@@ -286,25 +286,45 @@
   };
 
   /* ================= Notes ================= */
-  V.noteDoc = (p, n) => `<div class="doc-h"><div><h3>${esc(n.type)}</h3><div class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)} (${esc(E.roleLabel(n.role))})${n.cosignedBy ? ` · Cosigned by ${esc(n.cosignedBy)} ${E.fmtDT(n.cosignedTs)}` : ''}${n.source ? ` · ${chip('Started in ' + n.source, 'blue')}` : ''}</div></div><div>${statusChip(n.status)} ${n.status === 'Cosign needed' && E.can('note.cosign') ? `<button class="btn primary xs" data-act="noteCosign" data-id="${n.id}">Cosign</button>` : ''}</div></div><pre class="doc">${esc(n.text)}</pre>`;
-  /** The fill-in-the-blanks bar above the note editor. */
+  V.noteDoc = (p, n) => `<div class="doc-h"><div><h3>${esc(n.type)}</h3><div class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)} (${esc(E.roleLabel(n.role))})${n.cosignedBy ? ` · Cosigned by ${esc(n.cosignedBy)} ${E.fmtDT(n.cosignedTs)}` : ''}${n.source ? ` · ${chip('Started in ' + n.source, 'blue')}` : ''}</div></div><div>${statusChip(n.status)} ${n.status === 'Cosign needed' && E.can('note.cosign') ? `<button class="btn primary xs" data-act="noteCosign" data-id="${n.id}">Cosign</button>` : ''}</div></div><pre class="doc">${V.noteText(n.text)}</pre>`;
+  /** A signed note's text. The editor's Bold, Italic and List buttons leave plain marks; they show as formatting here. */
+  V.noteText = (t) => esc(t).replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:)]|$)/gm, '$1<i>$2</i>').replace(/^- /gm, '\u2022 ');
+  /** The fill-in-the-blanks line above the note editor. */
   V.blankBar = (text) => {
     const n = (String(text).match(/\*\*\*/g) || []).length;
-    return n ? `${icon('info', 20)}<span><b>${n} blank${n > 1 ? 's' : ''} to fill.</b> Wherever the template shows <code>***</code>, it is waiting for your own words. Click the button, then just type: your text replaces the stars.</span><button class="btn xs primary" data-act="noteNext">Go to next blank <kbd>F2</kbd></button>`
-      : `${icon('check', 20)}<span><b>No blanks left.</b> Read it through once, then sign.</span>`;
+    return n ? `<span><b>${n} blank${n > 1 ? 's' : ''} to fill.</b> Each <code>***</code> is waiting for your words: jump to it, then type.</span>`
+      : `${icon('check', 16)}<span><b>No blanks left.</b> Read it through once, then sign.</span>`;
+  };
+  const noteOpen = (p) => (E.ui.notePane == null ? !!p.noteDraft : !!E.ui.notePane);
+  /* The note pane: a third column docked on the right of the chart, as in Epic, so a note can be written
+     while the rest of the chart is read. It stays put as the learner moves between activities. */
+  V.notePane = (p) => {
+    const d = p.noteDraft, notes = [...p.notes].sort((a, b) => b.ts - a.ts);
+    if (!noteOpen(p)) return `<aside class="notepane shut"><button data-act="notePane" title="Open the note pane" aria-label="Open the note pane">${icon('notes', 24)}<span>Notes</span>${d ? '<i class="np-dot" title="Unsigned note"></i>' : ''}</button></aside>`;
+    const tab = E.ui.npTab === 'review' ? 'review' : 'mine';
+    const sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
+    const tool = (act, id, title, inner) => `<button class="np-t" data-act="${act}"${id ? ` data-id="${id}"` : ''} title="${title}" aria-label="${title}">${inner}</button>`;
+    const mine = d ? `<div class="np-row"><label>Type <select data-change="noteType">${opts(Object.keys(E.NOTE_TEMPLATES), d.type)}</select></label></div>
+        <div class="np-my"><b>My Note</b><span>${esc(d.type)} · unsigned · autosaved</span></div>
+        <div class="np-tools" role="toolbar" aria-label="Note tools">${tool('noteFmt', 'b', 'Bold', '<b>B</b>')}${tool('noteFmt', 'i', 'Italic', '<i>I</i>')}${tool('noteFmt', 'l', 'Bulleted list', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h2v2H2zM6 4.500h8v1H6zM2 10h2v2H2zM6 10.500h8v1H6z" fill="currentColor"/></svg>')}
+          <select class="np-smart" data-change="noteInsert" aria-label="Insert SmartText"><option value="">Insert SmartText…</option>${Object.keys(E.DOT).map((k) => `<option value="${k}">.${k}</option>`).join('')}</select>
+          ${tool('notePrev', '', 'Previous blank (Shift+F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3L3 8l6 5v-3h4V6H9z" fill="#C98A00" stroke="#7A5200"/></svg>')}${tool('noteNext', '', 'Next blank (F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 3l6 5-6 5v-3H3V6h4z" fill="#C98A00" stroke="#7A5200"/></svg>')}</div>
+        <div class="blanks" id="blankBar" aria-live="polite">${V.blankBar(d.text)}</div>
+        <textarea id="noteText" class="note-edit" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
+        <p class="fine np-hint">SmartLinks pull in chart data: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> <code>.allergies</code> <code>.problems</code> then a space.</p>
+        <div class="np-foot"><button class="btn primary" data-act="noteSign">${icon('check', 16)}${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button><button class="btn" data-act="noteCancel">Cancel note</button></div>`
+      : `<div class="np-empty"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button><p>The note stays open here while you look through the chart, so you can write from what is in front of you.</p></div>`;
+    const review = notes.length ? `<div class="np-list">${notes.map((n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span></button>`).join('')}</div><div class="np-doc">${sel ? V.noteDoc(p, sel) : ''}</div>` : empty('No notes yet');
+    return `<aside class="notepane" aria-label="Notes"><nav class="np-tabs"><button class="${tab === 'mine' ? 'on' : ''}" data-act="npTab" data-id="mine">${icon('notes', 24)}Notes</button><button class="${tab === 'review' ? 'on' : ''}" data-act="npTab" data-id="review">Review (${notes.length})</button><span class="spacer"></span><button class="np-hide" data-act="notePane" title="Hide the note pane" aria-label="Hide the note pane"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l6 5-6 5z" fill="currentColor"/></svg></button></nav>
+      <div class="np-b${tab === 'mine' && d ? ' edit' : ''}">${tab === 'mine' ? mine : review}</div></aside>`;
   };
   V.act.notes = (p) => {
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), d = p.noteDraft;
     const sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
-    const editor = d ? `<div class="doc-h"><h3>New note</h3><label>Type <select data-change="noteType">${opts(Object.keys(E.NOTE_TEMPLATES), d.type)}</select></label></div>
-        <div class="blanks" id="blankBar" aria-live="polite">${V.blankBar(d.text)}</div>
-        <textarea id="noteText" class="note-edit" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
-        <div class="toolbar"><span class="fine">Shortcuts that pull in chart data: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> <code>.allergies</code> <code>.problems</code> <code>.name</code> <code>.me</code> then a space.</span><span class="spacer"></span>
-        <button class="btn" data-act="noteCancel">Discard</button><button class="btn primary" data-act="noteSign">${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button></div>` : sel ? V.noteDoc(p, sel) : empty('No notes yet');
     return `<div class="split"><div class="pane list"><div class="toolbar"><b>Notes (${notes.length})</b><span class="spacer"></span><button class="btn xs" data-act="noteNew"${d ? ' disabled' : ''}>${icon('add', 16)}New note</button></div>
-        ${d ? `<div class="list-row sel"><b>Draft: ${esc(d.type)}</b><span class="muted">Unsigned · autosaved</span></div>` : ''}
-        ${notes.map((n) => `<button class="list-row${!d && sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('')}</div>
-      <div class="pane">${editor}</div></div>`;
+        ${d ? `<button class="list-row draft" data-act="notePaneOpen"><b>Draft: ${esc(d.type)}</b><span class="muted">Unsigned · autosaved · open in the note pane on the right</span></button>` : ''}
+        ${notes.map((n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('')}</div>
+      <div class="pane">${sel ? V.noteDoc(p, sel) : empty('No notes yet')}</div></div>`;
   };
 
   /* ================= Orders ================= */
