@@ -1,4 +1,4 @@
-/* EPIG Student Edition — controller: routing, rendering, and every user action. */
+/* SIM+EHR Student Edition — controller: routing, rendering, and every user action. */
 (function () {
   const E = window.EHR, V = E.V, ui = E.ui;
   const $ = (s, root) => (root || document).querySelector(s);
@@ -25,7 +25,7 @@
     const sc2 = $('#activity') || $('.main');
     if (sc2) sc2.scrollTop = keep;
     lastHash = location.hash;
-    document.title = (r.pid ? E.pt(r.pid).name + ' — ' : '') + 'Epig — SIM EHR';
+    document.title = (r.pid ? E.pt(r.pid).name + ' — ' : '') + 'SIM+EHR';
     $('#modal').innerHTML = ui.modal ? V.modal(ui.modal) : '';
     if (ui.modal) { const f = $('#modal input, #modal select, #modal button.primary'); if (f) f.focus(); }
     // The assistant in the corner takes its mood from the screen: worried by an advisory, thoughtful over a
@@ -189,7 +189,7 @@
   function exportReport(pr) {
     const s = E.progressSummary(pr), ev = E.evidence(pr), g = E.game(pr);
     const report = {
-      title: 'EPIG Student Edition — learner report', framework: E.EPA_SOURCE, exportedAt: new Date().toISOString(),
+      title: 'SIM+EHR Student Edition — learner report', framework: E.EPA_SOURCE, exportedAt: new Date().toISOString(),
       learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), proficiencyCheck: E.examReport(pr), miniGames: E.GAMES.map((g) => { const r = (pr.games || {})[g.id] || {}; return { game: g.name, plays: r.plays || 0, bestPercent: r.best || 0, perfectRounds: r.perfect || 0 }; }), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
       objectives: E.LEARNING.map((lo) => ({
         epa: lo.epa, epaTitle: lo.epaTitle, objective: lo.objective,

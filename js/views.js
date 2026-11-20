@@ -1,4 +1,4 @@
-/* EPIG Student Edition — views. Pure functions from state to HTML strings; all dynamic text goes through esc(). */
+/* SIM+EHR Student Edition — views. Pure functions from state to HTML strings; all dynamic text goes through esc(). */
 (function () {
   const E = window.EHR, esc = E.esc, H = E.HOUR;
   const V = (E.V = { act: {} });
@@ -115,7 +115,7 @@
       <div class="spacer"></div>
       <div class="search"><label for="ptSearch">Find patient</label><span class="search-box">${icon('search', 16)}<input id="ptSearch" data-input="ptSearch" placeholder="Name or MRN" autocomplete="off"></span><div id="ptSearchRes" class="search-res"></div></div>
     </header>
-    <div class="infobar">${icon('warn', 20)}<span><b>SIM EHR.</b> ${esc(E.QUIPS[E.ui.quip % E.QUIPS.length])} <b>Never enter real patient information.</b></span><span id="status" class="status" role="status">${esc(E.ui.status || '')}</span></div>
+    <div class="infobar">${icon('warn', 20)}<span><b>SIM+EHR.</b> ${esc(E.QUIPS[E.ui.quip % E.QUIPS.length])} <b>Never enter real patient information.</b></span><span id="status" class="status" role="status">${esc(E.ui.status || '')}</span></div>
     <div class="wstabs">
       <a class="wstab${r.pid ? '' : ' on'}" href="#/home">${icon('home', 20)}Home</a>
       ${db.openTabs.map((id) => { const p = E.pt(id); return p ? `<span class="wstab${r.pid === id ? ' on' : ''}"><a href="#/pt/${id}/summary">${icon('user', 20)}${esc(p.name)}</a><button data-act="closeTab" data-id="${id}" title="Close chart" aria-label="Close chart of ${esc(p.name)}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.500 4.500l7 7M11.500 4.500l-7 7" stroke="currentColor" stroke-width="1.800" stroke-linecap="round"/></svg></button></span>` : ''; }).join('')}
@@ -478,7 +478,8 @@
         <p class="fine">Simulated patient. Any resemblance to a real person is a coincidence, and so is their patience with hold music. Document the encounter in Notes when you finish.</p>`,
         `${m.state === 'error' ? '<button class="btn" data-act="callOpen">Try again</button>' : ''}<button class="btn ${m.state === 'live' || m.state === 'connecting' ? 'danger' : 'primary'}" data-act="callEnd">${m.state === 'live' || m.state === 'connecting' ? 'End call' : 'Close'}</button>`, 'call');
     }
-    if (m.type === 'help') return modal('Help — Epig SIM EHR', `
+    if (m.type === 'help') return modal('Help — SIM+EHR', `
+        <p><b>SIM+EHR</b> is the simulation. Inside it you work in <b>Epig</b>, a made-up hospital record (a parody of the systems you will meet on the wards), with Truffle the flying pig as your guide.</p>
         <h4>Getting around</h4>
         <ul><li><b>Patient Lists</b> shows the census. Select a patient to open the chart; open charts stay as tabs under the toolbar.</li><li>The left <b>sidebar</b> of a chart always shows identity, code status, allergies and the latest vitals.</li><li>Activity tabs across the chart: Summary, Chart Review, Results, Flowsheets, MAR, Notes, Orders, Problems &amp; Allergies.</li><li>Lab and imaging orders result on their own about 15–25 seconds after they are signed, and a message arrives in the Inbox.</li><li><b>Learning</b> lists the objectives, tracks practice tasks, and holds the knowledge check.</li></ul>
         <h4>Roles</h4>

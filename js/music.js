@@ -1,4 +1,4 @@
-/* EPIG Student Edition — the login screen's music.
+/* SIM+EHR Student Edition — the login screen's music.
 
    An original, unhurried loop in the manner of a 1990s simulation game's menu music: electric-piano chords,
    a walking bass, brushed drums and a soft square-wave melody, eight bars in F major at 96 beats a minute.

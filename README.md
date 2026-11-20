@@ -1,7 +1,8 @@
-# Epig — SIM EHR (Student Edition)
+# SIM+EHR (Student Edition)
 
-A practice electronic health record for medical students, built to prepare them for inpatient EHR
-work before they use a real system. It runs entirely in the browser.
+A practice electronic health record simulation for medical students, built to prepare them for
+inpatient EHR work before they use a real system. Inside the simulation you work in **Epig**, a
+made-up hospital record, with Truffle the flying pig as your guide. It runs entirely in the browser.
 
 **Open it:** https://jessetho.github.io/epig-sim-ehr/
 

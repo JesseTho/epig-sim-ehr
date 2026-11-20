@@ -1,4 +1,4 @@
-/* EPIG Student Edition — site settings. Edit this file to connect optional services.
+/* SIM+EHR Student Edition — site settings. Edit this file to connect optional services.
 
    VIDEO VISITS ("Call patient")
    The sim never talks to a video provider directly, because an API key must not sit in a page

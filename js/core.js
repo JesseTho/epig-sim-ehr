@@ -1,4 +1,4 @@
-/* EPIG Student Edition — core: namespace, formatting helpers, persistent store, roles.
+/* SIM+EHR Student Edition — core: namespace, formatting helpers, persistent store, roles.
    Everything lives on window.EHR so the app runs from file:// with no build step. */
 (function () {
   const E = (window.EHR = {});

@@ -1,4 +1,4 @@
-/* EPIG Student Edition — reference data: lab definitions, orderable catalog, order sets,
+/* SIM+EHR Student Edition — reference data: lab definitions, orderable catalog, order sets,
    frequencies, note templates. Teaching content only; not for clinical use. */
 (function () {
   const E = window.EHR;

@@ -1,4 +1,4 @@
-/* EPIG Student Edition — missions and the proficiency check.
+/* SIM+EHR Student Edition — missions and the proficiency check.
 
    MISSIONS are short cases, one per patient. Each has objectives (all needed for a bronze star), a safety rule
    (nothing ordered that puts the patient at risk, for silver) and bonus objectives (all of them, for gold).
@@ -432,7 +432,7 @@
         <div class="cert-brand">${icon('logo', 96)}${E.wordmark(72)}</div>
         <p class="cert-kick">Certificate of Proficiency</p>
         <p>This certifies that</p><p class="cert-name">${esc(pr.name)}</p>
-        <p>passed the EPIG SIM EHR proficiency check, finding information across simulated inpatient charts, with a score of <b>${ex.passedScore} of ${E.EXAM.questions}</b> on ${E.fmtDate(ex.passedAt)}.</p>
+        <p>passed the SIM+EHR proficiency check, finding information across the simulated inpatient charts of the Epig training record, with a score of <b>${ex.passedScore} of ${E.EXAM.questions}</b> on ${E.fmtDate(ex.passedAt)}.</p>
         <p class="cert-stats">${esc(E.roleLabel(pr.role))} · Level ${g.level}, ${esc(g.title)} · ${tot} of ${E.MISSIONS.length * 3} mission stars · ${g.earned.length} of ${E.BADGES.length} badges</p>
         <div class="cert-sign"><span>Faculty signature</span><span>Date</span></div>
         <p class="cert-fine">This certificate records practice in a training simulation with fictional patients. It does not grant access to any real health record system.</p></div></div>`);

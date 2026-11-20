@@ -1,4 +1,4 @@
-/* EPIG Student Edition — seed data. Every patient, clinician and value here is FICTIONAL and
+/* SIM+EHR Student Edition — seed data. Every patient, clinician and value here is FICTIONAL and
    written for teaching. Times are stored relative to "now" so the census always looks current. */
 (function () {
   const E = window.EHR;

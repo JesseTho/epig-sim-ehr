@@ -1,4 +1,4 @@
-/* EPIG Student Edition — clinical logic: orders, decision-support advisories, MAR schedule,
+/* SIM+EHR Student Edition — clinical logic: orders, decision-support advisories, MAR schedule,
    simulated resulting, dot phrases. Rules are simplified for teaching. */
 (function () {
   const E = window.EHR;

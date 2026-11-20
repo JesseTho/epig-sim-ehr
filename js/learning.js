@@ -1,4 +1,4 @@
-/* EPIG Student Edition — learning objectives and assessment.
+/* SIM+EHR Student Edition — learning objectives and assessment.
 
    FACULTY: this file is the curriculum. Edit it freely.
    Each objective is mapped to one of the AAMC Core Entrustable Professional Activities for

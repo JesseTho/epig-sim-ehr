@@ -1,4 +1,4 @@
-/* EPIG Student Edition — mini-games.
+/* SIM+EHR Student Edition — mini-games.
 
    Short rounds that drill one skill, built from the sim's own patients. When a game produces something a
    clinician would put in a chart, the learner can send it to the chart, where it goes through exactly the

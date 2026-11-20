@@ -1,4 +1,4 @@
-/* EPIG Student Edition — glyph set and dithered artwork.
+/* SIM+EHR Student Edition — glyph set and dithered artwork.
    Original drawings in the early-2000s desktop style: a dark outline tinted from the fill, a dithered
    ramp for the fill, pixel-dot highlights on the upper left, and a contact shadow. Drawn on a 32px grid
    (the logo on 64) with 1.5px outlines so they hold at 16px. Use EHR.icon(name, size). See DESIGN.md. */
@@ -230,38 +230,27 @@
       </g></g></svg>`;
   };
   const WMB = {};
-  /* The wordmark is made the same way as the rough-cut pig logo, so the two match:
-       1. drawn as small pixel art, WM_ART pixels tall, hard-edged, its pink bands blended with an ordered dither;
-       2. blown up with hard pixels, then scaled down smoothly to the screen's real pixels, as the pig was cut
-          down from its sprite art;
-       3. its edge hard-cut again, so it keeps the rough pixel outline at any size and on any display scaling. */
-  const WM_ART = 36;
-  const wordmarkArt = () => new Promise((done) => {
-    const n = WM_ART, w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), u = WM_BOX[3] / n;   // viewBox units per art pixel
+  /* The wordmark matches the rough-cut pig logo beside it: one art pixel per real screen pixel (the pig's
+     density), a hard-cut edge, and its three pinks blended with the fine ordered dither used across the app. */
+  const wmRaster = (h) => new Promise((done) => {
+    const dpr = Math.max(1, window.devicePixelRatio || 1), n = Math.round(h * dpr), w = Math.round((n * WM_BOX[2]) / WM_BOX[3]), u = WM_BOX[3] / n;   // u: viewBox units per pixel
     const fill = ramp(['#FBB2CF', '#F7609A', '#E0488A'], Math.round(36 / u));
-    const svg = wordmarkSvg(n).replace(/<g clip-path="url\(#wmc\)">[\s\S]*?<\/g>/, `<g clip-path="url(#wmc)"><rect x="-20" y="-3" width="160" height="36" fill="url(#wmd)"/><rect x="-20" y="32.9" width="160" height="14" fill="#E0488A"/></g>`)
+    const svg = wordmarkSvg(n).replace(/<g clip-path="url\(#wmc\)">[\s\S]*?<\/g>/, '<g clip-path="url(#wmc)"><rect x="-20" y="-3" width="160" height="36" fill="url(#wmd)"/><rect x="-20" y="32.9" width="160" height="14" fill="#E0488A"/></g>')
       .replace('<defs>', `<defs><pattern id="wmd" patternUnits="userSpaceOnUse" x="-20" y="-3" width="${8 * u}" height="36"><image href="${fill}" width="${8 * u}" height="36" preserveAspectRatio="none" style="image-rendering:pixelated"/></pattern>`);
     const img = new Image();
     img.onload = () => {
-      const cv = document.createElement('canvas'); cv.width = w; cv.height = n;
-      const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, w, n);
-      const id = ctx.getImageData(0, 0, w, n); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] >= 128 ? 255 : 0; ctx.putImageData(id, 0, 0);
-      done(cv);
+      try {
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = n;
+        const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, w, n);
+        const id = ctx.getImageData(0, 0, w, n); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] >= 128 ? 255 : 0; ctx.putImageData(id, 0, 0);
+        WMB[h] = { src: cv.toDataURL('image/png'), w: w / dpr, h: n / dpr };
+      } catch (e) { /* fall back to the SVG */ }
+      done();
     };
-    img.onerror = () => done(null);
+    img.onerror = done;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   });
-  const wmRaster = (art, h) => {
-    if (!art) return;
-    const dpr = Math.max(1, window.devicePixelRatio || 1), nd = Math.round(h * dpr), wd = Math.round((art.width * nd) / art.height);
-    const big = document.createElement('canvas'); big.width = art.width * 8; big.height = art.height * 8;
-    const b = big.getContext('2d'); b.imageSmoothingEnabled = false; b.drawImage(art, 0, 0, big.width, big.height);
-    const cv = document.createElement('canvas'); cv.width = wd; cv.height = nd;
-    const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(big, 0, 0, wd, nd);
-    const id = ctx.getImageData(0, 0, wd, nd); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] >= 128 ? 255 : 0; ctx.putImageData(id, 0, 0);
-    WMB[h] = { src: cv.toDataURL('image/png'), w: wd / dpr, h: nd / dpr };
-  };
-  E.glyphsReady = Promise.all([E.glyphsReady, wordmarkArt().then((art) => { wmRaster(art, 44); wmRaster(art, 72); })]);
+  E.glyphsReady = Promise.all([E.glyphsReady, wmRaster(44), wmRaster(72)]);
   /** The wordmark at 44px (banner) or 72px (login and loading screens). */
   E.wordmark = (h) => (WMB[h] ? `<img class="wm smooth" src="${WMB[h].src}" style="width:${WMB[h].w}px;height:${WMB[h].h}px" alt="Epig" draggable="false">` : wordmarkSvg(h).replace('<svg ', '<svg class="wm" role="img" aria-label="Epig" '));
 

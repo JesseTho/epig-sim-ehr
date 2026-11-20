@@ -1,4 +1,4 @@
-/* EPIG Student Edition — Truffle, the desk assistant in the bottom-right corner.
+/* SIM+EHR Student Edition — Truffle, the desk assistant in the bottom-right corner.
    A flying pig that reacts to what the learner is doing and offers one tip at a time, in the manner of the
    office assistants of the late 1990s. It never blocks work: it stays still unless clicked, speaks only when
    there is something useful to say, steps aside when it would cover a control, and can be put away. When put
@@ -137,7 +137,7 @@
     back = document.getElementById('pal-back');
     if (!root || !back) return;
     root.hidden = back.hidden = true;
-    root.innerHTML = `<div class="pal-bubble" role="status" hidden></div><button class="pal-pig" data-pal="toggle" aria-label="${NAME}, the EPIG guide. Show a tip." title="${NAME}: click for a tip"><i></i></button>`;
+    root.innerHTML = `<div class="pal-bubble" role="status" hidden></div><button class="pal-pig" data-pal="toggle" aria-label="${NAME}, your SIM+EHR guide. Show a tip." title="${NAME}: click for a tip"><i></i></button>`;
     back.innerHTML = `<i></i><span>${NAME}</span>`;
     back.title = `${NAME}: click for a tip`;
     root.addEventListener('click', (e) => {
