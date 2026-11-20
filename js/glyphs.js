@@ -378,5 +378,5 @@
     R(LINE, 62, 89, 20, 23); R(DOOR, 63, 90, 18, 22); R(GLASS, 65, 92, 6, 10); R(GLASS, 73, 92, 6, 10); R('#FFFFFF', 65, 92, 2, 2); R('#FFFFFF', 73, 92, 2, 2); R('#F2C94C', 71, 101, 1, 2);
     return cv.toDataURL('image/png');
   })());
-  scene('--hospital', 'hospital', [144, 180, 216, 288], 144);   // supplied art; the drawn one above is the fallback
+  scene('--hospital', 'hospital', [144], 144);   // only the 1x cut exists so far; add 180, 216, 288 here when they arrive   // supplied art; the drawn one above is the fallback
 })();

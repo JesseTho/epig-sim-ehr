@@ -62,7 +62,7 @@
       return `<span class="fly ${cls}" data-act="pigPop" data-key="${key}" data-left="${left.toFixed(1)}" style="top:${top};width:${size}px;height:${size}px;${at(dur, offset)}">${icon(name + '1', size)}${icon(name + '2', size)}</span>`;   // the hand-drawn pig, wing up and wing down
     };
     // Back to front: clouds, the distant hills, the pigs, the nearest hill.
-    const far = '<i class="land"></i>';   // the pink hospital is switched off for now (owner); its art and CSS remain
+    const far = '<i class="land"></i>' + (big ? '<i class="hosp"></i>' : '');   // the pink hospital stands on the far hills, behind the pigs
     return `<div class="skyfx ${kind}" aria-hidden="true">${big
       ? cl('c', '9%', 210, 20) + cl('a', '20%', 150, 95) + cl('b', '6%', 120, 50) + cl('a', '31%', 260, 170) + cl('b', '26%', 180, 10) + far + fly('pig', 'rl', 48, '8%', 58, 40) + fly('pig', 'lr', 48, '34%', 74, 8) + fly('pig', 'lr', 48, '18%', 97, 66)
       : cl('a', '6px', 170, 60) + cl('b', '24px', 230, 150) + cl('b', '12px', 120, 20) + far + fly('pig', 'lr', 24, '8px', 140, 100) + fly('pig', 'rl', 24, '4px', 190, 30)}<i class="land near"></i></div>`;
