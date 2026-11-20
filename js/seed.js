@@ -235,6 +235,6 @@
         thread: [{ who: 'patient', ts: T(-0.7), text: 'Hello, this is James Whitfield in 417. Nobody has told me the plan for my blood thinner. I take it for my irregular heartbeat and I would like to know when I start it again. Thank you.' }] },
     ].map((m) => Object.assign({ id: E.uid('m'), ts: T(-1), read: false, roles: null }, m));
 
-    return { version: E.SEED_VERSION, createdAt: now, user: null, openTabs: [], patients, inbox, audit: [], progress: {} };
+    return { version: E.SEED_VERSION, saveVersion: E.SAVE_VERSION, createdAt: now, user: null, openTabs: [], patients, inbox, audit: [], progress: {} };
   };
 })();

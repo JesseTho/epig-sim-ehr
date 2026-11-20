@@ -49,6 +49,7 @@
   /** Result every lab/imaging order whose simulated turnaround has elapsed. Returns what resulted. */
   E.processResults = () => {
     const now = Date.now(), done = [];
+    if (E.simPaused && E.simPaused()) return done;   // paused: nothing posts (the hold is added back by E.simClock in js/sim.js)
     E.db.patients.forEach((p) => p.orders.forEach((o) => {
       if (o.status !== 'In process' || o.resultAt > now) return;
       const c = E.cat(o.catId);
@@ -75,7 +76,7 @@
         subject: `${crit ? 'CRITICAL: ' : abnormal.length ? 'Abnormal: ' : 'Result: '}${c.name} — ${p.name}`,
         body: c.comps ? (abnormal.length ? 'Abnormal values:\n' + abnormal.join('\n') : 'All components within reference range.') + (moved.length ? '\n\nChanged since the last result:\n' + moved.join('\n') : '') : p.reports[p.reports.length - 1].text,
       });
-      done.push({ p, o });
+      done.push({ p, o, crit });
     }));
     return done;
   };

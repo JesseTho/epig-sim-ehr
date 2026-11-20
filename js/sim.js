@@ -191,8 +191,8 @@
       const rule = E.harmRule ? E.harmRule(p, o) : null, stop = high[0] || (rule && { title: rule.title, detail: rule.why(p, o) });
       // during a shift's Day work the attending is busy: an order whose advisory the student overrode is
       // cosigned by a hurried resident and reaches the patient
-      if (stop && o.overrides && o.overrides.length && E.shiftRushed && E.shiftRushed()) { E.activate(p, o, RESIDENT); o.rushed = true; rushed.push(o); auditAs(RESIDENT, `Cosigned order without review: ${o.name} (entered by ${o.by}, advisory overridden)`, p.id); }
-      else if (stop) { o.status = 'Declined'; o.declinedBy = p.attending; o.declineReason = stop.title; no.push({ o, a: stop }); auditAs(p.attending, `Declined pended order: ${o.name} (${stop.title})`, p.id); if (E.nearMiss) E.nearMiss(p, o, stop.title, p.attending); }
+      if (stop && o.overrides && o.overrides.length && E.shiftRushed && E.shiftRushed()) { E.activate(p, o, RESIDENT); o.rushed = true; o.feedback = 'Cosigned by the covering resident without the usual review, because the advisory was overridden.'; rushed.push(o); auditAs(RESIDENT, `Cosigned order without review: ${o.name} (entered by ${o.by}, advisory overridden)`, p.id); }
+      else if (stop) { o.status = 'Declined'; o.declinedBy = p.attending; o.declineReason = stop.title; o.feedback = `${stop.title}. ${stop.detail}`; /* kept in the learner's evidence */ no.push({ o, a: stop }); auditAs(p.attending, `Declined pended order: ${o.name} (${stop.title})`, p.id); if (E.nearMiss) E.nearMiss(p, o, stop.title, p.attending); }
       else { E.activate(p, o, p.attending); ok.push(o); auditAs(p.attending, `Cosigned order: ${o.name} (entered by ${o.by})`, p.id); }
     });
     const body = [
@@ -211,22 +211,50 @@
     if (!/\d{2,3}\/\d{2,3}/.test(t) && !/vitals?/i.test(t)) tips.push('Include today\'s vital signs (the .vitals dot phrase pulls them in).');
     const al = E.allergiesOf(p)[0];
     if (/H&P|Discharge/i.test(n.type) && al && !t.toLowerCase().includes(al.agent.split(' ')[0].toLowerCase())) tips.push(`This note type should list allergies; ${al.agent} is missing.`);
-    Object.assign(n, { status: 'Signed', cosignedBy: p.attending, cosignedTs: Date.now() });
+    const fb = tips.length ? `Cosigned. For next time:\n${tips.map((x) => '- ' + x).join('\n')}` : 'Cosigned. Clear and complete: story, data, assessment and plan are all there. Nice work.';
+    Object.assign(n, { status: 'Signed', cosignedBy: p.attending, cosignedTs: Date.now(), feedback: fb });   // feedback is kept in the learner's evidence
     auditAs(p.attending, `Cosigned note: ${n.type} by ${n.author}`, p.id);
-    E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'notes', subject: `${n.type} cosigned — ${p.name}`, body: tips.length ? `Cosigned. For next time:\n${tips.map((x) => '- ' + x).join('\n')}` : 'Cosigned. Clear and complete: story, data, assessment and plan are all there. Nice work.' });
+    E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'notes', subject: `${n.type} cosigned — ${p.name}`, body: fb });
     out.push(`${p.attending} cosigned your note — ${p.name}`);
   }
 
   /* ================= the clock: called every 2 seconds by js/app.js ================= */
   /** Runs everything that is due. Returns short lines to show the learner. */
+  /* The hold. While the learner has paused (E.simPaused), is logged out or is suspended, or the page was closed
+     or asleep, the hospital holds still. When it moves again, every item still waiting gets the held time added
+     to its own `simHold` (and a lab or study its `resultAt`, which is never shown), so it has the time it had
+     left. The timestamps the learner sees are never changed. Kept in E.db so it survives a reload. */
+  const FRESH = 15 * 60 * 1000, GAP = 90 * 1000;   // GAP: longer than any throttled timer in a background tab
+  const age = (x, t) => Date.now() - t - (x.simHold || 0);
+  function release(since, d) {
+    E.db.patients.forEach((p) => {
+      p.orders.forEach((o) => {
+        if (o.status === 'In process' && o.resultAt) o.resultAt += d;
+        else if (o.status === 'Pended' || (o.status === 'Active' && o.signedTs && since - o.signedTs - (o.simHold || 0) < FRESH)) o.simHold = (o.simHold || 0) + d;
+      });
+      p.notes.forEach((n) => { if (n.status === 'Cosign needed') n.simHold = (n.simHold || 0) + d; });
+    });
+  }
+  /** Called every two seconds by js/app.js, even when nobody is logged in. Returns true while the hospital is held. */
+  E.simClock = () => {
+    const h = E.db.simHold || (E.db.simHold = { since: null, last: 0 }), now = Date.now();
+    const held = !E.db.user || !!(E.suspended && E.suspended()) || E.simPaused();
+    if (!h.since && h.last && now - h.last > GAP) h.since = h.last;   // the page was closed or asleep
+    h.last = now;
+    if (held) { if (!h.since) h.since = now; return true; }
+    if (h.since) { release(h.since, Math.max(0, now - h.since)); h.since = null; }
+    return false;
+  };
+
   E.simTick = () => {
-    const c = CFG(), now = Date.now(), out = [], fresh = (o, s) => o.signedTs && now - o.signedTs >= s * 1000 && now - o.signedTs < 15 * 60 * 1000;
+    if (E.simPaused()) return [];
+    const c = CFG(), out = [], fresh = (o, s) => o.signedTs && age(o, o.signedTs) >= s * 1000 && age(o, o.signedTs) < FRESH;
     const solo = E.db.user && E.db.user.role === 'student';
     E.db.patients.forEach((p) => {
       if (c.attending && solo) {
-        const pend = p.orders.filter((o) => o.status === 'Pended' && o.byRole === 'student' && now - o.ts >= c.attendingDelay * 1000);
+        const pend = p.orders.filter((o) => o.status === 'Pended' && o.byRole === 'student' && age(o, o.ts) >= c.attendingDelay * 1000);
         if (pend.length) reviewOrders(p, pend, out);
-        p.notes.filter((n) => n.status === 'Cosign needed' && n.role === 'student' && now - n.ts >= c.noteDelay * 1000).forEach((n) => reviewNote(p, n, out));
+        p.notes.filter((n) => n.status === 'Cosign needed' && n.role === 'student' && age(n, n.ts) >= c.noteDelay * 1000).forEach((n) => reviewNote(p, n, out));
       }
       const act = p.orders.filter((o) => o.status === 'Active');
       // an order that is harming the patient (js/shift.js) gets its vital signs from the harm rule, not from here

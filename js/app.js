@@ -13,25 +13,128 @@
     return { view: ['inbox', 'log', 'learning', 'missions'].includes(h[0]) ? h[0] : 'home' };
   }
   const curPt = () => { const r = route(); return r.pid ? E.pt(r.pid) : null; };
+  /** The patient an open dialog was opened for. Saves use this, never the chart that happens to be behind it. */
+  const dlgPt = () => (ui.modal && ui.modal.pid ? E.pt(ui.modal.pid) : null);
+  // dialogs that edit one patient's chart; they close if the route moves to another patient underneath them
+  const PT_FORMS = ['vitals', 'allergy', 'problem', 'set', 'mar', 'alerts', 'allergyRemove', 'confirm'];
 
+  /* ---------- error surface: a failure shows a plain notice instead of a blank or frozen screen ---------- */
+  let crashFrom = null;
+  function crash(e, where) {
+    console.error('SIM+EHR: ' + where + ' failed', e);
+    crashFrom = where;
+    let box = document.getElementById('crash');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'crash'; box.className = 'notice warn'; box.setAttribute('role', 'alert');
+      box.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;max-width:min(560px,calc(100vw - 32px));display:block;padding:12px 16px;background:#fff;border:2px solid #b00;box-shadow:0 4px 16px rgba(0,0,0,.35)';
+      document.body.appendChild(box);
+    }
+    box.innerHTML = `<b style="display:block">Something went wrong on this screen</b><span style="display:block;margin:4px 0 10px">${E.esc((e && e.message) || String(e))}</span><button class="btn primary" data-act="crashReload">Reload</button> <a class="btn" href="#/home" data-act="crashHome">Go to patient list</a> <button class="btn" data-act="crashClose">Close</button>`;
+  }
+  const crashClear = () => { const b = document.getElementById('crash'); if (b) b.remove(); crashFrom = null; };
   function render() {
+    try { draw(); if (crashFrom === 'render') crashClear(); }
+    catch (e) { crash(e, 'render'); }
+  }
+  /* ---------- notices that stay until dismissed: saving failed, or the save had to be recovered ---------- */
+  function notice(id, html) {
+    let box = document.getElementById(id);
+    if (!box) {
+      box = document.createElement('div'); box.id = id; box.className = 'notice warn'; box.setAttribute('role', 'alert');
+      box.style.cssText = 'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:9999;max-width:min(560px,calc(100vw - 32px));display:block;padding:12px 16px;background:#fff;border:2px solid #b60;box-shadow:0 4px 16px rgba(0,0,0,.35)';
+      document.body.appendChild(box);
+    }
+    box.innerHTML = html + ` <button class="btn" data-act="noticeClose" data-id="${id}">Dismiss</button>`;
+  }
+  E.onSaveFail = (reason) => notice('savewarn', `<b style="display:block">Your work is not being saved on this device</b><span style="display:block;margin:4px 0 10px">${reason === 'full' ? 'The browser storage for this page is full.' : 'The browser is blocking storage for this page, for example in a private window or with site data turned off.'} What you do now will be lost when the page closes. Download your report from the Learning page to keep a copy.</span>${E.db && E.db.user ? '<button class="btn primary" data-act="learnExport">Download report</button>' : ''}`);
+
+  /* ---------- keeping place across a redraw ----------
+     The screen is rebuilt from strings, so a control is found again by what it does: its id, or its data-act with
+     its data-* values, or a link's href. */
+  let shownModal = null, opener = null, lastCtl = null;
+  const q = (v) => '"' + String(v).replace(/["\\]/g, '\\$&') + '"';
+  function ctlKey(el) {
+    if (!el || !el.getAttribute) return null;
+    if (el.id) return '#' + (window.CSS && CSS.escape ? CSS.escape(el.id) : el.id);
+    const act = el.getAttribute('data-act');
+    if (act) return `[data-act=${q(act)}]` + [...el.attributes].filter((a) => /^data-/.test(a.name) && a.name !== 'data-act').map((a) => `[${a.name}=${q(a.value)}]`).join('');
+    if (el.tagName === 'A' && el.getAttribute('href')) return `a[href=${q(el.getAttribute('href'))}]`;
+    return null;
+  }
+  const findCtl = (box, key) => { try { return key ? box.querySelector(key) : null; } catch (e) { return null; } };
+  // every element with a scroll offset, keyed by id, or by tag and first class plus its place among its kind
+  const sigOf = (el) => (el.id ? '#' + el.id : el.tagName + '.' + String(el.getAttribute('class') || '').split(' ')[0]);
+  function scrollSnap(box) {
+    const out = [], seen = {};
+    box.querySelectorAll('*').forEach((el) => { const s = sigOf(el), i = (seen[s] = (seen[s] || 0) + 1); if (el.scrollTop || el.scrollLeft) out.push({ k: s + '|' + i, t: el.scrollTop, l: el.scrollLeft }); });
+    return out;
+  }
+  function scrollRestore(box, snap) {
+    if (!snap.length) return;
+    const want = {}, seen = {}; snap.forEach((x) => (want[x.k] = x));
+    box.querySelectorAll('*').forEach((el) => { const s = sigOf(el), i = (seen[s] = (seen[s] || 0) + 1), w = want[s + '|' + i]; if (w) { el.scrollTop = w.t; el.scrollLeft = w.l; } });
+  }
+  /** While a dialog is open the page behind it cannot be reached by mouse, keyboard or screen reader. */
+  const setInert = (on) => ['#root', '#pal', '#pal-back'].forEach((s) => { const el = $(s); if (!el) return; el.inert = on; if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert'); });
+  const FOCUSABLE = 'button:not(:disabled), a[href], input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled), iframe, summary, [tabindex]:not([tabindex="-1"])';
+  const focusables = (box) => $$(FOCUSABLE, box).filter((x) => x.offsetParent !== null || x.tagName === 'IFRAME');
+  /** First field; failing that, the first button that is not destructive (so a danger confirm lands on Cancel). */
+  function firstFocus(box) {
+    const dlg = $('.modal', box) || box;
+    return $('input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled)', dlg)
+      || $$('button:not(:disabled), a[href]', dlg).find((b) => !b.closest('.modal-h') && !b.classList.contains('danger'))
+      || $('.modal-h .close', dlg) || dlg;
+  }
+  function drawModal() {
+    const box = $('#modal'), m = ui.modal;
+    if (!m) {
+      box.innerHTML = '';
+      if (shownModal) { shownModal = null; setInert(false); const el = findCtl(document, opener); opener = null; if (el) el.focus({ preventScroll: true }); }
+      return;
+    }
+    // the same dialog redrawn after a click inside it: keep its scroll and focus, and do not replay the zoom-in
+    const again = !!shownModal && (shownModal === m || (shownModal.type === m.type && shownModal.pid === m.pid && shownModal.id === m.id && shownModal.title === m.title));
+    const body0 = $('.modal-b', box), top = again && body0 ? body0.scrollTop : 0, ae = document.activeElement, fk = again && ae && box.contains(ae) ? ctlKey(ae) : null;
+    box.innerHTML = V.modal(m);
+    const dlg = $('.modal', box);
+    if (again) {
+      box.setAttribute('data-rerender', ''); if (dlg) dlg.style.animation = 'none';
+      const b = $('.modal-b', box); if (b) b.scrollTop = top;
+      const el = findCtl(box, fk) || (fk ? firstFocus(box) : null); if (el) el.focus({ preventScroll: true });
+    } else {
+      box.removeAttribute('data-rerender');
+      const f = firstFocus(box); if (f) f.focus();
+    }
+    shownModal = m; setInert(true);
+  }
+  /** Escape goes through the dialog's own Cancel, End or Close button, so whatever that writes (audit lines) is written. */
+  function escapeModal() {
+    const foot = $$('#modal .modal-f [data-act]');
+    const el = foot.find((b) => b.dataset.act === 'callEnd') || foot.find((b) => b.dataset.act === 'closeModal' && !b.disabled);
+    if (el && A[el.dataset.act]) return A[el.dataset.act](el.dataset, el);
+    A.closeModal();
+  }
+
+  function draw() {
     pendingRender = false;
     const root = $('#root');
     if (E.music) E.music.scene(E.db.user ? null : 'login');   // the login music plays on the login screen only
-    if (!E.db.user) { root.innerHTML = V.login(); $('#modal').innerHTML = ''; if (E.pal) E.pal.sync(null, false); return; }
+    if (!E.db.user) { root.innerHTML = V.login(); $('#modal').innerHTML = ''; shownModal = null; setInert(false); if (E.pal) E.pal.sync(null, false); return; }
     // privileges suspended after repeated harm (js/shift.js): nothing but the lockout until remediation is passed
-    if (E.suspended && E.suspended()) { ui.modal = null; root.innerHTML = V.lockout(); $('#modal').innerHTML = ''; $('#toast').innerHTML = ''; lastHash = null; document.title = 'SIM+EHR'; if (E.pal) E.pal.sync('sad', true); return; }
-    const r = route(), sc = $('#activity') || $('.main');
+    if (E.suspended && E.suspended()) { ui.modal = null; root.innerHTML = V.lockout(); $('#modal').innerHTML = ''; shownModal = null; setInert(false); $('#toast').innerHTML = ''; lastHash = null; document.title = 'SIM+EHR'; if (E.pal) E.pal.sync('sad', true); return; }
+    if (ui.modal && ui.modal.pid && !E.pt(ui.modal.pid)) ui.modal = null;   // its patient has left the ward (a reset, a case that ended)
+    const r = route(), same = lastHash === location.hash;
     const nt = $('#noteText'), typing = nt && { on: document.activeElement === nt, a: nt.selectionStart, b: nt.selectionEnd, top: nt.scrollTop };   // the note pane survives a redraw: caret, selection and scroll
-    const keep = sc && lastHash === location.hash ? sc.scrollTop : 0;
+    const scrolls = same ? scrollSnap(root) : [];   // a new route starts at the top; the same route keeps every scroller where it was
+    const ae = document.activeElement, rootFocus = !ui.modal && ae && ae !== nt && root.contains(ae) && ae.matches('button, a, tr, summary, [tabindex], input[type=checkbox], input[type=radio]') ? ctlKey(ae) : null;
+    if (ui.modal && !shownModal) opener = (ae && root.contains(ae) && ctlKey(ae)) || lastCtl;   // where focus goes back to when it closes
     root.innerHTML = V.shell(r, r.view === 'chart' ? V.chart(E.pt(r.pid), r.act) : V[r.view]());
-    const sc2 = $('#activity') || $('.main');
-    if (sc2) sc2.scrollTop = keep;
+    scrollRestore(root, scrolls);
     const nt2 = $('#noteText'); if (typing && nt2) { nt2.setSelectionRange(typing.a, typing.b); nt2.scrollTop = typing.top; if (typing.on && !ui.modal) nt2.focus(); }
+    if (rootFocus && !(typing && typing.on)) { const el = findCtl(root, rootFocus); if (el) el.focus({ preventScroll: true }); }
     lastHash = location.hash;
     document.title = (r.pid ? E.pt(r.pid).name + ' — ' : '') + 'SIM+EHR';
-    $('#modal').innerHTML = ui.modal ? V.modal(ui.modal) : '';
-    if (ui.modal) { const f = $('#modal input, #modal select, #modal button.primary'); if (f) f.focus(); }
+    drawModal();
     // The assistant in the corner takes its mood from the screen: worried by an advisory, thoughtful over a
     // risky change, waiting while a test is in process.
     if (E.pal) E.pal.sync(ui.modal ? ({ alerts: 'worry', allergyRemove: 'think', debrief: 'think', confirm: 'think' }[ui.modal.type] || null) : E.db.patients.some((p) => p.orders.some((o) => o.status === 'In process')) ? 'wait' : null, true);
@@ -56,14 +159,19 @@
   /** Notification balloon dropping from the level widget. Reserved for things that arrive on their own:
       points, levels, badges and new results. A message with no title is a plain confirmation and goes to
       the status line instead. */
-  function toast(text, title, glyph) {
+  function toast(text, title, glyph, tone) {
     if (!title) return status(text);
+    // critical: pages, harm and critical results (other files pass the 'alert' glyph for these). Routine balloons
+    // never push one out; only a newer critical balloon can.
+    const crit = tone === 'critical' || glyph === 'alert';
     const box = $('#toast'), b = document.createElement('div');
     b.className = 'balloon';
+    if (crit) { b.dataset.critical = '1'; b.setAttribute('role', 'alert'); }
     b.innerHTML = `${E.icon(glyph || 'info', 24)}<div><b>${E.esc(title)}</b><span>${E.esc(text)}</span></div>`;
     box.appendChild(b);
-    while (box.children.length > 2) box.firstChild.remove();
-    setTimeout(() => b.remove(), 7000);
+    const others = () => [...box.children].filter((x) => x !== b);
+    while (box.children.length > 2) { const old = others().find((x) => !x.dataset.critical) || (crit && others()[0]); if (!old) break; old.remove(); }
+    setTimeout(() => b.remove(), crit ? 15000 : 7000);
   }
   /** Record a learning event. Tasks completed by the same action are announced together in one balloon,
       with any level-up or badge they earned. */
@@ -90,6 +198,9 @@
 
   /** Runs once per navigation: audit trail and learning events tied to viewing something. */
   function onRoute() {
+    flushSave();
+    const m = ui.modal;
+    if (m && m.pid && PT_FORMS.includes(m.type) && route().pid !== m.pid) ui.modal = null;   // its chart is no longer the one on screen
     if (E.db.user) {
       const r = route();
       if (r.view === 'chart') {
@@ -133,14 +244,17 @@
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
-      const ctx = oink.ctx || (oink.ctx = new AC()), t0 = ctx.currentTime;
+      let ctx, out;
+      if (E.audio) { const s = E.audio.sfx(); if (!s) return; ctx = s.ctx; out = s.out; }   // js/audio.js: null when sound is off
+      else { ctx = oink.ctx || (oink.ctx = new AC()); out = ctx.destination; }
+      const t0 = ctx.currentTime;
       [0, 0.17].forEach((dt, i) => {
         const t = t0 + dt, osc = ctx.createOscillator(), rasp = ctx.createOscillator(), depth = ctx.createGain(), nose = ctx.createBiquadFilter(), vol = ctx.createGain();
         osc.type = 'sawtooth'; osc.frequency.setValueAtTime(i ? 150 : 172, t); osc.frequency.exponentialRampToValueAtTime(i ? 92 : 118, t + 0.13);
         rasp.frequency.value = 46; depth.gain.value = 26; rasp.connect(depth); depth.connect(osc.frequency);
         nose.type = 'bandpass'; nose.Q.value = 4; nose.frequency.setValueAtTime(850, t); nose.frequency.linearRampToValueAtTime(1450, t + 0.05); nose.frequency.linearRampToValueAtTime(700, t + 0.13);
         vol.gain.setValueAtTime(0.0001, t); vol.gain.exponentialRampToValueAtTime(0.25, t + 0.02); vol.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-        osc.connect(nose); nose.connect(vol); vol.connect(ctx.destination);
+        osc.connect(nose); nose.connect(vol); vol.connect(out);
         osc.start(t); rasp.start(t); osc.stop(t + 0.16); rasp.stop(t + 0.16);
       });
     } catch (e) { /* no audio: the pig goes quietly */ }
@@ -186,10 +300,7 @@
   }
 
   /* ---------- learner report ---------- */
-  E.evidence = (pr) => ({
-    notes: E.db.patients.flatMap((p) => p.notes.filter((n) => n.author === pr.name).map((n) => ({ patient: p.name, type: n.type, time: new Date(n.ts).toISOString(), status: n.status, cosignedBy: n.cosignedBy || null, text: n.text }))),
-    orders: E.db.patients.flatMap((p) => p.orders.filter((o) => o.by === pr.name).map((o) => ({ patient: p.name, order: o.name, details: E.orderDetail(o), time: new Date(o.ts).toISOString(), status: o.status, advisoriesOverridden: (o.overrides || []).map((x) => `${x.title} — ${x.reason}`) }))),
-  });
+  // E.evidence and E.activityLog live in js/core.js: they read the learner's own durable copies, not the ward.
   function exportReport(pr) {
     const s = E.progressSummary(pr), ev = E.evidence(pr), g = E.game(pr);
     const report = {
@@ -201,7 +312,7 @@
         knowledgeCheck: lo.quiz.map((q) => ({ question: q.q, answered: pr.quiz[q.id] != null ? q.options[pr.quiz[q.id]] : null, correct: pr.quiz[q.id] != null ? pr.quiz[q.id] === q.answer : null })),
       })),
       evidence: ev,
-      activityLog: E.db.audit.filter((a) => a.user === pr.name).map((a) => ({ time: new Date(a.ts).toISOString(), patient: a.patientId ? E.pt(a.patientId).name : null, action: a.action })),
+      activityLog: E.activityLog(pr),
     };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
@@ -250,7 +361,15 @@
     logout() { E.audit('Logged out'); E.db.user = null; E.db.openTabs = []; ui.modal = null; ui.learnWho = null; lastHash = null; E.save(); render(); },
     musicToggle() { if (E.music) E.music.toggle(); render(); },
     help() { ui.modal = { type: 'help' }; render(); },
-    closeModal() { ui.modal = null; render(); },
+    closeModal() {
+      const m = ui.modal;
+      if (m && m.type === 'game' && !m.checked) { const g = (E.GAMES || []).find((x) => x.id === m.game); E.audit(`Left a round of ${g ? g.name : 'a mini-game'} without checking it`, (m.s && m.s.pid) || null); E.save(); }
+      ui.modal = null; render();
+    },
+    crashReload() { if (E.db) E.save(); location.reload(); },
+    crashHome() { ui.modal = null; crashClear(); if (location.hash === '#/home') onRoute(); },   // otherwise the link itself navigates
+    crashClose() { crashClear(); },
+    noticeClose(d) { const b = document.getElementById(d.id); if (b) b.remove(); },
     listFilter(d) { ui.listFilter = d.id; render(); },
     pigPop,
     paneToggle(d) { ui.collapsed[d.id] = !ui.collapsed[d.id]; render(); },
@@ -266,7 +385,7 @@
 
     /* video visit */
     callOpen() {
-      const p = curPt() || E.pt(ui.modal && ui.modal.pid), ep = (E.CONFIG.videoVisit.endpoint || '').trim();
+      const p = (ui.modal && ui.modal.type === 'call' && E.pt(ui.modal.pid)) || curPt(), ep =(E.CONFIG.videoVisit.endpoint || '').trim();
       const m = (ui.modal = { type: 'call', pid: p.id, state: ep ? 'connecting' : 'off' });
       E.audit(ep ? 'Started a video visit' : 'Opened the video visit window (not connected)', p.id); E.save(); render();
       if (!ep) return;
@@ -314,7 +433,8 @@
     /* vitals */
     vitalsOpen() { ui.modal = { type: 'vitals', pid: curPt().id }; render(); },
     vitalsSave() {
-      const p = curPt(), v = { ts: Date.now(), by: E.db.user.name };
+      const p = dlgPt(), v = { ts: Date.now(), by: E.db.user.name };   // the patient named in the dialog, not the chart behind it
+      if (!p) return A.closeModal();
       for (const el of $$('#modal [data-v]')) {
         const k = el.dataset.v;
         if (k === 'o2') { v.o2 = el.value; continue; }
@@ -356,8 +476,8 @@
       track('note.template'); commit();
       const ta = $('#noteText'); if (ta) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
     },
-    noteCancel() { ui.modal = { type: 'confirm', title: 'Discard this note?', text: 'The unsigned note will be deleted.', yes: 'noteCancelDo', yesLabel: 'Discard', danger: true }; render(); },
-    noteCancelDo() { curPt().noteDraft = null; ui.modal = null; commit(); },
+    noteCancel() { ui.modal = { type: 'confirm', pid: curPt().id, title: 'Discard this note?', text: 'The unsigned note will be deleted.', yes: 'noteCancelDo', yesLabel: 'Discard', danger: true }; render(); },
+    noteCancelDo() { const p = dlgPt(); if (p) p.noteDraft = null; ui.modal = null; commit(); },
     noteSign() {
       const p = curPt(), d = p.noteDraft, u = E.db.user, text = d.text.trim();
       if (!text) return toast('The note is empty.');
@@ -399,7 +519,8 @@
     clearDrafts() { curPt().drafts = []; commit(); },
     setOpen(d) { ui.modal = { type: 'set', pid: curPt().id, id: d.id }; render(); },
     setAdd() {
-      const p = curPt(), ids = $$('#modal input[type=checkbox]:checked').map((c) => c.value);
+      const p = dlgPt(), ids = $$('#modal input[type=checkbox]:checked').map((c) => c.value);
+      if (!p) return A.closeModal();
       if (E.orderLock && E.orderLock(p)) return modalErr(E.orderLock(p));
       if (!ids.length) return modalErr('Select at least one order.');
       ids.forEach((id) => p.drafts.push(E.newOrder(id)));
@@ -437,7 +558,8 @@
     /* problems & allergies */
     allergyOpen() { ui.modal = { type: 'allergy', pid: curPt().id }; render(); },
     allergySave() {
-      const p = curPt(), agent = $('#alAgent').value.trim(), reaction = $('#alReaction').value.trim();
+      const p = dlgPt(), agent = $('#alAgent').value.trim(), reaction = $('#alReaction').value.trim();
+      if (!p) return A.closeModal();
       if (!agent || !reaction) return modalErr('Enter the agent and the reaction.');
       p.allergies.push({ id: E.uid('a'), agent, cls: $('#alCls').value, reaction, severity: $('#alSev').value, type: $('#alType').value, status: 'Active' });
       E.audit(`Added allergy: ${agent}`, p.id); track('chart.update'); ui.modal = null; commit();
@@ -465,7 +587,8 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     allergyRestore(d) { const p = curPt(), al = p.allergies.find((x) => x.id === d.id); al.status = 'Active'; delete al.removal; E.audit(`Restored allergy: ${al.agent}`, p.id); status('Allergy restored to the active list.'); commit(); },
         problemOpen() { ui.modal = { type: 'problem', pid: curPt().id }; render(); },
     problemSave() {
-      const p = curPt(), name = $('#prName').value.trim();
+      const p = dlgPt(), name = $('#prName').value.trim();
+      if (!p) return A.closeModal();
       if (!name) return modalErr('Enter the problem.');
       p.problems.unshift({ id: E.uid('pr'), name, noted: Date.now(), status: 'Active' });
       E.audit(`Added problem: ${name}`, p.id); track('chart.update'); ui.modal = null; commit();
@@ -492,8 +615,11 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       toast((right ? 'Correct on the first try.' : 'Read the explanation, it will come up again on the wards.') + (extra.length ? ' ' + extra.join(' ') : ''), `+${right ? E.XP.quizRight : E.XP.quizTried} XP · Knowledge check`, extra.length ? 'medal' : right ? 'star' : 'info');
       commit();
     },
-    progressAsk() { const g = E.game(E.progress()); ui.modal = { type: 'confirm', title: 'Reset your progress?', text: `This erases your ${g.xp} XP, your level, your badges, every completed practice task, all of your knowledge-check answers, your mission stars, your shift results and your proficiency check results, so you can start over from Level 1. Notes and orders you entered in the charts are kept, and so is your safety record. This cannot be undone.`, yes: 'progressDo', yesLabel: 'Reset my progress', danger: true }; render(); },
-    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; delete pr.bonus; delete pr.missions; delete pr.exam; delete pr.active; delete pr.games; delete pr.shifts; award = null; ui.modal = null; E.audit('Reset own learning progress'); status('Progress reset. You are back at Level 1.'); commit(); },
+    progressAsk() { const g = E.game(E.progress()); ui.modal = { type: 'confirm', title: 'Reset your progress?', text: `This erases your ${g.xp} XP, your level, your badges, every completed practice task, all of your knowledge-check answers, your mission stars, your shift and case results, your mini-game scores, your flying pigs and your safety record (every harm event, near miss, debrief and suspension), so you can start over. Your proficiency check record stays as it is: a pass stays, and attempts you have used still count. Notes and orders you entered are kept. This cannot be undone.`, yes: 'progressDo', yesLabel: 'Reset my progress', danger: true }; render(); },
+    /* Everything that earns XP goes, except the proficiency check: resetting progress must not hand back exam
+       attempts, so that record is kept whole (with any pass). The safety record goes (owner's decision: a reset is
+       a full start over, harm events included). The work samples stay. */
+    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; ['bonus', 'missions', 'active', 'games', 'shifts', 'cases', 'safety'].forEach((k) => delete pr[k]); if (E.ui) E.ui.lock = null; award = null; ui.modal = null; E.audit('Reset own learning progress'); const g = E.game(pr); status(`Progress reset. You are at Level ${g.level}.`); commit(); },
     learnPrint() { window.print(); },
     learnExport() { exportReport(viewedLearner()); },
   };
@@ -518,7 +644,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       }
       if (was !== el.value) noteStep(p, was, step === true);
       noteHist(p).caret = el.selectionStart;
-      d.text = el.value; d.pristine = false; E.save();
+      d.text = el.value; d.pristine = false; saveSoon();
       const bar = $('#blankBar'); if (bar) bar.innerHTML = V.blankBar(el.value);
     },
   };
@@ -541,15 +667,22 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (nav) { bounce = { key: nav.getAttribute('href') || nav.dataset.act, at: Date.now() }; const gl = $('.gl', nav); if (gl) gl.classList.add('bounce'); }
     const el = e.target.closest('[data-act]');
     if (!el || el.disabled) return;
+    if (!el.closest('#modal')) lastCtl = ctlKey(el);   // a dialog this opens gives focus back here when it closes
     const fn = A[el.dataset.act];
     if (fn) fn(el.dataset, el, e);
   });
-  document.addEventListener('focusin', (e) => { if (e.target.id === 'ptSearch') $('#toast').innerHTML = ''; });   // never let a balloon sit over the patient search
+  document.addEventListener('focusin', (e) => { if (e.target.id === 'ptSearch') $$('#toast > :not([data-critical])').forEach((x) => x.remove()); });   // never let a routine balloon sit over the patient search; a critical one stays
   document.addEventListener('input', (e) => { const k = e.target.dataset && e.target.dataset.input; if (k && I[k]) I[k](e.target); });
   document.addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.change; if (k && C[k]) C[k](e.target); });
   document.addEventListener('keydown', (e) => {
     const t = e.target;
-    if (e.key === 'Escape' && ui.modal) return A.closeModal();
+    if (e.key === 'Escape' && ui.modal) { e.preventDefault(); return escapeModal(); }
+    if (e.key === 'Tab' && ui.modal) {   // keep Tab inside the dialog
+      const f = focusables($('#modal')); if (!f.length) return;
+      const i = f.indexOf(document.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+      return;
+    }
     if (e.key === 'Enter' && t.id === 'loginName') return A.login();
     if (e.key === 'Enter' && t.matches && t.matches('tr[data-act]')) return t.click();
     if (e.key === 'F2' && t.id === 'noteText') { e.preventDefault(); nextBlank(t, true, e.shiftKey); }
@@ -559,23 +692,47 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
 
   /* Simulated lab/imaging turnaround. Never re-render underneath someone who is typing. */
   const busy = () => ui.modal || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
-  setInterval(() => {
-    if (!E.db || !E.db.user) return;
-    if (E.suspended && E.suspended()) return;   // the ward goes on without a suspended learner: nothing arrives until they are back
-    if (E.missionsTick && E.missionsTick()) { E.save(); pendingRender = true; }
-    if (E.shiftTick && E.shiftTick()) { E.save(); pendingRender = true; }
-    if (E.caseTick && E.caseTick()) { E.save(); pendingRender = true; }   // PBL cases (js/cases.js)
-    const done = E.processResults();
-    if (done.length) { E.save(); toast(done.map((x) => `${x.o.name} — ${x.p.name}`).join('; '), 'New result', 'results'); pendingRender = true; }
-    const sim = E.simTick ? E.simTick() : [];
-    if (sim.length) { E.save(); toast(sim.join('; '), 'While you were working', 'inbox'); pendingRender = true; }
+  /* Each step runs in its own try, so one that throws does not stop the others. A failure is logged and shown
+     once (per step and message), never swallowed. */
+  const tickSeen = new Set();
+  function step(name, fn) {
+    try { return fn(); }
+    catch (e) { const k = name + ':' + (e && e.message); if (!tickSeen.has(k)) { tickSeen.add(k); crash(e, name); } else console.error('SIM+EHR: ' + name + ' failed again', e); return undefined; }
+  }
+  function tick() {
+    if (!E.db) return;
+    // the hospital holds still while paused, logged out or suspended (js/sim.js); true while it is held
+    const held = step('hospital clock', () => (E.simClock ? E.simClock() : false));
+    if (!E.db.user) return;
+    if (E.suspended && step('suspension check', () => E.suspended())) return;   // the ward goes on without a suspended learner: nothing arrives until they are back
+    if (step('missions', () => E.missionsTick && E.missionsTick())) { E.save(); pendingRender = true; }
+    if (step('shift', () => E.shiftTick && E.shiftTick())) { E.save(); pendingRender = true; }
+    if (step('case', () => E.caseTick && E.caseTick())) { E.save(); pendingRender = true; }   // PBL cases (js/cases.js)
+    if (!held) {
+      const done = step('results', () => E.processResults()) || [];
+      if (done.length) { E.save(); const crit = done.some((x) => x.crit); toast(done.map((x) => `${x.o.name} — ${x.p.name}`).join('; '), crit ? 'Critical result' : 'New result', 'results', crit ? 'critical' : null); pendingRender = true; }
+      const sim = step('simulated staff', () => (E.simTick ? E.simTick() : [])) || [];
+      if (sim.length) { E.save(); toast(sim.join('; '), 'While you were working', 'inbox'); pendingRender = true; }
+    }
     if (pendingRender && !busy()) render();
-  }, 2000);
+  }
+  setInterval(tick, 2000);
+  /* Note typing is saved at most every 800 ms (a full save per keystroke is costly); these make sure nothing typed is lost. */
+  let saveTimer = null;
+  const saveSoon = () => { clearTimeout(saveTimer); saveTimer = setTimeout(flushSave, 800); };
+  function flushSave() { if (!saveTimer) return; clearTimeout(saveTimer); saveTimer = null; if (E.db) E.save(); }
+  document.addEventListener('focusout', (e) => { if (e.target && e.target.id === 'noteText') flushSave(); });
+  window.addEventListener('pagehide', () => { flushSave(); if (E.db) E.save(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { flushSave(); if (E.db) E.save(); } });
 
   // Missions and the proficiency check (js/missions.js) add their actions here and borrow a few helpers.
-  E.app = { commit, render, toast, status, go, curPt, busy, track };
+  E.app = { commit, render, toast, status, go, curPt, busy, track, flushSave };
   Object.assign(A, E.missionActions || {}, E.shiftActions || {}, E.gameActions || {}, E.caseActions || {}, E.worldActions || {});
 
   // Glyph bitmaps are drawn first; the screen is built from them.
-  (E.glyphsReady || Promise.resolve()).then(() => { E.load(); onRoute(); splash('boot'); });
+  (E.glyphsReady || Promise.resolve()).then(() => {
+    try { E.load(); } catch (e) { crash(e, 'loading saved work'); if (!E.db) E.db = E.buildSeed(); }
+    onRoute(); splash('boot');
+    if (E.loadNotice) notice('loadwarn', `<b style="display:block">About your saved work</b><span style="display:block;margin:4px 0 10px">${E.esc(E.loadNotice)}</span>`);
+  });
 })();
