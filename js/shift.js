@@ -582,7 +582,7 @@
     return { harmEvents: s.events.filter((e) => e.kind === 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order, what: e.title, outcome: e.outcome === 'rescued' ? 'rescued' : e.outcome === 'icu' ? 'transferred to intensive care' : 'unresolved', duringShift: e.shift })),
       nearMisses: s.events.filter((e) => e.kind !== 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order, what: e.title, stoppedBy: e.by })),
       debriefsCompleted: (s.debriefs || []).map((d) => ({ at: iso(d.at), wrongAnswersBeforeFinishing: d.wrong })),
-      suspensions: (s.suspensions || []).map((x) => ({ at: iso(x.at), after: x.after, liftedAt: iso(x.unlockedAt), remediationAttempts: x.attempts, startedOverWithoutRemediation: !!x.startedOver })), currentlySuspended: !!s.suspended, debriefOwed: !!s.debriefDue };
+      suspensions: (s.suspensions || []).map((x) => ({ at: iso(x.at), after: x.after, liftedAt: iso(x.unlockedAt), remediationAttempts: x.attempts })), currentlySuspended: !!s.suspended, debriefOwed: !!s.debriefDue };
   };
   function announce(before, text, title) {
     const g = E.game(E.progress()), extra = [], gained = g.xp - before.xp;
@@ -690,7 +690,7 @@
         <p>${c.strikes} patients have been harmed by orders you signed, so your ordering privileges are suspended. The gift shop is short of someone to restock the balloons, and nobody there can be given the wrong one.</p>
         <table class="tbl compact"><thead><tr><th>Patient</th><th>Order</th><th>What happened</th></tr></thead><tbody>${harm.map((e) => `<tr><td>${esc(e.patient)}</td><td>${esc(e.order)}</td><td>${esc(e.title)}${e.outcome === 'icu' ? ' · intensive care' : ''}</td></tr>`).join('')}</tbody></table>
         <p>To get your badge back, pass the remediation round: ${c.remediationQuestions} questions, ${c.remediationPass} right. It is not timed, and you can take it as often as you need. The suspension stays on your safety record either way.</p>
-        ${E.ui.lockOver ? `<p class="notice warn">${icon('warn', 24)}<span><b>Start over?</b> Every patient goes back to how they were on admission, any shift or mission in progress ends, and your badge is returned without the remediation round. Your XP, badges and safety record are kept, and the record will show that you started over.</span></p>
+        ${E.ui.lockOver ? `<p class="notice warn">${icon('warn', 24)}<span><b>Start over with a clean slate?</b> Everything of yours is erased: XP, level, badges, completed tasks and missions, shift reports and this safety record. Every patient goes back to how they were on admission. It cannot be undone.</span></p>
         <div class="lock-acts"><button class="btn" data-act="lockOverNo">Keep my place</button><button class="btn primary lg" data-act="lockOverDo">Start over</button></div>`
         : `<div class="lock-acts"><button class="btn" data-act="logout">Log off</button><button class="btn" data-act="lockOver">Start over</button><button class="btn primary lg" data-act="remStart">Start the remediation round</button></div>`}`;
     } else if (!L.done) {
@@ -840,17 +840,18 @@
     },
     lockOver() { E.ui.lockOver = true; E.app.render(); },
     lockOverNo() { E.ui.lockOver = false; E.app.render(); },
-    /* Game over, new game: the ward is put back as it was and the badge returned. The record keeps the suspension. */
+    /* Game over, new game: a clean slate. The learner's whole record is erased (XP, badges, tasks, missions,
+       shift reports, safety record) and the ward is put back as it was. Only the name and role stay. */
     lockOverDo() {
-      const s = E.safety(); if (!s.suspended) return;
-      const cur = s.suspensions[s.suspensions.length - 1]; if (cur) { cur.unlockedAt = Date.now(); cur.startedOver = true; }
-      s.suspended = null; s.strikes = 0; s.debriefDue = null; E.ui.lock = null; E.ui.lockOver = false; last = Date.now();
-      delete E.progress().active;
+      if (!E.suspended()) return;
+      const pr = E.progress(), all = E.db.progress;
+      Object.keys(all).forEach((k) => { if (all[k] === pr) delete all[k]; });
+      E.ui.lock = null; E.ui.lockOver = false; last = Date.now();
       E.reset(); E.db.openTabs = [];
-      E.audit('Started over after a suspension: sim data reset, privileges restored without remediation');
+      E.audit('Started over with a clean slate after a suspension');
       E.save();
       if (location.hash !== '#/home') location.hash = '#/home'; else E.app.render();
-      say('A fresh ward and a clean badge. The suspension is still on your safety record.', 'Started over', 'info');
+      say('A fresh ward, a clean badge and a blank record. Welcome back to day one.', 'Clean slate', 'info');
     },
     remDone() {
       const L = E.ui.lock, s = E.safety(); if (!L || !L.passed || !s.suspended) return;
