@@ -160,7 +160,7 @@
   const logoImg = (d, label) => `<img class="gl" src="assets/logo/epig-${cutFor(LOGO_CUTS, d)}.png" width="${d}" height="${d}" ${label ? `alt="${E.esc(label)}"` : 'alt="" aria-hidden="true"'} draggable="false">`;
   /* Truffle's sprite sheet, cut the same way: cells made for a 96px pig at the screen's real pixels. */
   // an absolute address: a url() held in a CSS variable resolves against the stylesheet that uses it, not this page
-  document.documentElement.style.setProperty('--pal-sheet', `url("${new URL(`assets/assistant/pig-sheet-${cutFor([96, 120, 144, 192], 96)}.png`, document.baseURI).href}")`);
+  document.documentElement.style.setProperty('--pal-sheet', `url("${new URL(`assets/assistant/truffle-v3-${cutFor([96, 120, 144, 192], 96)}.png`, document.baseURI).href}")`);
   const GRID = {};   // glyphs drawn on a grid other than 32 (none at present)
   E.GLYPHS = Object.keys(G);
 
