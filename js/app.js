@@ -216,7 +216,7 @@
     if (!t) return;
     let i = back ? (t.selectionStart > 0 ? t.value.lastIndexOf('***', t.selectionStart - 1) : -1) : t.value.indexOf('***', t.selectionEnd);
     if (i < 0) i = back ? t.value.lastIndexOf('***') : t.value.indexOf('***');
-    if (i >= 0) { t.focus(); t.setSelectionRange(i, i + 3); const line = t.value.slice(0, i).split('\n').length; t.scrollTop = Math.max(0, (line - 6) * 19); } else if (say) toast('Every blank is filled. You can sign.');
+    if (i >= 0) { t.focus(); t.setSelectionRange(i, i + 3); const line = t.value.slice(0, i).split('\n').length; t.scrollTop = Math.max(0, (line - 6) * (parseFloat(getComputedStyle(t).lineHeight) || 19)); } else if (say) toast('Every blank is filled. You can sign.');
   }
 
   /* ---------- actions (data-act) ---------- */
