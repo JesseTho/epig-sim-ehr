@@ -335,12 +335,12 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 .pal-pig[data-pose="cheer"] i { background-position: -192px -96px; } .pal-pig[data-pose="worry"] i { background-position: -288px -96px; }
 .pal-pig[data-pose="unsure"] i { background-position: 0 -192px; } .pal-pig[data-pose="gasp"] i { background-position: -96px -192px; } .pal-pig[data-pose="yawn"] i { background-position: -192px -192px; } .pal-pig[data-pose="smug"] i { background-position: -288px -192px; }
 .pal-pig[data-pose="shy"] i { background-position: 0 -288px; } .pal-pig[data-pose="sad"] i { background-position: -96px -288px; } .pal-pig[data-pose="phew"] i { background-position: -192px -288px; } .pal-pig[data-pose="wink"] i { background-position: -288px -288px; }
-/* at rest Truffle is alive but quiet: a blink now and then, and a glance around about every 20 seconds */
-.pal-pig:not([data-pose]):not(.flutter) i { animation: pal-idle 21s steps(1, end) infinite; }
+/* at rest Truffle blinks at a natural rate (about every 4 seconds, unevenly) and glances around once per cycle */
+.pal-pig:not([data-pose]):not(.flutter) i { animation: pal-idle 20s steps(1, end) infinite; }
 @keyframes pal-idle {
-  0%, 23.6%, 51.6%, 66%, 95.6%, 100% { background-position: 0 -384px; }
-  22.4%, 50.4%, 94.4% { background-position: -96px -384px; } 22.8%, 50.8%, 94.8% { background-position: -192px -384px; } 23.2%, 51.2%, 95.2% { background-position: -288px -384px; }
-  60% { background-position: 0 -480px; } 61.5% { background-position: -96px -480px; } 63% { background-position: -192px -480px; } 64.5% { background-position: -288px -480px; }
+  0%, 18.2%, 38.2%, 54.2%, 75%, 89.2%, 100% { background-position: 0 -384px; }
+  17%, 37%, 53%, 88% { background-position: -96px -384px; } 17.4%, 37.4%, 53.4%, 88.4% { background-position: -192px -384px; } 17.8%, 37.8%, 53.8%, 88.8% { background-position: -288px -384px; }
+  66% { background-position: 0 -480px; } 68.5% { background-position: -96px -480px; } 71% { background-position: -192px -480px; } 73% { background-position: -288px -480px; }
 }
 /* clicked: flap the two wing cells and hop, then settle */
 .pal-pig.flutter { animation: pal-hop .42s cubic-bezier(.3, 1.5, .5, 1) 3; } .pal-pig.flutter:not([data-pose]) i { animation: pal-flap .21s steps(1, end) 6; }
