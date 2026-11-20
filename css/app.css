@@ -269,7 +269,7 @@ button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var
 @keyframes drift { from { transform: translateX(-270px); } to { transform: translateX(100vw); } }
 .skyfx .land { position: absolute; left: 0; right: 0; bottom: 0; image-rendering: pixelated; }
 .skyfx.bn .land { height: 44px; background: var(--land-banner) 0 100% / 4800px 44px no-repeat; }
-.skyfx .hosp { position: absolute; left: 4%; bottom: 58px; width: 144px; height: 112px; background: var(--hospital) 0 0 / 144px 112px no-repeat; image-rendering: pixelated; }
+.skyfx .hosp { position: absolute; left: 4%; bottom: 58px; width: 144px; height: 112px; background: var(--hospital) 0 0 / 144px 112px no-repeat; }   /* drawn at the screen's real pixels: never enlarged */
 .skyfx.lg .land { height: 210px; background: var(--land) 50% 100% / 2400px 210px repeat-x; }
 /* the nearest ridge is a separate layer drawn after the pigs, so they pass behind it but in front of the far hills */
 .skyfx.bn .land.near { background-image: var(--land-banner-near); } .skyfx.lg .land.near { background-image: var(--land-near); }
@@ -538,3 +538,16 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
   html, body, #root { height: auto; } #root { display: block; } .main { overflow: visible; } body, .main { background: #fff; }
   .printonly { display: block; margin-top: 14px; } .card { break-inside: avoid; }
 }
+
+/* ---------- note blanks, inbox actions, text interview ---------- */
+.blanks { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 6px; background: #FFF6D6; border: 1px solid #C9A227; font-size: 12px; }
+.blanks span { flex: 1; } .blanks code { background: #fff; border: 1px solid #C9A227; padding: 0 3px; font-weight: 700; } .blanks kbd, .btn kbd { font: 700 10px var(--ui); border: 1px solid currentColor; border-radius: 2px; padding: 0 3px; margin-left: 4px; opacity: .8; }
+.doc-acts { display: flex; gap: 6px; align-items: center; flex: none; }
+.talk { display: grid; grid-template-columns: 150px minmax(0, 1fr) 270px; gap: 12px; min-height: 340px; }
+.talk-who { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding-top: 8px; } .talk-who b { font: 700 16px var(--book); }
+.talk-log { background: #fff; border: 1px solid #919B76; padding: 8px 10px; overflow-y: auto; max-height: 52vh; font-size: 13px; line-height: 19px; }
+.talk-log p { margin: 0 0 8px; } .talk-log .you { color: #33401A; } .talk-log .pt { background: #EEF4FB; border: 1px solid #B9CDE6; padding: 6px 8px; }
+.talk-q { display: flex; flex-direction: column; gap: 5px; } .talk-q .btn { justify-content: flex-start; text-align: left; white-space: normal; height: auto; min-height: 26px; padding: 4px 8px; line-height: 16px; } .talk-q .btn.asked { opacity: .65; }
+@media (max-width: 900px) { .talk { grid-template-columns: 1fr; } .talk-who { flex-direction: row; } }
+.modal.talkm { width: 940px; max-width: calc(100vw - 32px); }
+.modal.talkm { width: 940px; max-width: calc(100vw - 32px); }

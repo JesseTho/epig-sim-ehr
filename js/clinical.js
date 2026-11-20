@@ -52,26 +52,28 @@
     E.db.patients.forEach((p) => p.orders.forEach((o) => {
       if (o.status !== 'In process' || o.resultAt > now) return;
       const c = E.cat(o.catId);
-      let abnormal = [], crit = false;
+      let abnormal = [], crit = false; const moved = [];
       if (c.comps) {
         const values = {};
         c.comps.forEach((k) => {
           const d = E.LABS[k], last = E.latestLab(p, k);
           const base = last ? last.value : d.lo + (d.hi - d.lo) * (0.3 + Math.random() * 0.4);
-          values[k] = +(base * (1 + (Math.random() - 0.5) * 0.08)).toFixed(d.dec);
+          const sim = E.simLab ? E.simLab(p, k, base * (1 + (Math.random() - 0.5) * 0.05)) : { value: base, why: [] };
+          values[k] = +sim.value.toFixed(d.dec);
+          if (last && sim.why.length && values[k] !== +last.value.toFixed(d.dec)) moved.push(`${d.name} ${E.labVal(k, last.value)} → ${E.labVal(k, values[k])} (${sim.why.join(', ')})`);
           const f = E.flag(k, values[k]);
           if (f) abnormal.push(`${d.name} ${E.labVal(k, values[k])} ${d.unit} (${f})`);
           if (f.length === 2) crit = true;
         });
         p.labs.push({ id: E.uid('l'), ts: now, name: c.name, values });
       } else {
-        p.reports.push({ id: E.uid('r'), ts: now, kind: c.kind, name: c.name, status: 'Final', text: c.report, by: 'Sandbox auto-result' });
+        p.reports.push({ id: E.uid('r'), ts: now, kind: c.kind, name: c.name, status: o.catId === 'bcx' ? 'Preliminary' : 'Final', text: E.simReport ? E.simReport(p, c) : c.report, by: c.kind === 'Cardiology' ? 'Cardiology reading service' : o.type === 'lab' ? 'Laboratory' : 'Radiology' });
       }
       o.status = 'Completed'; o.resultTs = now;
       E.message({
         type: 'Result', from: o.type === 'lab' ? 'Laboratory' : 'Diagnostics', patientId: p.id, act: 'results', critical: crit,
         subject: `${crit ? 'CRITICAL: ' : abnormal.length ? 'Abnormal: ' : 'Result: '}${c.name} — ${p.name}`,
-        body: c.comps ? (abnormal.length ? 'Abnormal values:\n' + abnormal.join('\n') : 'All components within reference range.') : c.report,
+        body: c.comps ? (abnormal.length ? 'Abnormal values:\n' + abnormal.join('\n') : 'All components within reference range.') + (moved.length ? '\n\nChanged since the last result:\n' + moved.join('\n') : '') : p.reports[p.reports.length - 1].text,
       });
       done.push({ p, o });
     }));

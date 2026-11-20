@@ -337,26 +337,33 @@
   // --land has whole numbers of waves across its width, so it tiles left and right without a seam.
   set('--land', land(2400, 210, ridges(210).slice(0, 2)));
   set('--land-near', land(2400, 210, ridges(210).slice(2)));
-  /* The hospital on the hill: pixel art, 72 x 56 art pixels, shown doubled. Pink walls, a central tower with a
-     green-cross sign and a flag, rows of windows, a door with an awning. Drawn with rectangles, no image file. */
+  /* The hospital on the hill. ASSET RULE (see DESIGN.md): one art pixel is one real screen pixel, hard edges,
+     never shown enlarged. So it is drawn on a 144 x 112 grid scaled by the screen's pixel ratio, with every
+     rectangle snapped to whole pixels, and its shading is a one-pixel ordered dither. No image file. */
   set('--hospital', (() => {
-    const cv = document.createElement('canvas'); cv.width = 72; cv.height = 56;
-    const x = cv.getContext('2d'), R = (c, a, b, w, h) => { x.fillStyle = c; x.fillRect(a, b, w, h); };
-    const LINE = '#8E2F55', WALL = '#F6B3C8', LIGHT = '#FBD3DF', SHADE = '#E58FAE', ROOF = '#C24F7C', GLASS = '#CFE8FF', DOOR = '#7A2C4E';
+    const s = Math.max(1, window.devicePixelRatio || 1), cv = document.createElement('canvas'); cv.width = Math.round(144 * s); cv.height = Math.round(112 * s);
+    const x = cv.getContext('2d'), q = (v) => Math.round(v * s);
+    const R = (c, a, b, w, h) => { x.fillStyle = c; x.fillRect(q(a), q(b), Math.max(1, q(a + w) - q(a)), Math.max(1, q(b + h) - q(b))); };
+    const dith = (c, a, b, w, h) => { x.fillStyle = c; for (let j = q(b); j < q(b + h); j++) for (let i = q(a) + (j & 1); i < q(a + w); i += 2) x.fillRect(i, j, 1, 1); };   // 50% checker, one real pixel
+    const LINE = '#8E2F55', WALL = '#F6B3C8', LIGHT = '#FBD3DF', SHADE = '#E58FAE', ROOF = '#C24F7C', ROOFHI = '#DB7AA0', GLASS = '#CFE8FF', DOOR = '#7A2C4E';
     // wings
-    R(LINE, 7, 17, 58, 39); R(WALL, 8, 21, 56, 35); R(SHADE, 58, 21, 6, 35); R(ROOF, 8, 18, 56, 3);
+    R(LINE, 14, 34, 116, 78); R(WALL, 15, 41, 114, 71); R(SHADE, 120, 41, 9, 71); dith(SHADE, 112, 41, 8, 71); dith(LIGHT, 15, 41, 6, 71);
+    R(ROOF, 15, 35, 114, 6); R(ROOFHI, 15, 35, 114, 1); dith(LINE, 15, 40, 114, 1);
     // tower
-    R(LINE, 25, 5, 22, 51); R(LIGHT, 26, 9, 20, 47); R(SHADE, 43, 9, 3, 47); R(ROOF, 26, 6, 20, 3);
+    R(LINE, 50, 10, 44, 102); R(LIGHT, 51, 17, 42, 95); R(SHADE, 88, 17, 5, 95); dith(SHADE, 83, 17, 5, 95); dith('#FFFFFF', 51, 17, 4, 95);
+    R(ROOF, 51, 11, 42, 6); R(ROOFHI, 51, 11, 42, 1); dith(LINE, 51, 16, 42, 1);
     // flag
-    R(LINE, 36, 0, 1, 6); R('#E5487A', 37, 0, 4, 3);
+    R(LINE, 72, 0, 1, 11); R('#E5487A', 73, 0, 9, 6); R('#F58BB0', 73, 0, 9, 1); R('#B93565', 73, 5, 9, 1);
     // the sign: white plate, green cross
-    R(LINE, 30, 10, 12, 12); R('#FFFFFF', 31, 11, 10, 10); R('#1D5F12', 34, 12, 4, 8); R('#1D5F12', 32, 14, 8, 4); R('#3DAA2B', 35, 13, 2, 6); R('#3DAA2B', 33, 15, 6, 2);
-    // windows: frame, glass, a glint
-    const win = (a, b, w, h) => { R(LINE, a - 1, b - 1, w + 2, h + 2); R(GLASS, a, b, w, h); R('#FFFFFF', a, b, 1, 1); };
-    [25, 33, 41].forEach((y) => { [11, 17, 50, 56].forEach((xx) => win(xx, y, 3, 4)); });
-    [25, 33].forEach((y) => { [30, 39].forEach((xx) => win(xx, y, 3, 4)); });
-    // door and awning
-    R(ROOF, 30, 42, 12, 2); R(LINE, 31, 44, 10, 12); R(DOOR, 32, 45, 8, 11); R(GLASS, 33, 46, 2, 4); R(GLASS, 37, 46, 2, 4);
+    R(LINE, 60, 20, 24, 24); R('#FFFFFF', 61, 21, 22, 22); dith('#E4EEF7', 61, 37, 22, 6);
+    R('#1D5F12', 68, 24, 8, 16); R('#1D5F12', 64, 28, 16, 8); R('#3DAA2B', 69, 25, 6, 14); R('#3DAA2B', 65, 29, 14, 6); R('#7FD46A', 69, 25, 6, 1); R('#7FD46A', 65, 29, 4, 1);
+    // windows: frame, glass, sky reflection, mullion, sill
+    const win = (a, b) => { R(LINE, a - 1, b - 1, 8, 11); R(GLASS, a, b, 6, 9); dith('#8FC0EC', a, b + 5, 6, 4); R('#FFFFFF', a, b, 2, 2); R(LINE, a + 3, b, 0.6, 9); R('#FFFFFF', a - 2, b + 10, 10, 1); };
+    [48, 64, 80].forEach((y) => [20, 30, 40, 98, 108, 118].forEach((xx) => win(xx, y)));
+    [50, 66].forEach((y) => [58, 80].forEach((xx) => win(xx, y)));
+    // door, striped awning, step
+    R(LINE, 59, 83, 26, 6); R(ROOF, 60, 84, 24, 4); [60, 68, 76].forEach((xx) => R('#FFFFFF', xx, 84, 4, 4));
+    R(LINE, 62, 89, 20, 23); R(DOOR, 63, 90, 18, 22); R(GLASS, 65, 92, 6, 10); R(GLASS, 73, 92, 6, 10); R('#FFFFFF', 65, 92, 2, 2); R('#FFFFFF', 73, 92, 2, 2); R('#F2C94C', 71, 101, 1, 2);
     return cv.toDataURL('image/png');
   })());
 })();

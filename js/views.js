@@ -286,12 +286,19 @@
 
   /* ================= Notes ================= */
   V.noteDoc = (p, n) => `<div class="doc-h"><div><h3>${esc(n.type)}</h3><div class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)} (${esc(E.roleLabel(n.role))})${n.cosignedBy ? ` · Cosigned by ${esc(n.cosignedBy)} ${E.fmtDT(n.cosignedTs)}` : ''}${n.source ? ` · ${chip('Started in ' + n.source, 'blue')}` : ''}</div></div><div>${statusChip(n.status)} ${n.status === 'Cosign needed' && E.can('note.cosign') ? `<button class="btn primary xs" data-act="noteCosign" data-id="${n.id}">Cosign</button>` : ''}</div></div><pre class="doc">${esc(n.text)}</pre>`;
+  /** The fill-in-the-blanks bar above the note editor. */
+  V.blankBar = (text) => {
+    const n = (String(text).match(/\*\*\*/g) || []).length;
+    return n ? `${icon('info', 20)}<span><b>${n} blank${n > 1 ? 's' : ''} to fill.</b> Wherever the template shows <code>***</code>, it is waiting for your own words. Click the button, then just type: your text replaces the stars.</span><button class="btn xs primary" data-act="noteNext">Go to next blank <kbd>F2</kbd></button>`
+      : `${icon('check', 20)}<span><b>No blanks left.</b> Read it through once, then sign.</span>`;
+  };
   V.act.notes = (p) => {
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), d = p.noteDraft;
     const sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
     const editor = d ? `<div class="doc-h"><h3>New note</h3><label>Type <select data-change="noteType">${opts(Object.keys(E.NOTE_TEMPLATES), d.type)}</select></label></div>
+        <div class="blanks" id="blankBar" aria-live="polite">${V.blankBar(d.text)}</div>
         <textarea id="noteText" class="note-edit" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
-        <div class="toolbar"><span class="fine">Dot phrases: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> <code>.allergies</code> <code>.problems</code> <code>.name</code> <code>.me</code> then a space. Press <kbd>F2</kbd> to jump to the next <code>***</code>.</span><span class="spacer"></span>
+        <div class="toolbar"><span class="fine">Shortcuts that pull in chart data: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> <code>.allergies</code> <code>.problems</code> <code>.name</code> <code>.me</code> then a space.</span><span class="spacer"></span>
         <button class="btn" data-act="noteCancel">Discard</button><button class="btn primary" data-act="noteSign">${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button></div>` : sel ? V.noteDoc(p, sel) : empty('No notes yet');
     return `<div class="split"><div class="pane list"><div class="toolbar"><b>Notes (${notes.length})</b><span class="spacer"></span><button class="btn xs" data-act="noteNew"${d ? ' disabled' : ''}>${icon('add', 16)}New note</button></div>
         ${d ? `<div class="list-row sel"><b>Draft: ${esc(d.type)}</b><span class="muted">Unsigned · autosaved</span></div>` : ''}
@@ -403,7 +410,7 @@
     const p = m && m.patientId && E.pt(m.patientId);
     return `<div class="page"><h2>Inbox</h2><div class="split"><div class="pane list">
       ${list.map((x) => `<button class="list-row${m && m.id === x.id ? ' sel' : ''}${x.read ? '' : ' unread'}" data-act="inboxSel" data-id="${x.id}"><b>${esc(x.subject)}</b><span class="muted">${chip(x.type, x.critical ? 'red' : x.type === 'Result' ? 'blue' : x.type.startsWith('Cosign') ? 'amber' : 'grey')} ${esc(x.from)} · ${E.fmtDT(x.ts)}</span></button>`).join('') || empty('No messages')}</div>
-      <div class="pane">${m ? `<div class="doc-h"><div><h3>${esc(m.subject)}</h3><div class="muted">${esc(m.type)} · from ${esc(m.from)} · ${E.fmtDT(m.ts)}</div></div>${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}</div><pre class="doc">${esc(m.body)}</pre>` : empty('Select a message.')}</div></div></div>`;
+      <div class="pane">${m ? `<div class="doc-h"><div><h3>${esc(m.subject)}</h3><div class="muted">${esc(m.type)} · from ${esc(m.from)} · ${E.fmtDT(m.ts)}</div></div><span class="doc-acts">${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}<button class="btn xs" data-act="inboxDone" data-id="${m.id}" title="Remove this message from your Inbox">${icon('check', 16)}Done</button></span></div><pre class="doc">${esc(m.body)}</pre>` : empty('Select a message.')}</div></div></div>`;
   };
 
   /* ================= Activity log ================= */
@@ -467,6 +474,16 @@
         <label class="grow">How do you know? (required)<input id="rmComment" maxlength="200" placeholder="e.g., Patient reports taking amoxicillin in 2024 without a reaction"></label></div>`,
       `${cancel}<button class="btn danger" data-act="allergyRemoveSave">${student ? 'Request removal' : 'Remove allergy'}</button>`); }
     if (m.type === 'debrief') return modal('Learning moment', `<div class="debrief">${icon('learning', 48)}<div>${m.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div></div>`, '<button class="btn primary" data-act="closeModal">Got it</button>', 'lg');
+    if (m.type === 'call' && m.state === 'off') {
+      const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1];
+      return modal('Patient interview — ' + p.name, `<div class="talk">
+          <div class="talk-who"><span class="call-face">${icon('user', 96)}</span><b>${esc(p.name)}</b><span class="muted">${E.age(p.dob)} y.o. · ${esc(p.bed)}</span></div>
+          <div class="talk-log" id="talkLog">${asked.length ? asked.map((i) => `<p class="you"><b>You:</b> ${esc(iv[i].q)}</p><p class="pt"><b>${esc(fn)}:</b> ${esc(iv[i].a)}</p>`).join('') : `<p class="muted">Choose a question to start. ${esc(fn)} answers the way a patient would: in everyday words, and only what you ask.</p>`}</div>
+          <div class="talk-q"><b>Ask ${esc(fn)}</b>${iv.map((x) => `<button class="btn${asked.includes(x.i) ? ' asked' : ''}" data-act="callAsk" data-i="${x.i}">${asked.includes(x.i) ? icon('check', 16) : ''}${esc(x.q)}</button>`).join('')}</div>
+        </div>
+        <p class="fine">Video visits are not connected on this copy of the sim yet, so this is a text interview. ${E.db.user.role === 'physician' ? 'Faculty: set a video-visit server address in <code>js/config.js</code> to turn on live video. ' : ''}Simulated patient; any resemblance to a real person is a coincidence. Document the encounter in Notes when you finish.</p>`,
+        `<span class="muted">${asked.length} of ${iv.length} asked</span><button class="btn primary" data-act="callEnd">End interview</button>`, 'lg talkm');
+    }
     if (m.type === 'call') {
       const stage = m.state === 'live' ? `<iframe class="call-frame" src="${esc(m.url)}" title="Video visit with ${esc(p.name)}" allow="camera; microphone; autoplay; fullscreen; display-capture"></iframe>`
         : `<div class="call-wait"><span class="call-face">${icon('user', 120)}</span><b>${esc(p.name)}</b>${m.state === 'connecting' ? `<span>Calling…</span><div class="xpbar big call-bar" role="progressbar" aria-label="Connecting"><i></i></div>`

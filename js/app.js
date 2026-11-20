@@ -207,6 +207,14 @@
   }
   const viewedLearner = () => (E.db.user.role === 'physician' && ui.learnWho && E.db.progress[ui.learnWho]) || E.progress();
 
+  /** Select the next *** blank in the note so typing replaces it. */
+  function nextBlank(t, say) {
+    if (!t) return;
+    let i = t.value.indexOf('***', t.selectionEnd);
+    if (i < 0) i = t.value.indexOf('***');
+    if (i >= 0) { t.focus(); t.setSelectionRange(i, i + 3); const line = t.value.slice(0, i).split('\n').length; t.scrollTop = Math.max(0, (line - 6) * 19); } else if (say) toast('Every blank is filled. You can sign.');
+  }
+
   /* ---------- actions (data-act) ---------- */
   const A = {
     login() {
@@ -225,7 +233,12 @@
     pigPop,
     paneToggle(d) { ui.collapsed[d.id] = !ui.collapsed[d.id]; render(); },
     openPt(d) { $('#ptSearchRes') && ($('#ptSearchRes').innerHTML = ''); go(`#/pt/${d.id}/summary`); },
-    closeTab(d) { E.db.openTabs = E.db.openTabs.filter((id) => id !== d.id); E.save(); if (route().pid === d.id) go('#/home'); else render(); },
+    closeTab(d) {
+      const p = E.pt(d.id), n = p ? p.drafts.length : 0;
+      if (p && (n || p.noteDraft)) { ui.closing = d.id; ui.modal = { type: 'confirm', title: 'Unsigned work in this chart', text: `${p.name} has ${[n && `${n} unsigned order${n > 1 ? 's' : ''}`, p.noteDraft && 'a note that is not signed'].filter(Boolean).join(' and ')}. It is saved, but nothing takes effect until you sign it. Leaving orders unsigned is one of the commonest beginner mistakes.`, yes: 'closeTabDo', yesLabel: 'Close anyway' }; return render(); }
+      A.closeTabDo(d);
+    },
+    closeTabDo(d) { d = d && d.id ? d : { id: ui.closing }; ui.closing = null; ui.modal = null; E.db.openTabs = E.db.openTabs.filter((id) => id !== d.id); E.save(); if (route().pid === d.id) go('#/home'); else render(); },
     resetAsk() { ui.modal = { type: 'confirm', title: 'Reset sim data?', text: 'All patients return to their starting state and the timeline is regenerated from the current time. Orders, notes and documentation entered by anyone on this device are erased. Learning progress is kept.', yes: 'resetDo', yesLabel: 'Reset', danger: true }; render(); },
     resetDo() { const act = E.progress().active; if (act && act.type === 'mission') delete E.progress().active; E.reset(); E.db.openTabs = []; Object.assign(ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0 }); E.audit('Reset sim data'); E.save(); toast('Sim data reset'); go('#/home'); },
 
@@ -246,7 +259,8 @@
         })
         .catch((e) => { if (still()) { m.state = 'error'; m.msg = e.message === 'Failed to fetch' ? 'The video-visit server could not be reached.' : e.message; render(); } });
     },
-    callEnd() { const m = ui.modal; if (m && m.state === 'live') { E.audit('Ended a video visit', m.pid); E.save(); toast('Write up the encounter in Notes while it is fresh.', 'Video visit ended', 'notes'); } ui.modal = null; render(); },
+    callAsk(d) { const m = ui.modal, i = Number(d.i); m.asked = m.asked || []; if (!m.asked.includes(i)) { m.asked.push(i); if (m.asked.length === 1) E.audit('Interviewed the patient (text)', m.pid); E.save(); } render(); const log = $('#talkLog'); if (log) log.scrollTop = log.scrollHeight; },
+    callEnd() { const m = ui.modal; if (m && m.asked && m.asked.length) toast('Write up what the patient told you in Notes while it is fresh.', 'Interview ended', 'notes'); if (m && m.state === 'live') { E.audit('Ended a video visit', m.pid); E.save(); toast('Write up the encounter in Notes while it is fresh.', 'Video visit ended', 'notes'); } ui.modal = null; render(); },
 
     /* results / flowsheets / chart review */
     selLab(d) { ui.selLab = d.comp && ui.selLab !== d.comp ? d.comp : null; if (ui.selLab) track('results.trend'); render(); },
@@ -304,7 +318,7 @@
       const p = curPt(), d = p.noteDraft, u = E.db.user, text = d.text.trim();
       if (!text) return toast('The note is empty.');
       const left = (text.match(/\*\*\*/g) || []).length;
-      if (left) return toast(`Complete or remove the ${left} remaining *** placeholder${left > 1 ? 's' : ''} before signing. F2 jumps to the next one.`);
+      if (left) { nextBlank($('#noteText')); return toast(`${left} blank${left > 1 ? 's' : ''} still to fill. Each *** is a placeholder the template left for you: type over it (the next one is selected for you), or delete it if it does not apply.`, 'Not signed yet'); }
       const student = u.role === 'student';
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
       if (d.source) n.source = d.source;   // started in a mini-game
@@ -314,6 +328,7 @@
       track('note.sign'); if (d.type.startsWith('Handoff')) track('note.handoff');
       toast(student ? 'Note signed and routed for cosign' : 'Note signed'); commit();
     },
+    noteNext() { nextBlank($('#noteText'), true); },
     noteSel(d) { ui.noteSel = d.id; render(); },
     noteCosign(d) {
       const p = curPt(), n = p.notes.find((x) => x.id === d.id);
@@ -399,6 +414,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
 
     /* inbox */
     inboxSel(d) { const m = E.db.inbox.find((x) => x.id === d.id); ui.inboxSel = m.id; if (!m.read) E.audit(`Read message: ${m.subject}`, m.patientId); m.read = true; if (m.critical) track('critical.read'); commit(); },
+    inboxDone(d) { const m = E.db.inbox.find((x) => x.id === d.id); E.db.inbox = E.db.inbox.filter((x) => x !== m); ui.inboxSel = null; E.audit(`Marked message done: ${m.subject}`, m.patientId); commit(); },
     inboxChart(d) { const m = E.db.inbox.find((x) => x.id === d.id); if (m.type === 'Result') track('result.read'); go(`#/pt/${m.patientId}/${m.act || 'summary'}`); },
 
     /* learning */
@@ -440,6 +456,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
         track('note.dot');
       }
       d.text = el.value; d.pristine = false; E.save();
+      const bar = $('#blankBar'); if (bar) bar.innerHTML = V.blankBar(el.value);
     },
   };
   const C = {
@@ -465,12 +482,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (e.key === 'Escape' && ui.modal) return A.closeModal();
     if (e.key === 'Enter' && t.id === 'loginName') return A.login();
     if (e.key === 'Enter' && t.matches && t.matches('tr[data-act]')) return t.click();
-    if (e.key === 'F2' && t.id === 'noteText') {
-      e.preventDefault();
-      let i = t.value.indexOf('***', t.selectionEnd);
-      if (i < 0) i = t.value.indexOf('***');
-      if (i >= 0) { t.setSelectionRange(i, i + 3); const line = t.value.slice(0, i).split('\n').length; t.scrollTop = Math.max(0, (line - 6) * 19); } else toast('No *** placeholders left.');
-    }
+    if (e.key === 'F2' && t.id === 'noteText') { e.preventDefault(); nextBlank(t, true); }
   });
   window.addEventListener('hashchange', onRoute);
 
@@ -481,6 +493,8 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (E.missionsTick && E.missionsTick()) { E.save(); pendingRender = true; }
     const done = E.processResults();
     if (done.length) { E.save(); toast(done.map((x) => `${x.o.name} — ${x.p.name}`).join('; '), 'New result', 'results'); pendingRender = true; }
+    const sim = E.simTick ? E.simTick() : [];
+    if (sim.length) { E.save(); toast(sim.join('; '), 'While you were working', 'inbox'); pendingRender = true; }
     if (pendingRender && !busy()) render();
   }, 2000);
 

@@ -21,5 +21,9 @@
     videoVisit: {
       endpoint: '',
     },
+    /* The simulated hospital (js/sim.js). Delays are in seconds.
+       attending: when a student works alone, a simulated attending cosigns or declines pended orders and
+       cosigns notes, with feedback. Set to false if faculty will log in as Physician and cosign themselves. */
+    sim: { attending: true, attendingDelay: 40, noteDelay: 60, consultDelay: 45, nursingDelay: 20, vitalsDelay: 30 },
   };
 })();
