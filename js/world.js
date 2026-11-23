@@ -147,17 +147,32 @@
   }
   const F = (c, h) => Math.max(0, Math.min(1, (h - c.r0) / (c.r1 - c.r0)));
   const X = (c, h) => `calc(146px + (100% - 198px) * ${F(c, h).toFixed(4)})`;   // across the stage, clear of the two buildings
+  const surname = (p) => String(p.name || '').split(',')[0];
+  /** What the two buildings show. lab lists every test in process, so the lab can say what it is working on and link to it. */
   const state = () => {
-    if (W.demo) return { census: W.demo.census == null ? 7 : W.demo.census, beacon: !!W.demo.beacon, lab: !!W.demo.lab };
-    if (!E.db || !E.db.user) return { census: 0, beacon: false, lab: false };
+    if (W.demo) return { census: W.demo.census == null ? 7 : W.demo.census, beacon: !!W.demo.beacon, labs: W.demo.lab ? [{ id: 'demo', name: 'CBC', who: 'Example' }] : [], crisisPid: null };
+    if (!E.db || !E.db.user) return { census: 0, beacon: false, labs: [], crisisPid: null };
     const me = E.db.user.name, a = E.progress().active, cs = a && a.type === 'case' && E.CASES && E.CASES.find((x) => x.id === a.id);
-    return { census: E.db.patients.filter((p) => !p.icu && !p.discharged).length, lab: E.db.patients.some((p) => p.orders.some((o) => o.status === 'In process')),
-      beacon: (E.db.crises || []).some((x) => x.state === 'open' && x.who === me) || !!(cs && !a.done && cs.nodes[a.node] && cs.nodes[a.node].urgent) };
+    const crisis = (E.db.crises || []).find((x) => x.state === 'open' && x.who === me), labs = [];
+    E.db.patients.forEach((p) => p.orders.forEach((o) => { if (o.status === 'In process') labs.push({ id: o.id, name: o.name, pid: p.id, who: surname(p) }); }));
+    return { census: E.db.patients.filter((p) => !p.icu && !p.discharged).length, labs, crisisPid: crisis ? crisis.pid : null,
+      beacon: !!crisis || !!(cs && !a.done && cs.nodes[a.node] && cs.nodes[a.node].urgent) };
   };
-  const DUR = { out: 4.5, back: 4.5, amb: 6, car: 6, walk: 5, leave: 5 };
+  /* Everything crossing the stage moves at a steady speed, so on a wide screen the pig takes longer to reach the lab
+     instead of streaking across it. Walkers have a fixed path (the left edge to the door). */
+  const stageW = () => { const el = document.getElementById('wl'); return (el && el.clientWidth) || 900; };
+  const lim = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const travel = (kind) => (kind === 'out' || kind === 'back' ? lim((stageW() - 130) / 210, 3, 9) : kind === 'amb' || kind === 'car' ? lim((stageW() - 100) / 260, 3.5, 9) : 5);
+  const ARRIVE = { amb: 1, walk: 1 };                   // these add to the census only when they reach the door
+  const ends = (a) => a.t0 + a.dur * 1000;
+  let bump = { hosp: -1e9, lab: -1e9 }, lastCensus = null;
+  /** A one-shot animation that survives a redraw: the delay says how far into it we already are. */
+  const once = (since, ms) => { const d = performance.now() - since; return d < ms ? `animation-delay:-${(d / 1000).toFixed(2)}s` : null; };
+  /** A looping animation that survives a redraw: in step with the page clock rather than restarting. */
+  const loop = (sec) => `animation-delay:-${((performance.now() / 1000) % sec).toFixed(2)}s`;
   function inner() {
     const c = clock(), st = state(), t = performance.now(), still = reduce();
-    actors = actors.filter((a) => t - a.t0 < DUR[a.kind] * 1000);
+    actors = actors.filter((a) => t < ends(a));
     let h = '';
     if (c && (c.hour < 6.25 || c.hour >= 19)) h += '<i class="wl-night"></i>';   // light lettering on a dark sky
     if (c && CFG().ruler) {
@@ -165,43 +180,81 @@
       (c.bands || []).forEach(([from, cls], i, all) => { const to = all[i + 1] ? all[i + 1][0] : c.r1; h += `<i class="wl-band ${cls}" style="left:${X(c, from)};width:calc((100% - 198px) * ${(F(c, to) - F(c, from)).toFixed(4)})"></i>`; });
       const span = c.r1 - c.r0, major = span > 14 ? 6 : 3;
       for (let hr = Math.ceil(c.r0); hr <= c.r1; hr += span > 14 ? 2 : 1) h += `<i class="wl-tk${hr % major === 0 ? ' big' : ''}" style="left:${X(c, hr)}"></i>${hr % major === 0 ? `<b class="wl-hr" style="left:${X(c, hr)}">${pad(hr % 24)}</b>` : ''}`;
-      pins.forEach((p) => { h += `<a class="wl-pin k-${p.kind}" style="left:${X(c, p.hour)}" ${p.href ? `href="${esc(p.href)}"` : ''} title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></a>`; });
+      shown(t).forEach((p) => { h += `<a class="wl-pin k-${p.kind}" style="left:${X(c, p.hour)}" ${p.href ? `href="${esc(p.href)}"` : ''} tabindex="-1" title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></a>`; });
       h += `<b class="wl-now${c.paused ? ' paused' : ''}" style="left:${X(c, c.hour)}">${esc(c.text)}</b>`;
     }
-    if (c && !CFG().ruler) pins.forEach((p) => { h += `<a class="wl-flag k-${p.kind}" style="left:${X(c, p.hour)}" ${p.href ? `href="${esc(p.href)}"` : ''} title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></a>`; });
+    // a flag that has just been planted springs up out of the grass
+    if (c && !CFG().ruler) shown(t).forEach((p) => { const s = once(p.show, 500); h += `<a class="wl-flag k-${p.kind}${s ? ' new' : ''}" style="left:${X(c, p.hour)}${s ? ';' + s : ''}" ${p.href ? `href="${esc(p.href)}"` : ''} tabindex="-1" title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></a>`; });
     if (c) {
       const night = isNight(c.hour), day = Math.max(0, Math.min(1, (c.hour - 5.75) / 13.5)), alt = night ? 0.75 : Math.sin(Math.PI * day);
       const top = CFG().ruler ? Math.round(15 + (1 - alt) * 22) : Math.round(5 + (1 - alt) * 16);
       h += `<i class="wl-orb ${night ? 'moon' : 'sun'}" style="left:${X(c, c.hour)};top:${top}px"></i>`;
       if (!CFG().ruler) h += `<b class="wl-now free${c.paused ? ' paused' : ''}" style="left:${X(c, c.hour)};top:${top + 20}px">${esc(c.text)}</b>`;   // no ruler: the time rides under the sun
     }
-    h += `<i class="wl-hosp${st.beacon ? ' alarm' : ''}" title="${st.census} patients on your list">${st.beacon ? '<i class="wl-beacon"></i>' : ''}<b>${st.census}</b></i><i class="wl-lab${st.lab ? ' on' : ''}" title="${st.lab ? 'A test is in process' : 'Laboratory'}"></i>`;
+    // THE HOSPITAL. The census counts a new patient when the ambulance or the walker reaches the door, not when they set off.
+    const coming = still ? 0 : actors.filter((a) => ARRIVE[a.kind]).length, census = Math.max(0, st.census - coming);
+    if (lastCensus != null && census !== lastCensus) bump.hosp = Math.max(bump.hosp, t);
+    lastCensus = census;
+    const hb = once(bump.hosp, 450), pop = once(bump.hosp, 600);
+    const hHref = st.crisisPid ? `#/pt/${esc(st.crisisPid)}/orders` : '#/home';
+    const hTitle = st.beacon ? 'A patient needs you now. Open the chart.' : `${census} patient${census === 1 ? '' : 's'} on your list. Open Patient Lists.`;
+    h += `<a class="wl-hosp${st.beacon ? ' alarm' : ''}${hb ? ' got' : ''}" href="${hHref}" tabindex="-1" title="${esc(hTitle)}"${hb ? ` style="${hb}"` : ''}>${st.beacon ? `<i class="wl-beacon" style="${loop(0.6)}"></i>` : ''}<b class="${pop ? 'pop' : ''}"${pop ? ` style="${pop}"` : ''}>${census}</b></a>`;
+    // THE LAB lights only once a tube has landed in it: a test whose pig is still flying is not in the lab yet.
+    const flying = new Set(actors.filter((a) => a.kind === 'out' && !still).map((a) => a.oid)), inLab = st.labs.filter((o) => !flying.has(o.id));
+    const lb = once(bump.lab, 450), lit = inLab.length > 0;
+    const lTitle = lit ? `In the lab: ${inLab.slice(0, 4).map((o) => `${o.name} (${o.who})`).join(', ')}${inLab.length > 4 ? ` and ${inLab.length - 4} more` : ''}` : flying.size ? 'A tube is on its way to the lab' : 'Laboratory: nothing in process';
+    const lStyle = lb || (lit ? loop(0.62) : '');
+    h += `<a class="wl-lab${lit ? ' on' : ''}${lb ? ' got' : ''}"${lit && inLab[0].pid ? ` href="#/pt/${esc(inLab[0].pid)}/results"` : ''} tabindex="-1" title="${esc(lTitle)}"${lStyle ? ` style="${lStyle}"` : ''}>${lit && inLab.length > 1 ? `<b>${inLab.length}</b>` : ''}</a>`;
     if (!still) actors.forEach((a) => {
-      const at = `animation-duration:${DUR[a.kind]}s;animation-delay:-${((t - a.t0) / 1000).toFixed(2)}s`;
-      if (a.kind === 'out' || a.kind === 'back') h += `<span class="wl-act wl-pig ${a.kind}" style="${at}">${E.icon('pig1', 24)}${E.icon('pig2', 24)}<i class="wl-load ${a.kind === 'out' ? 'tube' : a.crit ? 'sheet crit' : 'sheet'}"></i></span>`;
-      else if (a.kind === 'walk' || a.kind === 'leave') h += `<span class="wl-act wl-person ${a.kind}" style="${at}"><i style="background-image:var(--wl-p${a.v}a)"></i><i style="background-image:var(--wl-p${a.v}b)"></i></span>`;
-      else h += `<i class="wl-act wl-van ${a.kind}" style="${at}"></i>`;
+      const at = `animation-duration:${a.dur.toFixed(2)}s;animation-delay:-${((t - a.t0) / 1000).toFixed(2)}s`;
+      const link = a.pid ? ` href="#/pt/${esc(a.pid)}/${a.kind === 'out' || a.kind === 'back' ? 'results' : 'summary'}" tabindex="-1"` : '', tip = a.label ? ` title="${esc(a.label)}"` : '';
+      if (a.kind === 'out' || a.kind === 'back') h += `<a class="wl-act wl-pig ${a.kind}"${link}${tip} style="${at}">${E.icon('pig1', 24)}${E.icon('pig2', 24)}<i class="wl-load ${a.kind === 'out' ? 'tube' : a.crit ? 'sheet crit' : 'sheet'}"></i></a>`;
+      else if (a.kind === 'walk' || a.kind === 'leave') h += `<a class="wl-act wl-person ${a.kind}"${link}${tip} style="${at}"><i style="background-image:var(--wl-p${a.v}a)"></i><i style="background-image:var(--wl-p${a.v}b)"></i></a>`;
+      else h += `<a class="wl-act wl-van ${a.kind}"${link}${tip} style="${at}">${a.kind === 'amb' ? `<i class="wl-siren" style="${loop(0.4)}"></i>` : ''}</a>`;
     });
     return h;
   }
+  /** Pins wait for whatever is carrying their news: a result's flag goes up when the pig lands, an admission's when the ambulance does. */
+  const shown = (t) => pins.filter((p) => p.show <= t);
   /** Called by the shell for every redraw: the stage that sits in the banner's spacer. */
   W.banner = () => (CFG().banner ? `<span class="wl" id="wl" aria-hidden="true">${inner()}</span>` : '');
   function refresh(force) {
     const c = clock(), st = state();
     paintBanner(CFG().banner ? c : null);
     const el = document.getElementById('wl'); if (!el) return;
-    const s = [c && c.text, c && c.paused, actors.map((a) => a.id).join(), pins.length, st.census, st.beacon, st.lab].join('|');
+    const t = performance.now();
+    const s = [c && c.text, c && c.paused, actors.filter((a) => t < ends(a)).map((a) => a.id).join(), shown(t).length, st.census, st.beacon, st.labs.map((o) => o.id).join()].join('|');
     if (s === sig && !force) return;
     sig = s; el.innerHTML = inner();
   }
   W.refresh = () => refresh(true);
+  /* What happens when something reaches where it was going: the building it lands at gives a small squash. */
+  function land(a) {
+    if (a.kind === 'out') bump.lab = performance.now();
+    if (a.kind === 'back') bump.hosp = performance.now();
+    refresh(true);
+    setTimeout(() => refresh(true), 650);   // once the squash and the census pop are over, back to the building's resting (or busy) state
+  }
   /** Something happened in the world. kind: out | back (the pig courier), amb (an emergency arrival), walk | leave (a patient on foot, in from
-      the left and out the same way), car, or pin (a mark on the ruler). */
+      the left and out the same way), car, or pin (a mark on the ruler).
+      o: { oid, pid, label } say which order or patient it is, so the sprite can link to the chart; crit marks a critical result;
+      pin/title/href plant a pin, which waits until this arrival lands. */
   W.emit = (kind, o) => {
     o = o || {};
-    if (DUR[kind]) { actors.push({ id: Math.random().toString(36).slice(2, 8), kind, crit: !!o.crit, v: o.v == null ? Math.floor(Math.random() * PEOPLE.length) : o.v, t0: performance.now() }); if (actors.length > 8) actors.shift(); }
+    const t = performance.now();
+    let at = t;
+    if (['out', 'back', 'amb', 'car', 'walk', 'leave'].includes(kind)) {
+      const a = { id: Math.random().toString(36).slice(2, 8), kind, dur: travel(kind), crit: !!o.crit, v: o.v == null ? Math.floor(Math.random() * PEOPLE.length) : o.v, t0: t, oid: o.oid, pid: o.pid, label: o.label };
+      actors.push(a); if (actors.length > 10) actors.shift();
+      if (ARRIVE[kind] || kind === 'back') at = ends(a);   // news that is being carried is pinned on arrival
+      if (!reduce()) setTimeout(() => land(a), a.dur * 1000 + 30);
+      else at = t;
+    }
+    // a result pin waits for the last pig still carrying a result home
+    if (kind === 'pin' && o.result && !reduce()) at = Math.max(at, ...actors.filter((a) => a.kind === 'back').map(ends));
     const c = clock();
-    if (c && (kind === 'pin' || o.pin)) { pins.push({ hour: c.hour, kind: o.pin || o.tone || 'page', title: o.title || '', href: o.href || '' }); if (pins.length > 40) pins.shift(); }
+    if (c && (kind === 'pin' || o.pin)) { pins.push({ hour: c.hour, show: at, kind: o.pin || o.tone || 'page', title: o.title || '', href: o.href || '' }); if (pins.length > 40) pins.shift(); }
+    if (at > t) setTimeout(() => refresh(true), at - t + 30);
     refresh(true);
   };
 
@@ -214,26 +267,29 @@
     const c = clock(), a = E.progress().active, key = a && (a.type === 'shift' || a.type === 'case') ? a.type + a.id + a.start : null;
     if (key !== runKey) { runKey = key; pins = []; }
     // orders: a tube goes out when a test is signed, a result comes back when it posts
-    const orders = {}; E.db.patients.forEach((p) => p.orders.forEach((o) => { if (o.type === 'lab' || o.type === 'img') orders[o.id] = o.status; }));
+    const orders = {}, meta = {}; E.db.patients.forEach((p) => p.orders.forEach((o) => { if (o.type === 'lab' || o.type === 'img') { orders[o.id] = o.status; meta[o.id] = { oid: o.id, pid: p.id, name: o.name, who: surname(p) }; } }));
     if (seen.orders) Object.keys(orders).forEach((id) => {
-      const was = seen.orders[id], now = orders[id];
-      if (now === 'In process' && was !== 'In process') W.emit('out');
-      if (now === 'Completed' && was === 'In process') W.emit('back', { crit: E.db.inbox.slice(0, 4).some((m) => m.type === 'Result' && m.critical && Date.now() - m.ts < 4000) });
+      const was = seen.orders[id], now = orders[id], m = meta[id];
+      if (now === 'In process' && was !== 'In process') W.emit('out', { oid: id, pid: m.pid, label: `${m.name} for ${m.who}, on its way to the lab` });
+      if (now === 'Completed' && was === 'In process') {
+        const crit = E.db.inbox.slice(0, 4).some((x) => x.type === 'Result' && x.critical && x.patientId === m.pid && Date.now() - x.ts < 4000);
+        W.emit('back', { oid: id, pid: m.pid, crit, label: `${m.name} for ${m.who}: ${crit ? 'a critical result' : 'the result'} is coming back` });
+      }
     });
     seen.orders = orders;
     // patients: arrivals, departures, intensive care
     const ids = E.db.patients.map((p) => p.id), icu = E.db.patients.filter((p) => p.icu).map((p) => p.id), home = E.db.patients.filter((p) => p.discharged).map((p) => p.id);
     if (seen.patients && E.db.createdAt === seen.created) {
       E.db.patients.forEach((p) => {
-        if (!seen.patients.includes(p.id)) W.emit(p.arrive === 'walk' ? 'walk' : 'amb', { v: who(p.id), pin: 'admit', title: `${p.name} admitted`, href: `#/pt/${p.id}/summary` });
-        if (home.includes(p.id) && !seen.home.includes(p.id)) W.emit('leave', { v: who(p.id), pin: 'admit', title: `${p.name} went home` });
+        if (!seen.patients.includes(p.id)) W.emit(p.arrive === 'walk' ? 'walk' : 'amb', { v: who(p.id), pid: p.id, label: `${p.name}, arriving`, pin: 'admit', title: `${p.name} admitted`, href: `#/pt/${p.id}/summary` });
+        if (home.includes(p.id) && !seen.home.includes(p.id)) W.emit('leave', { v: who(p.id), label: `${p.name}, going home`, pin: 'admit', title: `${p.name} went home` });
         if (icu.includes(p.id) && !seen.icu.includes(p.id) && !(a && a.type === 'case')) consequence('icu', { p });   // a case plays its own ending
       });
     }
     Object.assign(seen, { patients: ids, icu, home, created: E.db.createdAt });
     // the inbox: every page and result that arrives while a clock is running leaves a pin
     const top = E.db.inbox.map((m) => m.id);
-    if (seen.inbox && c && E.db.createdAt === seen.inboxAt) E.db.inbox.filter((m) => !seen.inbox.includes(m.id) && ['Page', 'Result', 'Staff Message', 'Safety'].includes(m.type)).forEach((m) => W.emit('pin', { pin: m.critical ? 'crit' : m.type === 'Result' ? 'result' : 'page', title: m.subject, href: m.patientId ? `#/pt/${m.patientId}/${m.act || 'summary'}` : '#/inbox' }));
+    if (seen.inbox && c && E.db.createdAt === seen.inboxAt) E.db.inbox.filter((m) => !seen.inbox.includes(m.id) && ['Page', 'Result', 'Staff Message', 'Safety'].includes(m.type)).forEach((m) => W.emit('pin', { pin: m.critical ? 'crit' : m.type === 'Result' ? 'result' : 'page', result: m.type === 'Result', title: m.subject, href: m.patientId ? `#/pt/${m.patientId}/${m.act || 'summary'}` : '#/inbox' }));
     seen.inbox = top; seen.inboxAt = E.db.createdAt;   // messages already waiting on a reset ward are not news
     // the safety record: harm, and rescue
     const ev = ((E.progress().safety || {}).events || []).map((e) => e.id + ':' + (e.outcome || ''));
