@@ -163,7 +163,7 @@
   const stageW = () => { const el = document.getElementById('wl'); return (el && el.clientWidth) || 900; };
   const lim = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const travel = (kind) => (kind === 'out' || kind === 'back' ? lim((stageW() - 130) / 210, 3, 9) : kind === 'amb' || kind === 'car' ? lim((stageW() - 100) / 260, 3.5, 9) : 5);
-  const ARRIVE = { amb: 1, walk: 1 };                   // these add to the census only when they reach the door
+  const ARRIVE = { amb: 1, walk: 1 };                   // arrivals: their pins wait for them to reach the door
   const ends = (a) => a.t0 + a.dur * 1000;
   let bump = { hosp: -1e9, lab: -1e9 }, lastCensus = null;
   /** A one-shot animation that survives a redraw: the delay says how far into it we already are. */
@@ -192,7 +192,7 @@
       if (!CFG().ruler) h += `<b class="wl-now free${c.paused ? ' paused' : ''}" style="left:${X(c, c.hour)};top:${top + 20}px">${esc(c.text)}</b>`;   // no ruler: the time rides under the sun
     }
     // THE HOSPITAL. The census counts a new patient when the ambulance or the walker reaches the door, not when they set off.
-    const coming = still ? 0 : actors.filter((a) => ARRIVE[a.kind]).length, census = Math.max(0, st.census - coming);
+    const coming = still ? 0 : actors.filter((a) => a.adds).length, census = Math.max(0, st.census - coming);
     if (lastCensus != null && census !== lastCensus) bump.hosp = Math.max(bump.hosp, t);
     lastCensus = census;
     const hb = once(bump.hosp, 450), pop = once(bump.hosp, 600);
@@ -238,13 +238,14 @@
   /** Something happened in the world. kind: out | back (the pig courier), amb (an emergency arrival), walk | leave (a patient on foot, in from
       the left and out the same way), car, or pin (a mark on the ruler).
       o: { oid, pid, label } say which order or patient it is, so the sprite can link to the chart; crit marks a critical result;
+      adds: false for an arrival of a patient already on the list (an admission order), so the census does not count them twice;
       pin/title/href plant a pin, which waits until this arrival lands. */
   W.emit = (kind, o) => {
     o = o || {};
     const t = performance.now();
     let at = t;
     if (['out', 'back', 'amb', 'car', 'walk', 'leave'].includes(kind)) {
-      const a = { id: Math.random().toString(36).slice(2, 8), kind, dur: travel(kind), crit: !!o.crit, v: o.v == null ? Math.floor(Math.random() * PEOPLE.length) : o.v, t0: t, oid: o.oid, pid: o.pid, label: o.label };
+      const a = { id: Math.random().toString(36).slice(2, 8), kind, dur: travel(kind), crit: !!o.crit, v: o.v == null ? Math.floor(Math.random() * PEOPLE.length) : o.v, t0: t, oid: o.oid, pid: o.pid, label: o.label, adds: !!ARRIVE[kind] && o.adds !== false };   // adds: a new patient, counted when they reach the door
       actors.push(a); if (actors.length > 10) actors.shift();
       if (ARRIVE[kind] || kind === 'back') at = ends(a);   // news that is being carried is pinned on arrival
       if (!reduce()) setTimeout(() => land(a), a.dur * 1000 + 30);
@@ -277,6 +278,20 @@
       }
     });
     seen.orders = orders;
+    // an admission order: when one is signed (or a student's is cosigned) for a patient already on the list, the patient comes
+    // up to the ward. They are on the list already, so the census does not change; only the arrival plays.
+    const admits = {}; E.db.patients.forEach((p) => p.orders.forEach((o) => { if (o.catId === 'admit') admits[o.id] = { status: o.status, p }; }));
+    if (seen.admits && seen.patients && E.db.createdAt === seen.created) {
+      const was = (p) => p.orders.some((o) => o.catId === 'admit' && seen.admits[o.id] && seen.admits[o.id].status === 'Active');
+      const done = new Set();
+      Object.keys(admits).forEach((id) => {
+        const { status, p } = admits[id], before = seen.admits[id];
+        if (status !== 'Active' || (before && before.status === 'Active') || !seen.patients.includes(p.id) || p.discharged || p.icu || was(p) || done.has(p.id)) return;
+        done.add(p.id);
+        W.emit(p.arrive === 'walk' ? 'walk' : 'amb', { v: who(p.id), pid: p.id, adds: false, label: `${p.name}, coming up to the ward`, pin: 'admit', title: `${p.name} admitted to the ward`, href: `#/pt/${p.id}/summary` });
+      });
+    }
+    seen.admits = admits;
     // patients: arrivals, departures, intensive care
     const ids = E.db.patients.map((p) => p.id), icu = E.db.patients.filter((p) => p.icu).map((p) => p.id), home = E.db.patients.filter((p) => p.discharged).map((p) => p.id);
     if (seen.patients && E.db.createdAt === seen.created) {
