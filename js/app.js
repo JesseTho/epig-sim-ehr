@@ -360,7 +360,10 @@
     },
     logout() { E.audit('Logged out'); E.db.user = null; E.db.openTabs = []; ui.modal = null; ui.learnWho = null; lastHash = null; E.save(); render(); },
     musicToggle() { if (E.music) E.music.toggle(); render(); },
-    help() { ui.modal = { type: 'help' }; render(); },
+    help() { ui.modal = { type: 'help', topic: ui.helpTopic || 'about' }; render(); },
+    helpTopic(d) { if (!ui.modal || ui.modal.type !== 'help') return; const q = $('.hp-q'), was = q ? q.value : '', list = $('.hp-list'), top = list ? list.scrollTop : 0;
+      ui.modal.topic = ui.helpTopic = d.id; render();
+      const a = $('.hp-doc'), q2 = $('.hp-q'), l2 = $('.hp-list'); if (a) a.scrollTop = 0; if (q2 && was) { q2.value = was; I.helpFind(q2); } if (l2) l2.scrollTop = top; },
     closeModal() {
       const m = ui.modal;
       if (m && m.type === 'game' && !m.checked) { const g = (E.GAMES || []).find((x) => x.id === m.game); E.audit(`Left a round of ${g ? g.name : 'a mini-game'} without checking it`, (m.s && m.s.pid) || null); E.save(); }
@@ -627,6 +630,17 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
 
   /* ---------- text inputs (data-input) and field changes (data-change) ---------- */
   const I = {
+    /* Filters the Help contents in place (no redraw, so the search box keeps focus). */
+    helpFind(el) {
+      const q = el.value.trim().toLowerCase(); let shown = 0, grp = null, grpHas = false;
+      const fin = () => { if (grp) grp.hidden = !grpHas; };
+      document.querySelectorAll('.hp-list > *').forEach((x) => {
+        if (x.classList.contains('hp-grp')) { fin(); grp = x; grpHas = false; return; }
+        if (!x.classList.contains('hp-item')) return;
+        const hit = !q || x.dataset.find.includes(q); x.hidden = !hit; if (hit) { shown++; grpHas = true; }
+      });
+      fin(); const none = $('.hp-none'); if (none) none.hidden = shown > 0;
+    },
     ptSearch(el) {
       const q = el.value.trim().toLowerCase(), box = $('#ptSearchRes');
       const hits = q ? E.db.patients.filter((p) => p.name.toLowerCase().includes(q) || p.mrn.includes(q)) : [];

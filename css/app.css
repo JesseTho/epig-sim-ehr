@@ -387,6 +387,22 @@ a.btn { text-decoration: none; }
 .game-main { flex: 1; min-width: 0; } .game-main b { display: block; font: 700 17px var(--book); color: var(--olive-6); } .game-skill { font-size: 11px; color: var(--muted); } .game-main p { margin: 4px 0 0; line-height: 1.45; }
 .game-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; white-space: nowrap; color: var(--muted); } .game-side .btn { margin-top: 4px; }
 .modal.xl { width: 940px; }
+/* Help window: contents on the left, one topic on the right (markup: V.modal type 'help') */
+.modal-b:has(> .hp) { padding: 0; overflow: hidden; display: flex; }
+.hp { display: flex; flex: 1; min-height: 0; height: min(560px, 70vh); }
+.hp-nav { width: 230px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: #F4F6EC; }
+.hp-q { margin: 8px; flex: none; }
+.hp-list { flex: 1; overflow: auto; padding: 0 0 8px; }
+.hp-grp { padding: 10px 12px 3px; font: 700 11px var(--title); letter-spacing: .04em; text-transform: uppercase; color: var(--olive-6); }
+.hp-item { display: block; width: 100%; text-align: left; padding: 4px 12px 4px 20px; border: 0; background: none; font: inherit; color: var(--link); cursor: pointer; }
+.hp-item:hover { background: #E7EDD5; text-decoration: underline; } .hp-item.on { background: var(--sel); color: var(--ink); font-weight: 700; text-decoration: none; }
+.hp-none { padding: 6px 12px; }
+.hp-doc { flex: 1; min-width: 0; overflow: auto; padding: 14px 18px; background: #fff; line-height: 1.5; }
+.hp-doc h3 { margin: 2px 0 10px; font: 700 17px var(--book); color: var(--olive-6); } .hp-crumb { font-size: 11px; }
+.hp-doc ul, .hp-doc ol { padding-left: 20px; } .hp-doc li { margin-bottom: 5px; }
+.hp-doc kbd { padding: 0 4px; border: 1px solid #A9B38B; border-bottom-width: 2px; border-radius: 3px; background: #F4F6EC; font: 12px ui-monospace, monospace; }
+.modal-f .spacer { flex: 1; } .hp-pos { white-space: nowrap; }
+@media (max-width: 700px) { .hp { flex-direction: column; height: 75vh; } .hp-nav { width: auto; max-height: 38%; border-right: 0; border-bottom: 1px solid var(--line); } }
 .g-pt { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; } .g-pt span { display: block; color: var(--muted); }
 .g-facts { background: #fff; border: 1px solid var(--line); padding: 8px 10px; margin: 0 0 8px; } .g-facts dd { font-weight: 400; }
 .g-ask { margin: 8px 0; }
