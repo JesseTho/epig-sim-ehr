@@ -450,11 +450,26 @@
       <section class="ib-main"><div class="ib-list"><div class="ib-head"><i></i><span>Type</span><span>Subject</span><span>Patient</span><span>From</span><span>Received</span></div>${rows || empty('No messages')}</div>
       <div class="ib-read">${read}</div></section></div>`;
   };
+  /* The patient conversation, presented like an RPG dialog: the patient's latest line in a framed box with a
+     portrait (typed out, click to finish it), the earlier exchange in a log above, and four numbered choices below
+     (keys 1 to 4). Choices are picked, not typed, because nothing here reads free text. */
+  E.TYPE_CPS = 45;   // characters per second for a line being typed out
   V.thread = (m, p) => {
-    const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1];
-    return `<div class="thread" id="threadLog">${m.thread.map((t) => `<div class="msg ${t.who === 'you' ? 'you' : 'pt'}"><b>${t.who === 'you' ? 'You' : esc(fn)}</b><span class="muted">${E.fmtDT(t.ts)}</span><p>${esc(t.text)}</p></div>`).join('')}</div>
-      <div class="thread-send"><b>Choose a message to send</b><span class="muted">Replies are picked from this list. There is no free-text box, because nothing here reads free text.</span>
-        ${iv.map((x) => `<button class="btn${asked.includes(x.i) ? ' asked' : ''}" data-act="msgAsk" data-id="${m.id}" data-i="${x.i}">${asked.includes(x.i) ? icon('check', 16) : ''}${esc(x.q)}</button>`).join('')}</div>
+    const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1] || p.name, th = m.thread, last = th[th.length - 1];
+    const cur = last && last.who === 'patient' ? last : null, log = cur ? th.slice(0, -1) : th;
+    const ty = E.ui.typing && E.ui.typing.mid === m.id && cur ? E.ui.typing : null;
+    const full = cur ? cur.text : asked.length ? `${fn} waits for your next question.` : `${fn} looks up as you come in.`;
+    const n = ty ? Math.min(full.length, Math.floor(((Date.now() - ty.start) / 1000) * E.TYPE_CPS)) : full.length;
+    const open = iv.filter((x) => !asked.includes(x.i)), pick = open.slice(0, 4).concat(iv.filter((x) => asked.includes(x.i)).slice(0, Math.max(0, 4 - open.length)));
+    const initials = p.name.split(', ').reverse().map((s) => s[0]).join('');
+    return `${log.length ? `<div class="thread" id="threadLog">${log.map((t) => `<div class="msg ${t.who === 'you' ? 'you' : 'pt'}"><b>${t.who === 'you' ? 'You' : esc(fn)}</b><span class="muted">${E.fmtDT(t.ts)}</span><p>${esc(t.text)}</p></div>`).join('')}</div>` : ''}
+      <div class="rpg">
+        <div class="rpg-box${ty && n < full.length ? ' typing' : ''}" data-act="typeSkip" title="${ty && n < full.length ? 'Click to finish the line' : ''}">
+          <div class="rpg-face" aria-hidden="true"><span>${esc(initials)}</span></div>
+          <div class="rpg-words"><div class="rpg-name">${esc(fn)}${cur ? '' : ' <span>(patient)</span>'}</div>
+            <p class="rpg-say${cur ? '' : ' aside'}" data-full="${esc(full)}" aria-live="polite">${esc(full.slice(0, n))}</p><i class="rpg-more" aria-hidden="true">▼</i></div></div>
+        <ol class="rpg-choices" aria-label="What do you say?">${pick.map((x, k) => { const was = asked.includes(x.i); return `<li><button class="rpg-opt${was ? ' asked' : ''}" data-act="msgAsk" data-id="${m.id}" data-i="${x.i}"><kbd>${k + 1}</kbd><span>${esc(x.q)}</span>${was ? icon('check', 16) : ''}</button></li>`; }).join('')}</ol>
+        <p class="rpg-left fine">${open.length ? `${open.length} question${open.length > 1 ? 's' : ''} not yet asked. Press 1 to 4, or click.` : 'You have asked everything. Write up what you learned in a note.'}</p></div>
       <p class="fine">Simulated patient; any resemblance to a real person is a coincidence. Anything you learn here belongs in a note.</p>`;
   };
 

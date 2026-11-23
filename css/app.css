@@ -577,6 +577,25 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .thread:empty::before { content: 'No messages yet. Choose one to send.'; color: var(--muted); }
 .thread .msg { max-width: 78%; padding: 6px 9px; border: 1px solid #B9CDE6; background: #EEF4FB; font-size: 13px; line-height: 19px; } .thread .msg p { margin: 2px 0 0; }
 .thread .msg b { margin-right: 6px; } .thread .msg.you { align-self: flex-end; background: #F1F6E2; border-color: #B4BF95; }
+/* Patient conversation as an RPG dialog (markup: V.thread) */
+.rpg { margin-top: 12px; }
+.rpg-box { position: relative; display: flex; gap: 14px; align-items: flex-start; min-height: 112px; padding: 14px 16px 18px; border-radius: 8px; background: linear-gradient(#24346B, #141E44); color: #fff; border: 3px solid #fff; box-shadow: 0 0 0 2px #141E44, 3px 4px 0 2px rgba(0, 0, 0, .25); cursor: default; }
+.rpg-box.typing { cursor: pointer; }
+.rpg-face { flex: none; width: 76px; height: 76px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 4px; background: linear-gradient(#F2D9B8, #D9B48C); box-shadow: inset 0 0 0 2px #8C6A44; }
+.rpg-face span { font: 700 26px var(--title); color: #5A3E22; letter-spacing: .02em; }
+.rpg-words { flex: 1; min-width: 0; }
+.rpg-name { display: inline-block; margin-bottom: 6px; padding: 1px 10px; border: 2px solid #fff; border-radius: 4px; background: #7B4FA8; font: 700 13px var(--title); letter-spacing: .03em; } .rpg-name span { font-weight: 400; opacity: .8; }
+.rpg-say { margin: 0; min-height: 3em; font-size: 16px; line-height: 1.5; white-space: pre-wrap; } .rpg-say.aside { font-style: italic; color: #C9D3F2; }
+.rpg-more { position: absolute; right: 14px; bottom: 6px; font-size: 12px; font-style: normal; color: #FFD45C; animation: rpg-bob .7s ease-in-out infinite alternate; } .rpg-box.typing .rpg-more { visibility: hidden; }
+@keyframes rpg-bob { to { transform: translateY(3px); } }
+.rpg-choices { list-style: none; margin: 10px 0 0; padding: 6px; display: grid; gap: 4px; border-radius: 8px; background: #141E44; border: 3px solid #fff; box-shadow: 0 0 0 2px #141E44; }
+.rpg-opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: 4px; background: none; color: #fff; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.rpg-opt:hover, .rpg-opt:focus-visible { background: #2E4386; outline: none; } .rpg-opt:hover::before, .rpg-opt:focus-visible::before { content: '▶'; color: #FFD45C; font-size: 11px; margin-left: -4px; }
+.rpg-opt kbd { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid #8FA2DA; border-radius: 3px; font: 700 12px var(--title); color: #FFD45C; }
+.rpg-opt span { flex: 1; } .rpg-opt.asked { color: #9AA6CC; } .rpg-opt .gl { flex: none; }
+.rpg-left { margin: 6px 2px 0; }
+@media (prefers-reduced-motion: reduce) { .rpg-more { animation: none; } }
+@media (max-width: 700px) { .rpg-face { width: 52px; height: 52px; } .rpg-face span { font-size: 18px; } .rpg-say { font-size: 15px; } }
 .thread-send { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-top: 10px; } .thread-send > .muted { margin-bottom: 3px; }
 .thread-send .btn { justify-content: flex-start; text-align: left; white-space: normal; height: auto; min-height: 24px; padding: 3px 9px; line-height: 16px; } .thread-send .btn.asked { opacity: .65; }
 
@@ -706,33 +725,49 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .wl-now::before { content: ""; position: absolute; left: 50%; top: -5px; width: 1px; height: 5px; background: #12233F; } .wl-now.paused { background: #A8690A; } .wl-now.free::before { display: none; } .wl-now.free { opacity: .92; }
 .wl-night ~ .wl-hr { color: #E8ECF7; } .wl-night ~ .wl-rule, .wl-night ~ .wl-tk { background: rgba(232, 236, 247, .7); }
 .wl-orb { margin-left: -8px; } .wl-orb.sun { width: 17px; height: 17px; background: var(--wl-sun) 0 0 / 17px 17px no-repeat; } .wl-orb.moon { width: 13px; height: 13px; background: var(--wl-moon) 0 0 / 13px 13px no-repeat; }
+/* The two buildings are links: the hospital opens Patient Lists (or, under a beacon, the patient in trouble); the lit lab opens the
+   results of what it is working on. Hovering lifts one a pixel; a delivery landing squashes it. */
+.wl-hosp, .wl-lab { transform-origin: 50% 100%; transition: transform .12s cubic-bezier(.2, .8, .3, 1.4); }
+.wl-hosp[href]:hover, .wl-lab[href]:hover { transform: translateY(-2px); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 1px 0 rgba(18, 35, 63, .35)); }
+.wl-hosp.got, .wl-lab.got { animation: wl-got .45s cubic-bezier(.3, 0, .4, 1) both; }
+@keyframes wl-got { 0% { transform: scale(1); } 30% { transform: scale(1.14, .82); } 62% { transform: translateY(-3px) scale(.94, 1.08); } 100% { transform: scale(1); } }
 .wl-hosp { left: 62px; bottom: 6px; width: 36px; height: 32px; background: var(--wl-hosp) 0 0 / 36px 32px no-repeat; pointer-events: auto; }
-.wl-hosp b { position: absolute; left: 38px; bottom: 0; min-width: 14px; padding: 1px 3px; text-align: center; font: 700 9px/1 var(--ui); color: #12233F; background: #fff; border: 1px solid #12233F; border-radius: 2px; image-rendering: auto; }
+/* the census rides the hospital's top right corner like a notification badge, clear of the kerb where the ambulance parks */
+.wl-hosp b { position: absolute; left: 29px; top: 6px; min-width: 14px; padding: 1px 3px; text-align: center; font: 700 9px/1 var(--ui); color: #12233F; background: #fff; border: 1px solid #12233F; border-radius: 7px; image-rendering: auto; font-variant-numeric: tabular-nums; }
+.wl-hosp b.pop { animation: wl-pop .6s cubic-bezier(.2, .8, .3, 1.5) both; } @keyframes wl-pop { 0% { transform: scale(1); background: #fff; } 25% { transform: scale(1.5); background: #FFE98A; } 100% { transform: scale(1); background: #fff; } }
+.wl-hosp.alarm b { color: #fff; background: #D2323F; border-color: #7A1A22; }
 .wl-beacon { position: absolute; left: 15px; top: -4px; width: 6px; height: 6px; border-radius: 50%; background: #FF2A1A; box-shadow: 0 0 0 2px rgba(255, 42, 26, .4); animation: wl-blink .6s steps(1, end) infinite; }
 @keyframes wl-blink { 50% { opacity: 0; } }
 .wl-lab { right: 0; bottom: 6px; width: 30px; height: 26px; background: var(--wl-lab) 0 0 / 30px 26px no-repeat; pointer-events: auto; } .wl-lab.on { background-image: var(--wl-lab-on); }
-/* the lab is busy: it squashes and hops from its base for as long as any test is in process */
-.wl-lab.on { transform-origin: 50% 100%; animation: wl-busy .62s cubic-bezier(.3, 0, .4, 1) infinite; }
+.wl-lab b { position: absolute; left: -6px; top: 2px; min-width: 12px; padding: 1px 2px; text-align: center; font: 700 9px/1 var(--ui); color: #12233F; background: #FFE98A; border: 1px solid #1F5560; border-radius: 6px; image-rendering: auto; }
+/* the lab is busy: it squashes and hops from its base for as long as a test is in it */
+.wl-lab.on:not(.got) { animation: wl-busy .62s cubic-bezier(.3, 0, .4, 1) infinite; }
 @keyframes wl-busy { 0%, 100% { transform: translateY(0) scale(1); } 18% { transform: translateY(0) scale(1.12, .84); } 48% { transform: translateY(-5px) scale(.93, 1.1); } 74% { transform: translateY(0) scale(1.07, .92); } 88% { transform: translateY(-1px) scale(.98, 1.03); } }
-@media (prefers-reduced-motion: reduce) { .wl-lab.on { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .wl-lab.on, .wl-hosp.got, .wl-lab.got, .wl-hosp b.pop, .wl-flag.new { animation: none !important; } .wl-hosp, .wl-lab { transition: none; } }
 .wl-act { animation-timing-function: linear; animation-fill-mode: both; }
-.wl-pig { width: 24px; height: 24px; } .wl-pig.out { animation-name: wl-out; } .wl-pig.back { animation-name: wl-back; }
+a.wl-act[href] { pointer-events: auto; cursor: pointer; }
+/* the courier: up out of the hospital roof, a long glide, down into the lab. Eased at both ends so it takes off and lands. */
+.wl-pig { width: 24px; height: 24px; animation-timing-function: cubic-bezier(.45, .05, .55, .95); } .wl-pig.out { animation-name: wl-out; } .wl-pig.back { animation-name: wl-back; }
 .wl-pig .gl { position: absolute; left: 0; top: 0; animation: flap-a .34s steps(1, end) infinite; image-rendering: auto; } .wl-pig .gl + .gl { animation-name: flap-b; } .wl-pig.back .gl { transform: scaleX(-1); }
+.wl-pig[href]:hover { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
 .wl-load { position: absolute; left: 10px; top: 19px; } .wl-load.tube { width: 5px; height: 10px; background: var(--wl-tube) 0 0 / 5px 10px no-repeat; }
-.wl-load.sheet { width: 8px; height: 10px; background: var(--wl-sheet) 0 0 / 8px 10px no-repeat; } .wl-load.sheet.crit { background-image: var(--wl-sheet-crit); }
-@keyframes wl-out { 0% { left: 84px; bottom: 26px; opacity: 0; } 8% { opacity: 1; } 50% { bottom: 40px; } 92% { opacity: 1; } 100% { left: calc(100% - 46px); bottom: 22px; opacity: 0; } }
-@keyframes wl-back { 0% { left: calc(100% - 46px); bottom: 22px; opacity: 0; } 8% { opacity: 1; } 50% { bottom: 40px; } 92% { opacity: 1; } 100% { left: 84px; bottom: 26px; opacity: 0; } }
-.wl-van { bottom: 5px; width: 30px; height: 16px; background: 0 0 / 30px 16px no-repeat; } .wl-van.amb { background-image: var(--wl-amb); transform: scaleX(-1); animation-name: wl-amb; } .wl-van.car { background-image: var(--wl-car); animation-name: wl-car; }
-@keyframes wl-amb { 0% { left: 100%; } 85% { left: 100px; opacity: 1; } 100% { left: 96px; opacity: 0; } }
-@keyframes wl-car { 0% { left: 92px; opacity: 0; } 12% { left: 102px; opacity: 1; } 100% { left: 100%; } }
+.wl-load.sheet { width: 8px; height: 10px; background: var(--wl-sheet) 0 0 / 8px 10px no-repeat; } .wl-load.sheet.crit { background-image: var(--wl-sheet-crit); animation: wl-blink .5s steps(1, end) infinite; }
+@keyframes wl-out { 0% { left: 70px; bottom: 22px; opacity: 0; } 6% { opacity: 1; } 15% { bottom: 40px; } 85% { bottom: 40px; } 94% { opacity: 1; } 100% { left: calc(100% - 34px); bottom: 20px; opacity: 0; } }
+@keyframes wl-back { 0% { left: calc(100% - 34px); bottom: 20px; opacity: 0; } 6% { opacity: 1; } 15% { bottom: 40px; } 85% { bottom: 40px; } 94% { opacity: 1; } 100% { left: 70px; bottom: 22px; opacity: 0; } }
+/* the ambulance comes in from the right with its light going and pulls up at the door; the car pulls away from it */
+.wl-van { bottom: 5px; width: 30px; height: 16px; background: 0 0 / 30px 16px no-repeat; } .wl-van.amb { background-image: var(--wl-amb); transform: scaleX(-1); animation-name: wl-amb; animation-timing-function: cubic-bezier(.25, .6, .35, 1); } .wl-van.car { background-image: var(--wl-car); animation-name: wl-car; animation-timing-function: cubic-bezier(.5, 0, .9, .6); }
+.wl-siren { position: absolute; left: 10px; top: -1px; width: 4px; height: 3px; background: #FF2A1A; box-shadow: 0 0 4px 2px rgba(255, 42, 26, .55); animation: wl-blink .4s steps(1, end) infinite; }
+@keyframes wl-amb { 0% { left: 100%; } 88% { left: 100px; opacity: 1; } 100% { left: 100px; opacity: 0; } }
+@keyframes wl-car { 0% { left: 100px; opacity: 0; } 10% { opacity: 1; } 100% { left: 100%; } }
 /* patients on foot: in from the left edge to the hospital door, and out the same way. Two frames, swapped like the pigs' wings. */
 .wl-person { bottom: 5px; width: 10px; height: 18px; } .wl-person.walk { animation-name: wl-walk; } .wl-person.leave { animation-name: wl-leave; transform: scaleX(-1); }
 .wl-person i { position: absolute; inset: 0; background: 0 0 / 10px 18px no-repeat; animation: flap-a .3s steps(1, end) infinite; } .wl-person i + i { animation-name: flap-b; }
-@keyframes wl-walk { 0% { left: -12px; } 90% { left: 70px; opacity: 1; } 100% { left: 76px; opacity: 0; } }
-@keyframes wl-leave { 0% { left: 76px; opacity: 0; } 10% { left: 70px; opacity: 1; } 100% { left: -12px; } }
+@keyframes wl-walk { 0% { left: -12px; } 90% { left: 75px; opacity: 1; } 100% { left: 77px; opacity: 0; } }
+@keyframes wl-leave { 0% { left: 77px; opacity: 0; } 10% { left: 72px; opacity: 1; } 100% { left: -12px; } }
 
 /* with the ruler off, what has already happened stands as small flags on the grass */
-.wl-flag { bottom: 5px; width: 8px; height: 12px; border-left: 1px solid #12233F; pointer-events: auto; cursor: pointer; } .wl-flag::after { content: ""; position: absolute; left: 0; top: 0; width: 7px; height: 5px; background: #F7C948; box-shadow: 0 0 0 1px #12233F; }
+.wl-flag { bottom: 5px; width: 8px; height: 12px; border-left: 1px solid #12233F; pointer-events: auto; cursor: pointer; transform-origin: 0 100%; } .wl-flag::after { content: ""; position: absolute; left: 0; top: 0; width: 7px; height: 5px; background: #F7C948; box-shadow: 0 0 0 1px #12233F; }
+.wl-flag.new { animation: wl-plant .5s cubic-bezier(.2, .8, .3, 1.5) both; } @keyframes wl-plant { 0% { transform: scaleY(0); } 100% { transform: scaleY(1); } }
 .wl-flag.k-crit::after { background: #E5372B; } .wl-flag.k-result::after { background: #6FA8E8; } .wl-flag.k-admit::after { background: #5DBB63; } .wl-flag:hover::after { box-shadow: 0 0 0 1px #12233F, 0 0 0 3px #fff; }
 
 /* ---------- the cutscene window ---------- */

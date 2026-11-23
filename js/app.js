@@ -115,6 +115,21 @@
     A.closeModal();
   }
 
+  /* The patient's line in the dialog box types itself out. The count comes from the clock, not from a counter,
+     so a redraw in the middle (the sim ticks) carries on where it was instead of starting again. */
+  let typeTimer = null;
+  function typeOn() {
+    const el = $('.rpg-say[data-full]'), box = el && el.closest('.rpg-box');
+    const stop = () => { clearInterval(typeTimer); typeTimer = null; };
+    if (!el || !ui.typing) { stop(); if (el) { el.textContent = el.dataset.full; box.classList.remove('typing'); box.removeAttribute('title'); } return; }
+    if (typeTimer) return;
+    typeTimer = setInterval(() => {
+      const e2 = $('.rpg-say[data-full]'); if (!e2 || !ui.typing) { ui.typing = null; stop(); return typeOn(); }
+      const full = e2.dataset.full, n = Math.floor(((Date.now() - ui.typing.start) / 1000) * E.TYPE_CPS);
+      e2.textContent = full.slice(0, n);
+      if (n >= full.length) { ui.typing = null; stop(); typeOn(); }
+    }, 30);
+  }
   function draw() {
     pendingRender = false;
     const root = $('#root');
@@ -130,6 +145,7 @@
     if (ui.modal && !shownModal) opener = (ae && root.contains(ae) && ctlKey(ae)) || lastCtl;   // where focus goes back to when it closes
     root.innerHTML = V.shell(r, r.view === 'chart' ? V.chart(E.pt(r.pid), r.act) : V[r.view]());
     scrollRestore(root, scrolls);
+    typeOn();
     const nt2 = $('#noteText'); if (typing && nt2) { nt2.setSelectionRange(typing.a, typing.b); nt2.scrollTop = typing.top; if (typing.on && !ui.modal) nt2.focus(); }
     if (rootFocus && !(typing && typing.on)) { const el = findCtl(root, rootFocus); if (el) el.focus({ preventScroll: true }); }
     lastHash = location.hash;
@@ -420,11 +436,15 @@
       if (!m.asked.includes(i)) m.asked.push(i);
       m.thread.push({ who: 'you', ts: Date.now(), text: q.q }, { who: 'patient', ts: Date.now(), text: q.a });
       m.read = true; m.ts = Date.now();
+      const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      ui.typing = still ? null : { mid: m.id, start: Date.now() };   // the reply types itself out (views.js V.thread)
       E.audit('Messaged the patient', p.id);
       if (m.thread.filter((t) => t.who === 'you').length === 1) toast('Write up what the patient told you in Notes while it is fresh.', 'Message sent', 'notes');
       commit();
       const log = $('#threadLog'); if (log) log.scrollTop = log.scrollHeight;
     },
+    /** Click on the dialog box while a line is typing: show it all at once. */
+    typeSkip() { if (!ui.typing) return; ui.typing = null; typeOn(); },
 
     /* results / flowsheets / chart review */
     selLab(d) { ui.selLab = d.comp && ui.selLab !== d.comp ? d.comp : null; if (ui.selLab) track('results.trend'); render(); },
@@ -697,6 +717,10 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       const i = f.indexOf(document.activeElement);
       if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
       return;
+    }
+    // the patient conversation: 1 to 4 pick a choice, as in an RPG (not while typing in a field)
+    if (!ui.modal && /^[1-4]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) {
+      const b = document.querySelectorAll('.rpg-opt')[Number(e.key) - 1]; if (b) { e.preventDefault(); return b.click(); }
     }
     if (e.key === 'Enter' && t.id === 'loginName') return A.login();
     if (e.key === 'Enter' && t.matches && t.matches('tr[data-act]')) return t.click();
