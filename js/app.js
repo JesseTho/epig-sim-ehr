@@ -115,20 +115,15 @@
     A.closeModal();
   }
 
-  /* The patient's line in the dialog box types itself out. The count comes from the clock, not from a counter,
-     so a redraw in the middle (the sim ticks) carries on where it was instead of starting again. */
+  /* "is typing…" before a patient's reply. The wait is measured from the clock, so a redraw in the middle (the sim
+     ticks) does not restart it; when it is over the reply is drawn and the log scrolls to it. */
   let typeTimer = null;
+  const logEnd = () => { const log = $('#threadLog'); if (log) log.scrollTop = log.scrollHeight; };
   function typeOn() {
-    const el = $('.rpg-say[data-full]'), box = el && el.closest('.rpg-box');
-    const stop = () => { clearInterval(typeTimer); typeTimer = null; };
-    if (!el || !ui.typing) { stop(); if (el) { el.textContent = el.dataset.full; box.classList.remove('typing'); box.removeAttribute('title'); } return; }
-    if (typeTimer) return;
-    typeTimer = setInterval(() => {
-      const e2 = $('.rpg-say[data-full]'); if (!e2 || !ui.typing) { ui.typing = null; stop(); return typeOn(); }
-      const full = e2.dataset.full, n = Math.floor(((Date.now() - ui.typing.start) / 1000) * E.TYPE_CPS);
-      e2.textContent = full.slice(0, n);
-      if (n >= full.length) { ui.typing = null; stop(); typeOn(); }
-    }, 30);
+    if (!ui.typing || typeTimer) return;
+    const m = E.db.inbox.find((x) => x.id === ui.typing.mid), last = m && m.thread && m.thread[m.thread.length - 1];
+    if (!last || last.who !== 'patient') { ui.typing = null; return; }
+    typeTimer = setTimeout(() => { typeTimer = null; ui.typing = null; render(); logEnd(); }, Math.max(0, ui.typing.start + E.typeMs(last.text) - Date.now()));
   }
   function draw() {
     pendingRender = false;
@@ -444,7 +439,7 @@
       const log = $('#threadLog'); if (log) log.scrollTop = log.scrollHeight;
     },
     /** Click on the dialog box while a line is typing: show it all at once. */
-    typeSkip() { if (!ui.typing) return; ui.typing = null; typeOn(); },
+    typeSkip() { if (!ui.typing) return; clearTimeout(typeTimer); typeTimer = null; ui.typing = null; render(); logEnd(); },
 
     /* results / flowsheets / chart review */
     selLab(d) { ui.selLab = d.comp && ui.selLab !== d.comp ? d.comp : null; if (ui.selLab) track('results.trend'); render(); },
@@ -720,7 +715,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     }
     // the patient conversation: 1 to 4 pick a choice, as in an RPG (not while typing in a field)
     if (!ui.modal && /^[1-4]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) {
-      const b = document.querySelectorAll('.rpg-opt')[Number(e.key) - 1]; if (b) { e.preventDefault(); return b.click(); }
+      const b = document.querySelectorAll('.im-opt')[Number(e.key) - 1]; if (b) { e.preventDefault(); return b.click(); }
     }
     if (e.key === 'Enter' && t.id === 'loginName') return A.login();
     if (e.key === 'Enter' && t.matches && t.matches('tr[data-act]')) return t.click();

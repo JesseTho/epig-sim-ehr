@@ -450,26 +450,27 @@
       <section class="ib-main"><div class="ib-list"><div class="ib-head"><i></i><span>Type</span><span>Subject</span><span>Patient</span><span>From</span><span>Received</span></div>${rows || empty('No messages')}</div>
       <div class="ib-read">${read}</div></section></div>`;
   };
-  /* The patient conversation, presented like an RPG dialog: the patient's latest line in a framed box with a
-     portrait (typed out, click to finish it), the earlier exchange in a log above, and four numbered choices below
-     (keys 1 to 4). Choices are picked, not typed, because nothing here reads free text. */
-  E.TYPE_CPS = 45;   // characters per second for a line being typed out
+  /* The patient conversation, as an instant-messenger window of the era: name-and-time lines in a log, a buddy
+     icon, "is typing…" before each reply, and a reply box offering four numbered replies (keys 1 to 4). Replies
+     are picked, not typed, because nothing here reads free text. */
+  E.typeMs = (text) => Math.min(2600, 700 + String(text).length * 12);   // how long "is typing…" shows before a reply
   V.thread = (m, p) => {
     const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1] || p.name, th = m.thread, last = th[th.length - 1];
-    const cur = last && last.who === 'patient' ? last : null, log = cur ? th.slice(0, -1) : th;
-    const ty = E.ui.typing && E.ui.typing.mid === m.id && cur ? E.ui.typing : null;
-    const full = cur ? cur.text : asked.length ? `${fn} waits for your next question.` : `${fn} looks up as you come in.`;
-    const n = ty ? Math.min(full.length, Math.floor(((Date.now() - ty.start) / 1000) * E.TYPE_CPS)) : full.length;
+    const ty = E.ui.typing && E.ui.typing.mid === m.id && last && last.who === 'patient' ? E.ui.typing : null;
+    const waiting = !!ty && Date.now() - ty.start < E.typeMs(last.text), shown = waiting ? th.slice(0, -1) : th;
     const open = iv.filter((x) => !asked.includes(x.i)), pick = open.slice(0, 4).concat(iv.filter((x) => asked.includes(x.i)).slice(0, Math.max(0, 4 - open.length)));
-    const initials = p.name.split(', ').reverse().map((s) => s[0]).join('');
-    return `${log.length ? `<div class="thread" id="threadLog">${log.map((t) => `<div class="msg ${t.who === 'you' ? 'you' : 'pt'}"><b>${t.who === 'you' ? 'You' : esc(fn)}</b><span class="muted">${E.fmtDT(t.ts)}</span><p>${esc(t.text)}</p></div>`).join('')}</div>` : ''}
-      <div class="rpg">
-        <div class="rpg-box${ty && n < full.length ? ' typing' : ''}" data-act="typeSkip" title="${ty && n < full.length ? 'Click to finish the line' : ''}">
-          <div class="rpg-face" aria-hidden="true"><span>${esc(initials)}</span></div>
-          <div class="rpg-words"><div class="rpg-name">${esc(fn)}${cur ? '' : ' <span>(patient)</span>'}</div>
-            <p class="rpg-say${cur ? '' : ' aside'}" data-full="${esc(full)}" aria-live="polite">${esc(full.slice(0, n))}</p><i class="rpg-more" aria-hidden="true">▼</i></div></div>
-        <ol class="rpg-choices" aria-label="What do you say?">${pick.map((x, k) => { const was = asked.includes(x.i); return `<li><button class="rpg-opt${was ? ' asked' : ''}" data-act="msgAsk" data-id="${m.id}" data-i="${x.i}"><kbd>${k + 1}</kbd><span>${esc(x.q)}</span>${was ? icon('check', 16) : ''}</button></li>`; }).join('')}</ol>
-        <p class="rpg-left fine">${open.length ? `${open.length} question${open.length > 1 ? 's' : ''} not yet asked. Press 1 to 4, or click.` : 'You have asked everything. Write up what you learned in a note.'}</p></div>
+    const initials = p.name.split(', ').reverse().map((s) => s[0]).join(''), seen = shown[shown.length - 1];
+    const line = (t) => `<div class="im-line ${t.who === 'you' ? 'you' : 'pt'}"><span class="im-who">${t.who === 'you' ? 'You' : esc(fn)} <span class="im-ts">(${E.fmtTime(t.ts)})</span>:</span> ${esc(t.text)}</div>`;
+    return `<div class="im">
+        <div class="im-bar">${icon('inbox', 16)}<b>Conversation with ${esc(fn)} ${esc(p.name.split(', ')[0])}</b><span>Patient portal</span></div>
+        <div class="im-body">
+          <div class="im-log" id="threadLog" data-act="typeSkip" aria-live="polite">${shown.length ? shown.map(line).join('') : `<div class="im-sys">${esc(fn)} has signed on. Choose a reply below to start the conversation.</div>`}</div>
+          <aside class="im-buddy" aria-hidden="true"><div class="im-face">${esc(initials)}</div><b>${esc(fn)}</b><span class="im-on">Online</span></aside>
+        </div>
+        <div class="im-status">${waiting ? `<i class="im-pen"></i>${esc(fn)} is typing…` : seen ? `Last message received at ${E.fmtTime(seen.ts)}.` : '&nbsp;'}</div>
+        <div class="im-compose"><div class="im-compose-h"><b>Choose a reply</b><span class="fine">${open.length ? `Press 1 to 4, or click · ${open.length} not yet asked` : 'You have asked everything. Write up what you learned in a note.'}</span></div>
+          <ol class="im-opts" aria-label="Choose a reply">${pick.map((x, k) => { const was = asked.includes(x.i); return `<li><button class="im-opt${was ? ' asked' : ''}" data-act="msgAsk" data-id="${m.id}" data-i="${x.i}"${waiting ? ' disabled' : ''}><kbd>${k + 1}</kbd><span>${esc(x.q)}</span>${was ? icon('check', 16) : ''}</button></li>`; }).join('')}</ol></div>
+      </div>
       <p class="fine">Simulated patient; any resemblance to a real person is a coincidence. Anything you learn here belongs in a note.</p>`;
   };
 
