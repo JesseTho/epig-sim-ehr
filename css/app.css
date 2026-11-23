@@ -599,6 +599,18 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .im-opt kbd { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--face); font: 700 11px var(--title); color: var(--olive-6); }
 .im-opt span { flex: 1; } .im-opt.asked { color: var(--muted); }
 @media (max-width: 700px) { .im-buddy { display: none; } .im-log { height: 220px; } }
+/* The conversation popped out over a chart (markup: V.chatFloat): a floating window, draggable by its title bar */
+.im-float { position: fixed; z-index: 40; width: 470px; max-width: calc(100vw - 24px); left: max(12px, calc(50vw - 360px)); bottom: 16px; }
+.im-float .im { margin: 0; max-width: none; box-shadow: 4px 6px 18px rgba(0, 0, 0, .35); }
+.im-float .im-bar { cursor: move; user-select: none; touch-action: none; }
+.im-float .im-buddy { display: none; } .im-float .im-log { height: 190px; } .im-float .im-opt { padding: 3px 6px; }
+.im-ctl { margin-left: auto; display: flex; gap: 3px; }
+.im-ctl button { width: 21px; height: 19px; padding: 0; border: 1px solid rgba(255, 255, 255, .6); border-radius: 3px; background: rgba(255, 255, 255, .14); color: #fff; font: 700 12px/1 var(--title); cursor: pointer; }
+.im-ctl button:hover { background: rgba(255, 255, 255, .3); } .im-ctl button.x:hover { background: #C8382B; border-color: #fff; }
+.im-tab { position: fixed; z-index: 40; left: max(12px, calc(50vw - 360px)); bottom: 0; display: flex; align-items: center; gap: 6px; padding: 5px 16px 6px; border: 1px solid var(--olive-6); border-bottom: 0; border-radius: 6px 6px 0 0; background: var(--bar); color: #fff; font: 700 12px var(--title); text-shadow: 1px 1px 0 #1F2A0C; cursor: pointer; box-shadow: 0 -2px 8px rgba(0, 0, 0, .2); }
+.im-tab:hover { filter: brightness(1.15); }
+/* The Inbox keeps a note pane on the right when the selected message is about a patient */
+.main > .page.ib { position: relative; }
 .thread-send { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-top: 10px; } .thread-send > .muted { margin-bottom: 3px; }
 .thread-send .btn { justify-content: flex-start; text-align: left; white-space: normal; height: auto; min-height: 24px; padding: 3px 9px; line-height: 16px; } .thread-send .btn.asked { opacity: .65; }
 

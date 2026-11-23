@@ -163,7 +163,7 @@
   };
   V.chart = (p, act) => `<div class="chartwrap">${V.sidebar(p)}<section class="chart">
       <nav class="acts">${E.ACTS.map(([id, label]) => `<a href="#/pt/${p.id}/${id}" class="${id === act ? 'on' : ''}">${icon(ACT_GLYPH[id], 24)}${label}</a>`).join('')}</nav>
-      <div class="activity" id="activity">${V.chartBanner ? V.chartBanner(p) : ''}${V.act[act](p)}</div></section>${V.notePane(p)}</div>`;
+      <div class="activity" id="activity">${V.chartBanner ? V.chartBanner(p) : ''}${V.act[act](p)}</div></section>${V.notePane(p)}${V.chatFloat(p)}</div>`;
 
   /* ================= trend chart ================= */
   V.trend = (pts, lo, hi, dec) => {
@@ -443,18 +443,27 @@
     const tone = (x) => (x.critical ? 'red' : x.type === 'Result' ? 'blue' : x.type === 'Patient Message' ? 'purple' : x.type.startsWith('Cosign') ? 'amber' : 'grey');
     const folders = FOLDERS.map(([id, label, test, g]) => { const mine = all.filter(test), un = mine.filter((x) => !x.read).length; return id !== 'all' && !mine.length ? '' : `<button class="ib-f${f[0] === id ? ' on' : ''}${un ? ' un' : ''}" data-act="inboxFolder" data-id="${id}">${icon(g, 16)}<span>${label}</span><i>${un ? un : mine.length}</i></button>`; }).join('');
     const rows = list.map((x) => { const q = x.patientId && E.pt(x.patientId); return `<button class="list-row ib-row${m && m.id === x.id ? ' sel' : ''}${x.read ? '' : ' unread'}" data-act="inboxSel" data-id="${x.id}"><i class="ib-dot" title="${x.read ? 'Read' : 'Unread'}"></i><span class="ib-type">${chip(x.type, tone(x))}</span><b>${x.critical ? '<em class="ib-crit" title="Critical">!</em>' : ''}${esc(x.subject)}</b><span class="ib-pt">${q ? esc(q.name) : ''}</span><span class="ib-from">${esc(x.from)}</span><span class="ib-ts">${E.fmtDT(x.ts)}</span></button>`; }).join('');
-    const read = m ? `<div class="ib-bar"><button class="btn xs" data-act="inboxDone" data-id="${m.id}" title="Remove this message from your Inbox">${icon('check', 16)}Done</button>${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}<span class="spacer"></span>${p ? `<span class="ib-who">${icon('user', 16)}<b>${esc(p.name)}</b> ${E.age(p.dob)} ${esc(p.sex)} · MRN ${esc(p.mrn)} · ${esc(p.bed)}</span>` : ''}</div>
+    const read = m ? `<div class="ib-bar"><button class="btn xs" data-act="inboxDone" data-id="${m.id}" title="Remove this message from your Inbox">${icon('check', 16)}Done</button>${p ? `<button class="btn primary xs" data-act="inboxChart" data-id="${m.id}">Open chart: ${esc(p.name)}</button>` : ''}${p && m.thread ? `<button class="btn xs" data-act="msgPop" data-id="${m.id}" title="Open the chart with this conversation in a window over it">Pop out over chart</button>` : ''}<span class="spacer"></span>${p ? `<span class="ib-who">${icon('user', 16)}<b>${esc(p.name)}</b> ${E.age(p.dob)} ${esc(p.sex)} · MRN ${esc(p.mrn)} · ${esc(p.bed)}</span>` : ''}</div>
         <div class="ib-msg"><div class="doc-h"><div><h3>${esc(m.subject)}</h3><div class="muted">${esc(m.type)} · from ${esc(m.from)} · ${E.fmtDT(m.ts)}</div></div></div>${m.thread ? V.thread(m, p) : `<pre class="doc">${esc(m.body)}</pre>`}</div>`
       : `<div class="ib-none">${icon('inbox', 48)}<p>${list.length ? 'Select a message.' : 'Nothing here. Enjoy it while it lasts.'}</p></div>`;
     return `<div class="page ib"><aside class="ib-folders"><h2>Inbox</h2><h5>My messages</h5>${folders}</aside>
       <section class="ib-main"><div class="ib-list"><div class="ib-head"><i></i><span>Type</span><span>Subject</span><span>Patient</span><span>From</span><span>Received</span></div>${rows || empty('No messages')}</div>
-      <div class="ib-read">${read}</div></section></div>`;
+      <div class="ib-read">${read}</div></section>${p ? V.notePane(p) : ''}</div>`;
   };
   /* The patient conversation, as an instant-messenger window of the era: name-and-time lines in a log, a buddy
      icon, "is typing…" before each reply, and a reply box offering four numbered replies (keys 1 to 4). Replies
      are picked, not typed, because nothing here reads free text. */
   E.typeMs = (text) => Math.min(2600, 700 + String(text).length * 12);   // how long "is typing…" shows before a reply
-  V.thread = (m, p) => {
+  /** The conversation floating over a chart (opened with Message patient in the sidebar). Minimised, it is a tab. */
+  V.chatFloat = (p) => {
+    const c = E.ui.chat; if (!c || c.pid !== p.id) return '';
+    const m = E.db.inbox.find((x) => x.type === 'Patient Message' && x.patientId === p.id && x.thread); if (!m) return '';
+    const fn = p.name.split(', ')[1] || p.name, typing = E.ui.typing && E.ui.typing.mid === m.id;
+    if (c.min) return `<button class="im-tab" data-act="chatMin" title="Show the conversation">${icon('inbox', 16)}${esc(fn)}${typing ? ' is typing…' : ''}</button>`;
+    const pos = c.x != null ? ` style="left:${c.x}px;top:${c.y}px;bottom:auto"` : '';
+    return `<div class="im-float"${pos} role="dialog" aria-label="Conversation with ${esc(fn)}">${V.thread(m, p, true)}</div>`;
+  };
+  V.thread = (m, p, float) => {
     const iv = E.interview(p), asked = m.asked || [], fn = p.name.split(', ')[1] || p.name, th = m.thread, last = th[th.length - 1];
     const ty = E.ui.typing && E.ui.typing.mid === m.id && last && last.who === 'patient' ? E.ui.typing : null;
     const waiting = !!ty && Date.now() - ty.start < E.typeMs(last.text), shown = waiting ? th.slice(0, -1) : th;
@@ -462,7 +471,7 @@
     const initials = p.name.split(', ').reverse().map((s) => s[0]).join(''), seen = shown[shown.length - 1];
     const line = (t) => `<div class="im-line ${t.who === 'you' ? 'you' : 'pt'}"><span class="im-who">${t.who === 'you' ? 'You' : esc(fn)} <span class="im-ts">(${E.fmtTime(t.ts)})</span>:</span> ${esc(t.text)}</div>`;
     return `<div class="im">
-        <div class="im-bar">${icon('inbox', 16)}<b>Conversation with ${esc(fn)} ${esc(p.name.split(', ')[0])}</b><span>Patient portal</span></div>
+        <div class="im-bar"${float ? ' title="Drag to move"' : ''}>${icon('inbox', 16)}<b>Conversation with ${esc(fn)} ${esc(p.name.split(', ')[0])}</b>${float ? '<span class="im-ctl"><button data-act="chatMin" title="Minimise" aria-label="Minimise">_</button><button class="x" data-act="chatClose" title="Close" aria-label="Close">×</button></span>' : '<span>Patient portal</span>'}</div>
         <div class="im-body">
           <div class="im-log" id="threadLog" data-act="typeSkip" aria-live="polite">${shown.length ? shown.map(line).join('') : `<div class="im-sys">${esc(fn)} has signed on. Choose a reply below to start the conversation.</div>`}</div>
           <aside class="im-buddy" aria-hidden="true"><div class="im-face">${esc(initials)}</div><b>${esc(fn)}</b><span class="im-on">Online</span></aside>
@@ -470,8 +479,8 @@
         <div class="im-status">${waiting ? `<i class="im-pen"></i>${esc(fn)} is typing…` : seen ? `Last message received at ${E.fmtTime(seen.ts)}.` : '&nbsp;'}</div>
         <div class="im-compose"><div class="im-compose-h"><b>Choose a reply</b><span class="fine">${open.length ? `Press 1 to 4, or click · ${open.length} not yet asked` : 'You have asked everything. Write up what you learned in a note.'}</span></div>
           <ol class="im-opts" aria-label="Choose a reply">${pick.map((x, k) => { const was = asked.includes(x.i); return `<li><button class="im-opt${was ? ' asked' : ''}" data-act="msgAsk" data-id="${m.id}" data-i="${x.i}"${waiting ? ' disabled' : ''}><kbd>${k + 1}</kbd><span>${esc(x.q)}</span>${was ? icon('check', 16) : ''}</button></li>`; }).join('')}</ol></div>
-      </div>
-      <p class="fine">Simulated patient; any resemblance to a real person is a coincidence. Anything you learn here belongs in a note.</p>`;
+      </div>${float ? '' : `
+      <p class="fine">Simulated patient; any resemblance to a real person is a coincidence. Anything you learn here belongs in a note: the note pane is on the right.</p>`}`;
   };
 
   /* ================= Activity log ================= */

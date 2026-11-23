@@ -12,7 +12,13 @@
     if (h[0] === 'pt' && E.pt(h[1])) return { view: 'chart', pid: h[1], act: ACT_IDS.includes(h[2]) ? h[2] : 'summary' };
     return { view: ['inbox', 'log', 'learning', 'missions'].includes(h[0]) ? h[0] : 'home' };
   }
-  const curPt = () => { const r = route(); return r.pid ? E.pt(r.pid) : null; };
+  /** The patient in front of the learner: the open chart, or on the Inbox the patient of the selected message
+      (the Inbox has a note pane too, so a note can be written while reading a result or talking to the patient). */
+  const curPt = () => {
+    const r = route(); if (r.pid) return E.pt(r.pid);
+    if (r.view !== 'inbox') return null;
+    const m = E.db.inbox.find((x) => x.id === ui.inboxSel); return (m && m.patientId && E.pt(m.patientId)) || null;
+  };
   /** The patient an open dialog was opened for. Saves use this, never the chart that happens to be behind it. */
   const dlgPt = () => (ui.modal && ui.modal.pid ? E.pt(ui.modal.pid) : null);
   // dialogs that edit one patient's chart; they close if the route moves to another patient underneath them
@@ -417,13 +423,20 @@
     callEnd() { const m = ui.modal; if (m && m.state === 'live') { E.audit('Ended a video visit', m.pid); E.save(); toast('Write up the encounter in Notes while it is fresh.', 'Video visit ended', 'notes'); } ui.modal = null; render(); },
 
     /* patient messages: a thread per patient, kept in the Inbox */
+    /* From the chart it pops out as a floating window over the chart, so the learner can read the chart and write a
+       note while talking; from anywhere else it opens the thread in the Inbox. */
     msgOpen(d) {
-      const p = E.pt(d.id) || curPt();
+      const p = E.pt(d.id) || curPt(), r = route();
       let m = E.db.inbox.find((x) => x.type === 'Patient Message' && x.patientId === p.id);
       if (!m) { E.message({ type: 'Patient Message', from: p.name + ' (patient)', patientId: p.id, act: 'summary', subject: 'Message thread with ' + p.name, body: '', read: true, thread: [], asked: [] }); m = E.db.inbox[0]; E.audit('Started a message thread with the patient', p.id); }
-      ui.modal = null; ui.inboxSel = m.id; if (!m.read) { m.read = true; E.audit('Read message: ' + m.subject, p.id); }
-      E.save(); go('#/inbox');
+      ui.modal = null; if (!m.read) { m.read = true; E.audit('Read message: ' + m.subject, p.id); }
+      if (r.view === 'chart' && r.pid === p.id) { ui.chat = Object.assign({}, ui.chat && ui.chat.pid === p.id ? ui.chat : {}, { pid: p.id, min: false }); E.save(); render(); logEnd(); return; }
+      ui.inboxSel = m.id; E.save(); go('#/inbox');
     },
+    /** Inbox → the patient's chart with the conversation floating over it. */
+    msgPop(d) { const m = E.db.inbox.find((x) => x.id === d.id); if (!m || !E.pt(m.patientId)) return; ui.chat = { pid: m.patientId, min: false }; go(`#/pt/${m.patientId}/summary`); },
+    chatMin() { if (ui.chat) { ui.chat.min = !ui.chat.min; render(); if (!ui.chat.min) logEnd(); } },
+    chatClose() { ui.chat = null; render(); },
     msgAsk(d) {
       const m = E.db.inbox.find((x) => x.id === d.id); if (!m || !m.thread) return;
       const p = E.pt(m.patientId), i = Number(d.i), q = E.interview(p)[i]; if (!q) return;
@@ -704,6 +717,20 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
   document.addEventListener('focusin', (e) => { if (e.target.id === 'ptSearch') $$('#toast > :not([data-critical])').forEach((x) => x.remove()); });   // never let a routine balloon sit over the patient search; a critical one stays
   document.addEventListener('input', (e) => { const k = e.target.dataset && e.target.dataset.input; if (k && I[k]) I[k](e.target); });
   document.addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.change; if (k && C[k]) C[k](e.target); });
+  /* Drag the floating conversation by its title bar. The position is kept in ui.chat, so a redraw leaves it put. */
+  document.addEventListener('pointerdown', (e) => {
+    const bar = e.target.closest && e.target.closest('.im-float .im-bar'); if (!bar || e.target.closest('button') || !ui.chat) return;
+    const box = bar.closest('.im-float').getBoundingClientRect(), dx = e.clientX - box.left, dy = e.clientY - box.top;
+    e.preventDefault();
+    const move = (ev) => {
+      const el = $('.im-float'); if (!el || !ui.chat) return;
+      ui.chat.x = Math.round(Math.min(Math.max(0, ev.clientX - dx), window.innerWidth - 120));
+      ui.chat.y = Math.round(Math.min(Math.max(0, ev.clientY - dy), window.innerHeight - 40));
+      el.style.left = ui.chat.x + 'px'; el.style.top = ui.chat.y + 'px'; el.style.bottom = 'auto';
+    };
+    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+  });
   document.addEventListener('keydown', (e) => {
     const t = e.target;
     if (e.key === 'Escape' && ui.modal) { e.preventDefault(); return escapeModal(); }
