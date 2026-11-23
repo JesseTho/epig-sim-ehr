@@ -77,56 +77,137 @@
     if (skyDefault == null) skyDefault = root.getPropertyValue('--g-banner');
     skyKey = key;
     root.setProperty('--g-banner', c ? skyUrl(c.hour, 72) : skyDefault);
+    applyTone(c ? c.hour : null);
+  }
+
+  /* THE LIGHT everything else stands in. At each hour every colour in the banner is blended toward a tint by an amount:
+     warm pink at dawn, nothing by day, gold then rose at sunset, deep blue at night. Same half-hour steps as the sky.
+     - Sprites drawn here (buildings, vehicles, people, the courier's load) are redrawn with the blended colours, so they
+       stay pixel-exact. A colour written '!#RRGGBB' is a light source (a lit window, a headlight, the ambulance's light)
+       and is never toned; at night the hospital's windows and sign come on, and vehicles get headlights.
+     - Image files (clouds, hills) and the hand-drawn pigs get the same blend through an SVG colour matrix, which is a
+       per-pixel linear blend with no blur, and works when the page is opened from disk.
+     Clouds have their own table: they catch the sunset and go grey-blue at night, rather than just darkening. */
+  const TONE_LAND = [[0, '#16204A', 0.58], [5, '#1B2550', 0.52], [6.5, '#B86A86', 0.26], [8, '#FFFFFF', 0], [16.5, '#E8B070', 0.08], [18.5, '#B0506A', 0.28], [19.75, '#222C60', 0.48], [21, '#16204A', 0.58], [24, '#16204A', 0.58]];
+  const TONE_CLOUD = [[0, '#3A4472', 0.62], [5, '#4A4F80', 0.55], [6.5, '#F4A6B6', 0.38], [8, '#FFFFFF', 0], [16.5, '#F6D9A8', 0.16], [18.5, '#F59A80', 0.46], [19.75, '#6A6496', 0.52], [21, '#3A4472', 0.62], [24, '#3A4472', 0.62]];
+  const NO_TONE = ['#FFFFFF', 0];
+  function toneAt(table, hour) {
+    const h = (((Math.round(hour * 2) / 2) % 24) + 24) % 24, i = Math.max(0, table.findIndex((k) => k[0] > h) - 1), a = table[i], b = table[i + 1] || a, f = b[0] === a[0] ? 0 : (h - a[0]) / (b[0] - a[0]);
+    return [mix(a[1], b[1], f), a[2] + (b[2] - a[2]) * f];
+  }
+  const lampsOn = (h) => h < 6.25 || h >= 18.75;   // lights come on a little before the sky goes dark
+  const FILTERS = ['land', 'cloud', 'pig', 'cut-land', 'cut-cloud'];
+  function filters() {
+    if (document.getElementById('wl-tones') || !document.body) return;
+    document.body.insertAdjacentHTML('beforeend', `<svg id="wl-tones" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">${FILTERS.map((n) => `<filter id="wl-tone-${n}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0"/></filter>`).join('')}</svg>`);
+  }
+  /** colour' = colour × (1 − amount) + tint × amount, for every pixel of whatever wears the filter. */
+  function setFilter(name, [c, a]) {
+    filters();
+    const f = document.querySelector(`#wl-tone-${name} feColorMatrix`); if (!f) return;
+    const [r, g, b] = [1, 3, 5].map((i) => (parseInt(c.slice(i, i + 2), 16) / 255) * a), k = (1 - a).toFixed(3);
+    f.setAttribute('values', `${k} 0 0 0 ${r.toFixed(3)} 0 ${k} 0 0 ${g.toFixed(3)} 0 0 ${k} 0 ${b.toFixed(3)} 0 0 0 1 0`);
+  }
+  let toneKey = null;
+  function applyTone(hour) {
+    const key = hour == null ? 'day' : Math.round(hour * 2);
+    if (key === toneKey) return;
+    toneKey = key;
+    const h = hour == null ? 12 : hour, land = hour == null ? NO_TONE : toneAt(TONE_LAND, h), cloud = hour == null ? NO_TONE : toneAt(TONE_CLOUD, h);
+    setFilter('land', land); setFilter('cloud', cloud); setFilter('pig', [land[0], land[1] * 0.5]);   // the mascot dims only half as much, so it is always itself
+    document.documentElement.classList.toggle('wl-toned', land[1] > 0.005 || cloud[1] > 0.005);
+    if (spritesReady) toned(land, hour != null && lampsOn(h));
   }
 
   /* =====================================================================================================
      3. SPRITES, drawn on a canvas sized by the screen's pixel ratio with every rectangle snapped to whole
      pixels (the asset rule in DESIGN.md). Placeholders until art is supplied.
      ===================================================================================================== */
+  const plain = (c) => (c[0] === '!' ? c.slice(1) : c);
+  let ink = plain, spritesReady = false;   // ink: how a colour is painted (set by toned() while it redraws)
   function draw(w, h, fn, k) {
     const s = Math.max(1, window.devicePixelRatio || 1) * (k || 1), cv = document.createElement('canvas'); cv.width = Math.round(w * s); cv.height = Math.round(h * s);
     const x = cv.getContext('2d'), q = (v) => Math.round(v * s);
-    const R = (c, a, b, ww, hh) => { x.fillStyle = c; x.fillRect(q(a), q(b), Math.max(1, q(a + ww) - q(a)), Math.max(1, q(b + hh) - q(b))); };
-    const D = (c, a, b, ww, hh) => { x.fillStyle = c; for (let j = q(b); j < q(b + hh); j++) for (let i = q(a) + (j & 1); i < q(a + ww); i += 2) x.fillRect(i, j, 1, 1); };
+    const R = (c, a, b, ww, hh) => { x.fillStyle = ink(c); x.fillRect(q(a), q(b), Math.max(1, q(a + ww) - q(a)), Math.max(1, q(b + hh) - q(b))); };
+    const D = (c, a, b, ww, hh) => { x.fillStyle = ink(c); for (let j = q(b); j < q(b + hh); j++) for (let i = q(a) + (j & 1); i < q(a + ww); i += 2) x.fillRect(i, j, 1, 1); };
     fn(R, D);
     return `url("${cv.toDataURL('image/png')}")`;
   }
-  const LINE = '#8E2F55', WALL = '#F6B3C8', LIGHT = '#FBD3DF', SHADE = '#E58FAE', ROOF = '#C24F7C', GLASS = '#CFE8FF', INK = '#27324A';
-  const van = (body, stripe, cross) => (R, D) => {
+  const LINE = '#8E2F55', WALL = '#F6B3C8', LIGHT = '#FBD3DF', SHADE = '#E58FAE', ROOF = '#C24F7C', GLASS = '#CFE8FF', INK = '#27324A', LAMP = '!#FFD86A';
+  /* the ambulance's light is always a light; after dark both vehicles have a headlight and a tail light */
+  const van = (body, stripe, cross, lamps) => (R, D) => {
     R(INK, 1, 2, 22, 11); R(INK, 22, 5, 7, 8); R(body, 2, 3, 20, 9); R(body, 22, 6, 6, 6); D('#C9D3DE', 2, 9, 26, 3);
     R(GLASS, 22, 6, 4, 3); R('#FFFFFF', 22, 6, 1, 1); R(stripe, 2, 8, 26, 1);
-    if (cross) { R('#1D8F3A', 9, 4, 2, 6); R('#1D8F3A', 7, 6, 6, 2); R('#E5372B', 10, 0, 4, 2); R('#FF9C8E', 10, 0, 2, 1); }
+    if (cross) { R('#1D8F3A', 9, 4, 2, 6); R('#1D8F3A', 7, 6, 6, 2); R('!#E5372B', 10, 0, 4, 2); R('!#FF9C8E', 10, 0, 2, 1); }
+    if (lamps) { R('!#FFF3B0', 28, 8, 1.5, 2); R('!#FF4A3A', 1, 9, 1, 2); }
     [6, 21].forEach((cx) => { R(INK, cx - 1, 11, 5, 4); R(INK, cx, 10, 3, 6); R('#9AA3AD', cx, 12, 3, 2); });
   };
+  /* THE AMBULANCE: "Rescue Vehicles" by bart, opengameart.org/content/rescue-vehicles, CC0 (public domain), converted to
+     pixel data with tools/png-sprite.js. It faces left, the way it drives in. Letters index AMB_PAL; '.' is clear.
+     The corner lamps (a) and roof lights (b) are light sources, so they glow at night instead of being toned. */
+  const AMB = ['............a..............a....', '...........abccccccccccccccba...', '...........acddddddddddddddc....', '..........abcddddddddddddddc....', '..........cccddedddddffffffc....',
+    '.........cggcdeeedddfffffffc....', '........cgggcddedddfffdddddc....', '........cgggcdddddfffddddddc....', '.....ccchhhhcddddfffdddddddc....', '....cfffffffcffffffddffffffc....', '....cfffffffcfffffddfffffffc....',
+    '...cddccddddcddddddfffdccddc....', '...cdciicdddcdddddfffdciicdc....', '..abciiiiccccccccccccciiiicba...', '...a.iiii.............iiii.a....', '......ii...............ii.......'];
+  const AMB_PAL = ['!#FBF236', '!#D95763', '#9BADB7', '#FFFFFF', '#6ABE30', '#AC3232', '#696A6A', '#847E87', '#323C39'];
+  const pix = (R, rows, pal) => rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') R(pal[row.charCodeAt(x) - 97], x, y, 1, 1); });
+  const ambulance = (lamps) => (R) => { pix(R, AMB, AMB_PAL); if (lamps) { R('!#FFF3B0', 3, 10, 1, 2); R('!#FF4A3A', 27, 10, 1, 2); } };
   /* skin, hair, shirt, legs */
   const PEOPLE = [['#F2C9A0', '#3B2A1E', '#3B7BC8', '#2F3A55'], ['#C68E5A', '#1E1A18', '#E5487A', '#3A3A3A'], ['#8D5A3A', '#1E1A18', '#F7C948', '#2F3A55'], ['#F7D9BE', '#B9B9B9', '#5DBB63', '#5A4A3A'], ['#DDA878', '#5A3A1E', '#8E6BD0', '#2F3A55'], ['#E8B98E', '#F2F2F2', '#2F9E9E', '#6B5B4B']];
   const who = (id) => [...String(id || '')].reduce((n, ch) => n + ch.charCodeAt(0), 0) % PEOPLE.length;
+  /** Everything on the banner stage that stands in the day's light, drawn at that light. tone: [tint, amount]; lamps: after dark. */
+  function toned([tint, amt], lamps) {
+    ink = (c) => (c[0] === '!' ? c.slice(1) : amt > 0.005 ? mix(c, tint, amt) : c);
+    try {
+      // after dark most of the hospital's windows are lit (a fixed few stay dark, so it looks lived in) and the sign glows
+      const pane = (a, b) => (lamps && (a * 7 + b * 3) % 5 !== 0 ? LAMP : GLASS);
+      root.setProperty('--wl-hosp', draw(36, 32, (R, D) => {
+        R(LINE, 0, 12, 36, 20); R(WALL, 1, 15, 34, 17); D(SHADE, 28, 15, 7, 17); R(ROOF, 1, 13, 34, 2);
+        R(LINE, 11, 2, 14, 30); R(LIGHT, 12, 5, 12, 27); D(SHADE, 21, 5, 3, 27); R(ROOF, 12, 3, 12, 2);
+        R(lamps ? '!#F4FFF2' : '#FFFFFF', 14, 7, 8, 8); R(lamps ? '!#3DDA3B' : '#3DAA2B', 17, 8, 2, 6); R(lamps ? '!#3DDA3B' : '#3DAA2B', 15, 10, 6, 2);
+        [3, 7, 27, 31].forEach((a) => [18, 24].forEach((b) => { R(LINE, a - 0.5, b - 0.5, 3, 4); R(pane(a, b), a, b, 2, 3); }));
+        [18, 23].forEach((b) => [14, 20].forEach((a) => R(pane(a, b), a, b, 2, 3)));
+        R(LINE, 15, 26, 6, 6); R('#7A2C4E', 16, 27, 4, 5); if (lamps) R('!#FFC94A', 16, 27, 4, 1);
+      }));
+      // the lab's windows and screen light up only while it is working, which at night makes a busy lab easy to spot
+      const lab = (lit) => (R, D) => {
+        R('#1F5560', 0, 6, 30, 20); R('#8FD0D6', 1, 9, 28, 17); D('#5FA9B4', 22, 9, 7, 17); R('#2F7F8C', 1, 7, 28, 2); R('#1F5560', 20, 1, 4, 6); R(lamps ? '!#9FE8F0' : '#CFE4E8', 21, 0, 2, 2);
+        R('#FFFFFF', 3, 11, 9, 9); R('#2F7F8C', 6, 12, 3, 3); R('#2F7F8C', 5, 15, 5, 4); R(lit ? '!#7CE06A' : '#B9E3E8', 6, 16, 3, 2);
+        [15, 20, 25].forEach((a) => { R('#1F5560', a - 0.5, 11.5, 3, 5); R(lit ? '!#FFE98A' : GLASS, a, 12, 2, 4); });
+        R('#1F5560', 17, 19, 6, 7); R('#17434C', 18, 20, 4, 6);
+      };
+      root.setProperty('--wl-lab', draw(30, 26, lab(false))); root.setProperty('--wl-lab-on', draw(30, 26, lab(true)));
+      root.setProperty('--wl-amb', draw(32, 16, ambulance(lamps))); root.setProperty('--wl-car', draw(30, 16, van('#F7C948', '#B8860B', false, lamps)));
+      PEOPLE.forEach(([skin, hair, shirt, legs], i) => ['a', 'b'].forEach((f) => root.setProperty(`--wl-p${i}${f}`, draw(10, 18, (R) => {
+        R(INK, 2, 0, 6, 6); R(hair, 3, 0, 4, 2); R(skin, 3, 2, 4, 3); R(INK, 6, 3, 1, 1);
+        R(INK, 1, 6, 8, 7); R(shirt, 2, 6, 6, 6); R(skin, f === 'a' ? 1 : 2, 8, 1, 3); R(skin, f === 'a' ? 8 : 7, 8, 1, 3);
+        if (f === 'a') { R(legs, 2, 12, 2, 5); R(legs, 6, 12, 2, 5); R(INK, 1, 17, 3, 1); R(INK, 6, 17, 3, 1); } else { R(legs, 3, 12, 2, 5); R(legs, 5, 12, 2, 5); R(INK, 3, 17, 5, 1); }
+      }))));
+      // the courier's load is toned at half strength: it is small and has to stay readable (and a critical sheet stays red)
+      const half = amt / 2;
+      ink = (c) => (c[0] === '!' ? c.slice(1) : half > 0.005 ? mix(c, tint, half) : c);
+      root.setProperty('--wl-tube', draw(5, 10, (R) => { R(INK, 0, 0, 5, 2); R('#B13A6B', 0, 0, 5, 1); R(INK, 0.5, 2, 4, 8); R('#F4F8FB', 1.5, 2, 2, 7); R('#D2323F', 1.5, 5, 2, 4); }));
+      const sheet = (c) => (R) => { R(INK, 0, 0, 8, 10); R('#FFFFFF', 1, 1, 6, 8); [3, 5, 7].forEach((y) => R(c, 2, y, 4, 1)); };
+      root.setProperty('--wl-sheet', draw(8, 10, sheet('#3B7BC8'))); root.setProperty('--wl-sheet-crit', draw(8, 10, sheet('!#D2323F')));
+    } finally { ink = plain; }
+  }
   function sprites() {
-    root.setProperty('--wl-hosp', draw(36, 32, (R, D) => {
-      R(LINE, 0, 12, 36, 20); R(WALL, 1, 15, 34, 17); D(SHADE, 28, 15, 7, 17); R(ROOF, 1, 13, 34, 2);
-      R(LINE, 11, 2, 14, 30); R(LIGHT, 12, 5, 12, 27); D(SHADE, 21, 5, 3, 27); R(ROOF, 12, 3, 12, 2);
-      R('#FFFFFF', 14, 7, 8, 8); R('#3DAA2B', 17, 8, 2, 6); R('#3DAA2B', 15, 10, 6, 2);
-      [3, 7, 27, 31].forEach((a) => [18, 24].forEach((b) => { R(LINE, a - 0.5, b - 0.5, 3, 4); R(GLASS, a, b, 2, 3); }));
-      [18, 23].forEach((b) => [14, 20].forEach((a) => R(GLASS, a, b, 2, 3)));
-      R(LINE, 15, 26, 6, 6); R('#7A2C4E', 16, 27, 4, 5);
-    }));
-    const lab = (lit) => (R, D) => {
-      R('#1F5560', 0, 6, 30, 20); R('#8FD0D6', 1, 9, 28, 17); D('#5FA9B4', 22, 9, 7, 17); R('#2F7F8C', 1, 7, 28, 2); R('#1F5560', 20, 1, 4, 6); R('#CFE4E8', 21, 0, 2, 2);
-      R('#FFFFFF', 3, 11, 9, 9); R('#2F7F8C', 6, 12, 3, 3); R('#2F7F8C', 5, 15, 5, 4); R(lit ? '#7CE06A' : '#B9E3E8', 6, 16, 3, 2);
-      [15, 20, 25].forEach((a) => { R('#1F5560', a - 0.5, 11.5, 3, 5); R(lit ? '#FFE98A' : GLASS, a, 12, 2, 4); });
-      R('#1F5560', 17, 19, 6, 7); R('#17434C', 18, 20, 4, 6);
+    toned(NO_TONE, false);
+    // the cutscene's own vehicles, the sun and the moon are never toned: the cutscene tones its whole stage with a filter
+    root.setProperty('--wl-amb2', draw(32, 16, ambulance(false), 2)); root.setProperty('--wl-car2', draw(30, 16, van('#F7C948', '#B8860B', false), 2));
+    spritesReady = true; skyKey = null; toneKey = null;   // if the light was set before the sprites existed, set it again on the next tick
+    /* what the pig carries into a consequence picture: drawn at the pictures' doubled size (js/cuts.js), never toned */
+    const CARGO = {
+      kit: [9, 8, (R) => { R(INK, 3, 0, 3, 2); R(INK, 0, 1, 9, 7); R('#FFFFFF', 1, 2, 7, 5); R('#E5372B', 4, 2, 1, 5); R('#E5372B', 2, 4, 5, 1); }],
+      blood: [7, 11, (R) => { R(INK, 3, 0, 1, 2); R(INK, 0, 2, 7, 8); R('#C42430', 1, 3, 5, 6); R('#EA323C', 1, 3, 2, 2); R('#FFFFFF', 2, 6, 3, 1); R(INK, 3, 10, 1, 1); }],
+      mask: [10, 7, (R) => { R('#5A6A8A', 0, 2, 10, 1); R(INK, 2, 1, 6, 6); R('#BDE8D4', 3, 2, 4, 4); R('#7CCFAE', 3, 4, 4, 2); R('#FFFFFF', 3, 2, 1, 1); }],
+      stamp: [8, 11, (R) => { R(INK, 2, 0, 4, 5); R('#8A4836', 3, 1, 2, 3); R(INK, 0, 5, 8, 3); R('#5D2C28', 1, 5, 6, 2); R('#E5372B', 0, 8, 8, 3); R('#FF8A80', 1, 9, 2, 1); }],
+      phew: [4, 6, (R) => { R('#5FB8F0', 1, 0, 2, 2); R('#5FB8F0', 0, 2, 4, 3); R('#CFEFFF', 1, 2, 1, 1); R('#3A8CC8', 1, 5, 2, 1); }],
+      tube: [5, 10, (R) => { R(INK, 0, 0, 5, 2); R('#B13A6B', 0, 0, 5, 1); R(INK, 0.5, 2, 4, 8); R('#F4F8FB', 1.5, 2, 2, 7); R('#D2323F', 1.5, 5, 2, 4); }],
+      sheet: [8, 10, (R) => { R(INK, 0, 0, 8, 10); R('#FFFFFF', 1, 1, 6, 8); [3, 5, 7].forEach((y) => R('#3B7BC8', 2, y, 4, 1)); }],
+      sheetCrit: [8, 10, (R) => { R(INK, 0, 0, 8, 10); R('#FFFFFF', 1, 1, 6, 8); [3, 5, 7].forEach((y) => R('#D2323F', 2, y, 4, 1)); }],
     };
-    root.setProperty('--wl-lab', draw(30, 26, lab(false))); root.setProperty('--wl-lab-on', draw(30, 26, lab(true)));
-    root.setProperty('--wl-amb', draw(30, 16, van('#FFFFFF', '#E5372B', true))); root.setProperty('--wl-car', draw(30, 16, van('#F7C948', '#B8860B', false)));
-    root.setProperty('--wl-amb2', draw(30, 16, van('#FFFFFF', '#E5372B', true), 2)); root.setProperty('--wl-car2', draw(30, 16, van('#F7C948', '#B8860B', false), 2));
-    PEOPLE.forEach(([skin, hair, shirt, legs], i) => ['a', 'b'].forEach((f) => root.setProperty(`--wl-p${i}${f}`, draw(10, 18, (R) => {
-      R(INK, 2, 0, 6, 6); R(hair, 3, 0, 4, 2); R(skin, 3, 2, 4, 3); R(INK, 6, 3, 1, 1);
-      R(INK, 1, 6, 8, 7); R(shirt, 2, 6, 6, 6); R(skin, f === 'a' ? 1 : 2, 8, 1, 3); R(skin, f === 'a' ? 8 : 7, 8, 1, 3);
-      if (f === 'a') { R(legs, 2, 12, 2, 5); R(legs, 6, 12, 2, 5); R(INK, 1, 17, 3, 1); R(INK, 6, 17, 3, 1); } else { R(legs, 3, 12, 2, 5); R(legs, 5, 12, 2, 5); R(INK, 3, 17, 5, 1); }
-    }))));
-    root.setProperty('--wl-tube', draw(5, 10, (R) => { R(INK, 0, 0, 5, 2); R('#B13A6B', 0, 0, 5, 1); R(INK, 0.5, 2, 4, 8); R('#F4F8FB', 1.5, 2, 2, 7); R('#D2323F', 1.5, 5, 2, 4); }));
-    const sheet = (c) => (R) => { R(INK, 0, 0, 8, 10); R('#FFFFFF', 1, 1, 6, 8); [3, 5, 7].forEach((y) => R(c, 2, y, 4, 1)); };
-    root.setProperty('--wl-sheet', draw(8, 10, sheet('#3B7BC8'))); root.setProperty('--wl-sheet-crit', draw(8, 10, sheet('#D2323F')));
+    Object.entries(CARGO).forEach(([k, [w, h, fn]]) => root.setProperty(`--cut-${k}`, draw(w, h, fn, 2)));
+    W.cargoSize = (k) => (CARGO[k] ? [CARGO[k][0] * 2, CARGO[k][1] * 2] : [0, 0]);
     root.setProperty('--wl-sun', draw(17, 17, (R, D) => { R('#F7B500', 5, 3, 7, 11); R('#F7B500', 3, 5, 11, 7); R('#FFD84A', 5, 4, 7, 9); R('#FFD84A', 4, 5, 9, 7); R('#FFF3B0', 6, 5, 3, 3); [[8, 0], [8, 15], [0, 8], [15, 8]].forEach(([a, b]) => R('#F7B500', a, b, 1.5, 1.5)); D('#F7B500', 2, 2, 2, 2); D('#F7B500', 13, 2, 2, 2); D('#F7B500', 2, 13, 2, 2); D('#F7B500', 13, 13, 2, 2); }));
     root.setProperty('--wl-moon', draw(13, 13, (R, D) => { R('#E8ECF7', 3, 1, 7, 11); R('#E8ECF7', 1, 3, 11, 7); R('#FFFFFF', 3, 2, 5, 4); D('#B6BEDA', 7, 6, 4, 4); R('#B6BEDA', 4, 8, 2, 2); }));
   }
@@ -362,20 +443,36 @@
   W.scene = (sc) => {
     if (!CFG().cutscenes) return false;
     const def = sc.cid && E.CONSEQUENCES[sc.cid];
-    E.ui.modal = Object.assign({ type: 'scene', i: 0, t0: performance.now(), hour: 12 }, sc);
+    E.ui.modal = Object.assign({ type: 'scene', i: 0, t0: performance.now(), s0: performance.now(), hour: 12 }, sc);   // s0: the picture's clock; t0 restarts for each caption line
     if (E.ui.modal.hour == null) E.ui.modal.hour = 12;
     E.sfx.play((def && def.sound) || KIND_SOUND[sc.kind] || 'blip');
     if (E.app) E.app.render();
     return true;
   };
   const SPEED = 26;   // milliseconds a letter
+  /* An animated consequence picture built by tools/build-scenes.js (js/cuts.js): the intro once, then the loop, shown at exactly
+     twice its art size (the recorded exception to the asset rule for the bought Mucho Pixels packs). Its clock is the
+     window's own opening time, so a redraw (the sound button, say) carries on instead of starting over. The pig is ours and
+     is drawn live: it flies in from the right with what it is carrying and hovers there. */
+  const cutHtml = (m, id) => {
+    const c = E.CUTS, s = c.scenes[id], fh = c.h * 2, ms = 1000 / c.fps, el = Math.round(performance.now() - (m.s0 || performance.now()));
+    const anim = [s.intro ? `cut-intro ${s.intro * ms}ms steps(${s.intro}) ${-el}ms both` : '', `cut-loop ${s.loop * ms}ms steps(${s.loop}) ${s.intro * ms - el}ms infinite`].filter(Boolean).join(', ');
+    const st = `width:${c.w * 2}px;height:${fh}px;background-image:url('assets/cut/${esc(id)}.png');background-size:${c.w * 2}px auto;background-position:0 ${-s.intro * fh}px;--i1:${-s.intro * fh}px;--l1:${-(s.intro + s.loop) * fh}px;animation:${anim}`;
+    const p = s.pig, [cw, ch] = p ? W.cargoSize(p.carry) : [0, 0];
+    const pig = p ? `<span class="cut-pig${p.carry === 'phew' ? ' phew' : ''}" style="left:${p.at[0] * 2}px;top:${p.at[1] * 2}px;animation-delay:${300 - el}ms, ${2100 - el}ms">${E.icon('pig1', 48)}${E.icon('pig2', 48)}<i class="cut-cargo ${esc(p.carry)}" style="width:${cw}px;height:${ch}px;background-image:var(--cut-${esc(p.carry)})"></i></span>` : '';
+    return `<div class="cut-anim" style="${st}">${pig}</div>`;
+  };
   const mediaHtml = (m, def) => {
+    if (m.cid && E.CUTS && E.CUTS.scenes[m.cid]) return cutHtml(m, m.cid);
     const src = def && def.media;
     if (src && /\.(webm|mp4)$/i.test(src)) return `<video class="cut-media" src="${esc(src)}" autoplay playsinline ${E.sfx.on ? '' : 'muted'}></video>`;
     if (src) return `<img class="cut-media" src="${esc(src)}" alt="">`;
     return `<div class="cut-ph ${esc((def && def.tone) || '')}"><span class="cut-ph-g">${E.icon(def && def.tone === 'green' ? 'check' : def && def.tone === 'amber' ? 'warn' : 'alert', 96)}</span><b>${esc(def ? def.title : '')}</b><small>Placeholder picture${m.cid ? ` · ${esc(m.cid)}` : ''}</small>${def && def.art ? `<em>${esc(def.art)}</em>` : ''}</div>`;
   };
   const diorama = (m) => {
+    // the stage stands in the scene's own light; "night passes" animates through the whole day, so it is left untoned
+    const lit = m.kind !== 'night';
+    setFilter('cut-land', lit ? toneAt(TONE_LAND, m.hour) : NO_TONE); setFilter('cut-cloud', lit ? toneAt(TONE_CLOUD, m.hour) : NO_TONE);
     const night = isNight(m.hour), cl = (shape, top, left) => `<i class="cl ${shape}" style="top:${top};animation:none;transform:translateX(${left})"></i>`;
     const extra = { arrive: '<i class="cut-van amb"></i>', home: '<i class="cut-van car"></i>', page: '<i class="cut-win"></i><span class="cut-pager">' + E.icon('inbox', 48) + '</span>', rapid: '<i class="cut-beacon"></i><i class="cut-flash"></i>', dawn: '<i class="cut-orb sun rise"></i>', dusk: '<i class="cut-orb sun set"></i>', night: `<i class="cut-dark" style="background-image:${skyUrl(1, 180)}"></i><i class="cut-orb sun"></i><i class="cut-orb moon"></i><i class="cut-stars"></i>` }[m.kind] || '';
     return `<div class="skyfx cut-sky" style="background-image:${skyUrl(m.kind === 'night' ? 17.5 : m.hour, 180)}">${night && m.kind !== 'night' ? '<i class="cut-stars on"></i>' : cl('a', '18px', '300px') + cl('e', '44px', '470px') + cl('b', '30px', '70px')}<i class="cut-land"></i><i class="cut-hosp"></i>${extra}<i class="cut-land near"></i></div>`;

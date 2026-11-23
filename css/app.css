@@ -730,6 +730,12 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .wl { position: absolute; left: 8px; right: 8px; top: 0; bottom: -6px; overflow: hidden; image-rendering: pixelated; }
 @container (max-width: 380px) { .wl { display: none; } }
 .wl > * { position: absolute; }
+/* The day's light on the scenery (js/world.js, applyTone): the banner's clouds, hills and pigs wear an SVG colour matrix that
+   blends each pixel toward the hour's tint. Only while a clock is running and the tint is not zero (.wl-toned on <html>). */
+.wl-toned .banner .skyfx.bn .cl { filter: url(#wl-tone-cloud); }
+.wl-toned .banner .skyfx.bn .land { filter: url(#wl-tone-land); }
+.wl-toned .banner .skyfx.bn .fly .gl, .wl-toned .wl-pig .gl { filter: url(#wl-tone-pig); }
+.cut-sky .cl { filter: url(#wl-tone-cut-cloud); } .cut-sky .cut-land, .cut-sky .cut-hosp, .cut-sky .cut-van { filter: url(#wl-tone-cut-land); }
 .wl-rule { left: 146px; right: 52px; top: 6px; height: 1px; background: rgba(18, 35, 63, .55); }
 .wl-tk { top: 6px; width: 1px; height: 3px; background: rgba(18, 35, 63, .6); } .wl-tk.big { height: 6px; }
 .wl-hr { top: 13px; transform: translateX(-50%); font: 700 9px/1 var(--ui); color: #12233F; opacity: .8; image-rendering: auto; }
@@ -770,8 +776,8 @@ a.wl-act[href] { pointer-events: auto; cursor: pointer; }
 @keyframes wl-out { 0% { left: 70px; bottom: 22px; opacity: 0; } 6% { opacity: 1; } 15% { bottom: 40px; } 85% { bottom: 40px; } 94% { opacity: 1; } 100% { left: calc(100% - 34px); bottom: 20px; opacity: 0; } }
 @keyframes wl-back { 0% { left: calc(100% - 34px); bottom: 20px; opacity: 0; } 6% { opacity: 1; } 15% { bottom: 40px; } 85% { bottom: 40px; } 94% { opacity: 1; } 100% { left: 70px; bottom: 22px; opacity: 0; } }
 /* the ambulance comes in from the right with its light going and pulls up at the door; the car pulls away from it */
-.wl-van { bottom: 5px; width: 30px; height: 16px; background: 0 0 / 30px 16px no-repeat; } .wl-van.amb { background-image: var(--wl-amb); transform: scaleX(-1); animation-name: wl-amb; animation-timing-function: cubic-bezier(.25, .6, .35, 1); } .wl-van.car { background-image: var(--wl-car); animation-name: wl-car; animation-timing-function: cubic-bezier(.5, 0, .9, .6); }
-.wl-siren { position: absolute; left: 10px; top: -1px; width: 4px; height: 3px; background: #FF2A1A; box-shadow: 0 0 4px 2px rgba(255, 42, 26, .55); animation: wl-blink .4s steps(1, end) infinite; }
+.wl-van { bottom: 5px; width: 30px; height: 16px; background: 0 0 / 30px 16px no-repeat; } .wl-van.amb { width: 32px; background-size: 32px 16px; background-image: var(--wl-amb); animation-name: wl-amb; animation-timing-function: cubic-bezier(.25, .6, .35, 1); } .wl-van.car { background-image: var(--wl-car); animation-name: wl-car; animation-timing-function: cubic-bezier(.5, 0, .9, .6); }
+.wl-siren { position: absolute; left: 11px; top: 0; width: 3px; height: 2px; background: #FF2A1A; box-shadow: 15px 0 0 #FF2A1A; animation: wl-blink .4s steps(1, end) infinite; }   /* the two roof lights flash, hard-edged like the rest of the pixel art */
 @keyframes wl-amb { 0% { left: 100%; } 88% { left: 100px; opacity: 1; } 100% { left: 100px; opacity: 0; } }
 @keyframes wl-car { 0% { left: 100px; opacity: 0; } 10% { opacity: 1; } 100% { left: 100%; } }
 /* patients on foot: in from the left edge to the hospital door, and out the same way. Two frames, swapped like the pigs' wings. */
@@ -791,8 +797,8 @@ a.wl-act[href] { pointer-events: auto; cursor: pointer; }
 .cut-sky { background-size: 8px 180px; background-repeat: repeat-x; } .cut-sky > * { position: absolute; }
 .cut-land { left: 0; right: 0; bottom: 0; height: 44px; background: var(--land-banner) 62% 100% / 4800px 44px no-repeat; } .cut-land.near { background-image: var(--land-banner-near); }
 .cut-hosp { left: 56px; bottom: 22px; width: 144px; height: 112px; background: var(--hospital) 0 0 / 144px 112px no-repeat; }
-.cut-van { bottom: 12px; width: 60px; height: 32px; background: 0 0 / 60px 32px no-repeat; }
-.cut-van.amb { background-image: var(--wl-amb2); transform: scaleX(-1); animation: cut-amb 3.4s cubic-bezier(.2, .7, .3, 1) both; } @keyframes cut-amb { from { left: 100%; } to { left: 214px; } }
+.cut-van { bottom: 12px; z-index: 2; width: 60px; height: 32px; background: 0 0 / 60px 32px no-repeat; }   /* vehicles drive in front of the nearest hill, never behind it */
+.cut-van.amb { width: 64px; background-size: 64px 32px; background-image: var(--wl-amb2); animation: cut-amb 3.4s cubic-bezier(.2, .7, .3, 1) both; } @keyframes cut-amb { from { left: 100%; } to { left: 214px; } }
 .cut-van.car { background-image: var(--wl-car2); left: 214px; animation: cut-car 4.2s cubic-bezier(.6, 0, .9, .6) 1s both; } @keyframes cut-car { from { left: 214px; } to { left: 105%; } }
 .cut-win { left: 154px; top: 110px; width: 6px; height: 9px; background: #FFE98A; animation: wl-blink .8s steps(1, end) infinite; }
 .cut-pager { right: 150px; top: 46px; transform-origin: 50% 100%; animation: cut-ring .42s steps(2, end) infinite; image-rendering: auto; } @keyframes cut-ring { 0% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
@@ -815,6 +821,21 @@ a.wl-act[href] { pointer-events: auto; cursor: pointer; }
 .modal.cut .modal-h .cap .gl { filter: brightness(0) invert(1); }
 /* a consequence: the result of something the learner did. A picture or a video goes here; until there is one, a placeholder with the art brief. */
 .cut-stage.result { height: 250px; display: grid; image-rendering: auto; } .cut-media { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The animated consequence pictures (tools/build-scenes.js, js/cuts.js): a column of frames shown at exactly twice the art size,
+   the intro once and then the loop. Doubling is the owner's recorded exception to the asset rule for the bought Mucho Pixels
+   packs (DESIGN.md). Centred, and cropped at the sides on a narrow window rather than shrunk. */
+.cut-stage.result:has(.cut-anim) { height: 248px; place-items: center; overflow: hidden; background: #B9879C; }
+.cut-anim { position: relative; flex: none; background-repeat: no-repeat; image-rendering: pixelated; }
+@keyframes cut-intro { from { background-position: 0 0; } to { background-position: 0 var(--i1); } }
+@keyframes cut-loop { from { background-position: 0 var(--i1); } to { background-position: 0 var(--l1); } }
+/* the pig (ours, drawn live): flies in from the right, facing the bed, with what it carries, then hovers */
+.cut-pig { position: absolute; width: 48px; height: 48px; animation: cut-pig-in 1.8s cubic-bezier(.2, .7, .3, 1) both, cut-hover 1.4s ease-in-out infinite; image-rendering: auto; }
+.cut-pig .gl { position: absolute; left: 0; top: 0; transform: scaleX(-1); animation: flap-a .34s steps(1, end) infinite; } .cut-pig .gl + .gl { animation-name: flap-b; }
+.cut-cargo { position: absolute; left: 14px; top: 36px; background: no-repeat 0 0 / 100% 100%; image-rendering: pixelated; }
+.cut-pig.phew .cut-cargo { left: 4px; top: 2px; animation: cut-drip 1.1s ease-in infinite; }   /* the rescued pig, sweating with relief */
+@keyframes cut-pig-in { from { transform: translate(460px, -40px); } to { transform: translate(0, 0); } }
+@keyframes cut-hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes cut-drip { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(14px); opacity: 0; } }
 .cut-ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px 44px; text-align: center; color: #fff; background: repeating-linear-gradient(45deg, #5B1F1A 0 8px, #69251F 8px 16px); }
 .cut-ph.amber { background: repeating-linear-gradient(45deg, #6B4A0E 0 8px, #7A5612 8px 16px); }
 .cut-ph.green { background: repeating-linear-gradient(45deg, #1F4D2C 0 8px, #265934 8px 16px); } .cut-ph-g .gl { display: block; }

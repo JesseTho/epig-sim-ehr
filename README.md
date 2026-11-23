@@ -85,4 +85,8 @@ against the school's program objectives before using them for grading. All of it
 
 One piece of artwork was supplied by the project owner rather than drawn in code: the sprite sheet for Truffle, the corner assistant (`assets/assistant/`). The EPIG logo (`assets/logo/`) is cut from the same sheet. An earlier airbrushed logo picture is kept in `assets/logo/` but is not used. The files as received are kept beside the processed versions as `*-source.png`. Confirm where they came from and that they may be used before the sandbox is distributed.
 
+The ambulance in the banner and the arrival cutscene is from [Rescue Vehicles](https://opengameart.org/content/rescue-vehicles) by bart on OpenGameArt, released under CC0 (public domain, no attribution required; credited here anyway). It is stored as pixel data in `js/world.js`, converted from the PNG with `tools/png-sprite.js`, so it can be toned with the time of day.
+
+The animated pictures in the consequence windows (`assets/cut/`) are composed from two packs by [Mucho Pixels](https://muchopixels.itch.io/), the [Hospital Tileset Pack](https://muchopixels.itch.io/hospital-tileset-pack) (bought) and the [Character Animation Asset Pack](https://muchopixels.itch.io/character-animation-asset-pack), under the GameDev Market Pro licence: the art may be used and edited in this project but the asset files may not be redistributed. The packs are kept out of the published files; only the finished scenes are published. Rebuild them with `node tools/build-scenes.js` from the unpacked packs in `docs/art-source/mucho-hospital` and `docs/art-source/mucho-characters`.
+
 The plan for bringing EPIG in line with real Epic onboarding is in [docs/training-parity-plan.md](docs/training-parity-plan.md).
