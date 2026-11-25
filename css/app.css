@@ -103,7 +103,7 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
    so choosing one cannot push its neighbours along. */
 .tool.on { background: #fff; border-color: #8C9A66; box-shadow: inset 1px 1px 2px rgba(60, 70, 30, .25); text-shadow: .5px 0 0 currentColor; }
 .tool .badge { position: absolute; top: 2px; right: 8px; z-index: 4; }
-.badge { background: #D2362A; color: #fff; border: 1px solid #fff; border-radius: 8px; font-size: 10px; font-weight: 700; padding: 0 5px; line-height: 14px; box-shadow: 0 1px 1px rgba(0, 0, 0, .3); }
+.badge { background: #D2362A; color: #fff; border: 1px solid #fff; border-radius: 8px; font-size: 11px; font-weight: 700; padding: 0 5px; line-height: 14px; box-shadow: 0 1px 1px rgba(0, 0, 0, .3); }
 .search { position: relative; display: flex; align-items: center; gap: 6px; } .search label { color: var(--muted); }
 .search-box { display: flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #7F9D5E; padding: 1px 4px; }
 .search-box input:not([type=checkbox]) { border: 0; width: 190px; padding: 2px; outline-offset: 3px; }
@@ -131,16 +131,36 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
 .lvl:hover { box-shadow: inset 0 0 0 2px var(--hot-2), 2px 3px 5px rgba(18, 35, 63, .32); }
 .lvl-t { display: flex; flex-direction: column; gap: 2px; } .lvl-t b { font: 700 13px var(--title); color: var(--olive-6); }
 .lvl-n { font-size: 11px; line-height: 1.25; color: var(--muted); text-align: right; } .lvl-n .gl { margin-right: 2px; }
+/* The points are there but the rank also asks for a demonstration: one short line says what (the full sentence is in the title). */
+.lvl-need { display: block; font: 700 11px/1.1 var(--ui); color: #6B4A00; } .lvl.held { padding-top: 3px; padding-bottom: 3px; }
+/* the one sound switch, beside the level widget: the speaker glyph on a button face, pressed in when muted */
+.snd-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; flex: none; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; image-rendering: pixelated; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7), 2px 3px 5px rgba(18, 35, 63, .3); }
+.snd-btn > * { image-rendering: auto; } .snd-btn:hover { box-shadow: inset 0 0 0 2px var(--hot-2), 2px 3px 5px rgba(18, 35, 63, .3); }
+.snd-btn[aria-pressed="true"] { background: var(--g-down) 0 0 / 8px 23px repeat-x, #C9C6B2; box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .35); }
 .xpbar { display: block; width: 170px; height: 13px; padding: 1px; background: #fff; border: 1px solid var(--olive-5); border-radius: 2px; box-shadow: inset 1px 1px 1px rgba(0, 0, 0, .15); }
 .xpbar i { display: block; height: 100%; min-width: 0; background: repeating-linear-gradient(90deg, #4DBB2E 0 7px, transparent 7px 9px), linear-gradient(#fff, #fff); background-blend-mode: normal; box-shadow: inset 0 3px 2px rgba(255, 255, 255, .55); }
 .xpbar.big { width: 100%; max-width: 420px; height: 18px; margin: 6px 0 4px; } .xpbar.big i { background: repeating-linear-gradient(90deg, #4DBB2E 0 10px, #fff 10px 12px); }
-#toast { position: fixed; right: 350px; top: 76px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+#toast { position: fixed; right: clamp(8px, calc(100vw - 346px), 350px); top: 76px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }   /* under the level widget; on a narrow window it slides right rather than off the left edge */
 .balloon { position: relative; display: flex; gap: 8px; max-width: 330px; padding: 8px 12px 9px; background: var(--note); border: 1px solid #000; border-radius: 7px; box-shadow: 2px 3px 6px rgba(0, 0, 0, .35); transform-origin: calc(100% - 104px) 0; animation: pop .28s cubic-bezier(.16, 1, .3, 1); }
 .balloon b { display: block; } .balloon span { display: block; }
 .balloon:first-child::after { content: ""; position: absolute; right: 96px; top: -8px; width: 14px; height: 14px; background: var(--note); border: solid #000; border-width: 1px 0 0 1px; transform: skewX(20deg) rotate(45deg); }
-.balloon { width: 330px; } .balloon span { white-space: pre-line; }
+.balloon { width: min(330px, calc(100vw - 16px)); } .balloon span { white-space: pre-line; }
 @keyframes pop { from { opacity: 0; transform: scale(.7) translateY(-14px); } }
-@media (prefers-reduced-motion: reduce) { .balloon { animation: none; } }
+/* While a dialog is open the balloons rise above its scrim (50), so a level-up or badge earned in a result dialog is
+   seen, and move to the bottom-left corner: dialog buttons sit at the right of the footer and in the title bar, and
+   the dock that lives in that corner is behind the scrim anyway. They never take a click (pointer-events: none). */
+body:has(> #modal .modal-bg) #toast { z-index: 52; top: auto; right: auto; left: 12px; bottom: 12px; align-items: flex-start; }
+body:has(> #modal .modal-bg) .balloon::after { display: none; }
+/* A milestone (level-up, badge, a good case ending): the same balloon, larger, on the gold of an earned badge, with
+   one slower pop that settles. It does not flash or repeat. Added as `.balloon.big` (see toast in js/app.js). */
+.balloon.big { width: min(410px, calc(100vw - 16px)); max-width: none; gap: 10px; padding: 12px 16px 13px; border-width: 2px; background: var(--g-gold) 0 0 / 8px 170px repeat-x, #FFF0B8; image-rendering: pixelated; animation: pop-big .5s cubic-bezier(.3, 1.4, .5, 1); }
+.balloon.big > * { image-rendering: auto; }
+.balloon.big b { font: 700 18px/1.2 var(--book); color: var(--olive-6); margin-bottom: 2px; } .balloon.big span { font-size: 13px; line-height: 1.4; }
+.balloon.big:first-child::after { top: -9px; background: #FFF6C4; border-width: 2px 0 0 2px; }
+@keyframes pop-big { from { opacity: 0; transform: scale(.6) translateY(-18px); } 65% { opacity: 1; transform: scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { .balloon, .balloon.big { animation: none; } }
+/* the same dialog redrawn after a click inside it does not zoom in again (js/app.js marks it) */
+#modal[data-rerender] .modal { animation: none; }
 
 /* ---------- task panes ---------- */
 .taskpane { width: 236px; flex: none; padding: 12px 12px 2px; overflow-y: auto; background: var(--g-pane) 0 0 / 8px 640px repeat-x, #C9D8AC; image-rendering: pixelated; border-right: 1px solid #A3B580; scrollbar-color: #8C9F68 #C5D1A2; }
@@ -160,6 +180,12 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
 .avatar { width: 64px; height: 64px; flex: none; display: grid; place-items: end center; overflow: hidden; border: 2px solid #fff; border-radius: 4px; background: var(--g-tile) 0 0 / 8px 64px repeat-x, #E8F4FD; image-rendering: pixelated; box-shadow: 1px 2px 3px rgba(0, 0, 0, .35); }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 700; } .kv.wide { max-width: 480px; margin-top: 10px; }
 .sb-vitals { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-weight: 700; } .sb-vitals span { display: block; font-size: 11px; color: var(--muted); font-weight: 400; } .abn { color: var(--red); }
+/* H or L beside an abnormal vital sign, as lab results carry them: the state is readable without the red */
+.vflag { font: 700 11px var(--ui); color: var(--red); margin-left: 1px; } .vit-grid .vflag { font-size: 12px; }
+/* a mark that says a state in shape as well as colour (MAR chips, knowledge-check options) */
+.mk { font-style: normal; font-weight: 700; margin-right: 2px; }
+/* text for screen readers only */
+.sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ---------- list views ---------- */
 .tbl { width: 100%; border-collapse: collapse; background: var(--work); }
@@ -193,7 +219,7 @@ input[type=checkbox], input[type=radio] { accent-color: #4F8A2A; }
 @media (max-width: 1200px) { .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .badges { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .banner { gap: 6px; } .bn-brand .wm { width: auto; height: 32px; } .lvl { padding: 3px 6px; } .lvl > .gl { display: none; } .lvl .xpbar { width: 84px; } .rank { flex-wrap: wrap; } }
-@media (max-width: 900px) { .grid3, .grid2, .split { grid-template-columns: 1fr; } .taskpane { width: 196px; } .tool span, .bn-user, .bn-tag, .search label, .lvl-n { display: none; } }
+@media (max-width: 900px) { .grid3, .grid2, .split { grid-template-columns: 1fr; } .taskpane { width: 196px; } .tool span, .bn-user, .bn-tag, .search label, .lvl-n, .lvl-need { display: none; } }
 .plain { list-style: none; padding: 0; } .plain li { padding: 3px 0; border-bottom: 1px solid #ECEADD; } .plain li:last-child { border: 0; }
 .empty { color: var(--muted); padding: 10px; text-align: center; }
 .notice { display: flex; gap: 6px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid; }
@@ -219,7 +245,7 @@ pre.doc { white-space: pre-wrap; font: 13px/1.55 var(--ui); margin: 0; padding: 
 /* trend charts */
 .trend { width: 100%; max-width: 760px; height: auto; display: block; }
 .tr-band { fill: #E6F1D6; } .tr-line { stroke: var(--line); } .tr-path { stroke: var(--olive-5); stroke-width: 2; }
-.tr-pt { fill: var(--olive-5); } .tr-out { fill: #C0241A; } .tr-ax { font-size: 10px; fill: var(--muted); } .tr-val { font-size: 11px; font-weight: 700; fill: var(--ink); }
+.tr-pt { fill: var(--olive-5); } .tr-out { fill: #C0241A; } .tr-ax { font-size: 11px; fill: var(--muted); } .tr-val { font-size: 11px; font-weight: 700; fill: var(--ink); }
 
 /* orders */
 input.wide { width: 100%; padding: 5px 8px; }
@@ -241,7 +267,8 @@ input.wide { width: 100%; padding: 5px 8px; }
 .mchip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid transparent; border-radius: 2px; padding: 0 3px; font-size: 11px; font-weight: 700; white-space: nowrap; margin: 1px 0; line-height: 15px; }
 button.mchip { cursor: pointer; } button.mchip:hover { box-shadow: 0 0 0 2px var(--hot-2); }
 .mchip.given { background: var(--green-bg); color: var(--green); border-color: #9CCFB1; } .mchip.held, .mchip.refused, .mchip.dc { background: var(--face); color: #3F4233; border-color: #B9B6A4; }
-.mchip.due { background: #FFE27A; color: #3F2C00; border-color: #B88A0E; } .mchip.overdue { background: #B3261E; color: #fff; border-color: #6E150F; } .mchip.future { background: #fff; color: var(--muted); border-color: #B9B6A4; }
+.mchip.due { background: #FFE27A; color: #3F2C00; border-color: #B88A0E; } .mchip.overdue { background: #B3261E; color: #fff; border-color: #6E150F; } .mchip.future { background: #fff; color: var(--muted); border-color: #9C9886; border-style: dashed; }   /* scheduled: a dashed outline, so it differs from due and overdue in shape too */
+.mchip.overdue { border-width: 1px 1px 1px 3px; padding-left: 2px; }   /* with its "!": a heavy left edge */
 .mar-dlg { background: #fff; border: 1px solid var(--line); padding: 7px 10px; margin-bottom: 10px; }
 .scans { display: flex; gap: 8px; margin: 10px 0; } .scan { flex: 1; padding: 8px; gap: 8px; } .scan.ok { background: var(--green-bg); border-color: var(--green); color: var(--green); font-weight: 700; box-shadow: none; }
 .barcode { width: 30px; height: 16px; background: repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 3px, #000 3px 4px, transparent 4px 7px, #000 7px 10px, transparent 10px 11px); }
@@ -421,26 +448,36 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 /* ---------- the mission / proficiency-check panel (bottom-left) ----------
    It sits over the bottom of the task-pane column only, which pads itself so nothing is ever hidden behind it.
    On screens without a task pane the page moves right to make room. */
-.dock { position: fixed; left: 12px; bottom: 10px; z-index: 45; width: 212px; display: flex; flex-direction: column; max-height: calc(100vh - 230px); background: var(--face); border: 1px solid #2C3814; border-radius: 6px 6px 2px 2px; box-shadow: 3px 6px 14px rgba(0, 0, 0, .4); }
-.dock-h { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 3px 0 6px; flex: none; color: #fff; background: var(--bar); image-rendering: pixelated; border-radius: 5px 5px 0 0; }
+/* The activity strip: a full-width bar between the chart tabs and the page while a shift, case, mission or the check runs. */
+.dock { flex: none; background: var(--face); border-bottom: 1px solid #919B76; font-size: 12px; }
+.dock-row { display: flex; align-items: center; gap: 12px; padding: 5px 12px; flex-wrap: wrap; }
+.dock-sum { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; }
+.dock-sum > *, .dock-sum .dock-score, .dock-row .dock-acts { margin: 0; padding-top: 0; border-top: 0; } .dock .dock-sum .xpbar.shift-bar { display: inline-block; width: 130px; flex: 0 0 130px; margin: 0; }
+.dock-sum .dock-todo { display: flex; gap: 4px 16px; flex-wrap: wrap; } .dock-sum .dock-todo li { padding: 0; font-size: 12px; } .dock-sum .dock-todo li > span { gap: 5px; }
+.dock-story { flex: 1 1 260px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .dock-sum .dock-score { display: inline-flex; }
+.dock-row .dock-acts { flex: none; } .dock-row .dock-acts .btn { flex: none; padding-left: 9px; padding-right: 9px; }
+.dock-h { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 7px; flex: none; max-width: 300px; color: #fff; background: var(--bar); image-rendering: pixelated; border-radius: 4px; }
 .dock-h > * { image-rendering: auto; } .dock-h b { flex: 1; min-width: 0; font: 700 12px var(--title); text-shadow: 1px 1px 0 #1F2A0C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dock-h .cap { width: 19px; height: 19px; } .dock-timer { font: 700 12px var(--title); padding: 1px 5px; border-radius: 3px; background: rgba(0, 0, 0, .25); } .dock-timer.low { background: #B3261E; }
-.dock-b { overflow: auto; padding: 8px 9px 9px; } .dock.min .dock-b { display: none; }
+.dock-b { overflow: auto; max-height: 38vh; padding: 8px 12px 10px; border-top: 1px solid var(--line-2); background: var(--page); } .dock-b > * { max-width: 760px; }
+.dock-exam .dock-b { display: grid; grid-template-columns: repeat(2, minmax(0, 380px)); gap: 4px 8px; align-items: start; } .dock-exam .dock-b > .dock-qt, .dock-exam .dock-b > .dock-dots { grid-column: 1 / -1; margin: 0; } .dock-exam .dock-b .qopt { margin: 0; }
 .dock-pt { display: flex; align-items: center; gap: 5px; margin: 0 0 4px; font-weight: 700; } .dock-brief { font-size: 11px; line-height: 1.4; color: var(--muted); margin: 0 0 6px; }
 .dock h5 { margin: 8px 0 3px; font: 700 11px var(--ui); text-transform: uppercase; letter-spacing: .05em; color: var(--olive-6); }
 .dock-list { list-style: none; margin: 0; padding: 0; } .dock-list li { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; line-height: 1.35; } .dock-list .gl { margin-top: 1px; }
 .dock-list li.done > span { color: var(--muted); } .dock-list li.bad > span { color: var(--red); } .dock-list li.hid > span { font-style: italic; color: var(--muted); }
-.dock-list small { display: block; color: var(--muted); margin-top: 1px; } .dock-list.wide li { padding: 3px 0; } .dock-list.wide li.bad > span { color: var(--ink); }
+.dock-list small { display: block; color: var(--muted); margin-top: 1px; } .dock-list.wide li { padding: 3px 0; } .dock-list.wide li.bad > span { color: var(--ink); } .dock-list.wide li > .btn.xs { margin-left: auto; align-self: center; }
+.next-step .btn { margin-left: auto; }
 .tick0 { flex: none; width: 14px; height: 14px; margin: 1px 1px 0; border: 1px solid #7F9D5E; background: #fff; box-shadow: inset 1px 1px 0 #DCDACA; }
 .dock-score { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; padding-top: 6px; border-top: 1px solid var(--line-2); font-weight: 700; color: var(--olive-6); }
 .dock-acts { display: flex; gap: 5px; margin-top: 8px; } .dock-acts .btn { flex: 1; padding-left: 4px; padding-right: 4px; }
+#modal input[data-alert-why] { flex: 1; min-width: 260px; }
 .dock-q { margin: 0 0 3px; color: var(--muted); } .dock-qt { margin: 0 0 8px; font: 700 13px/1.4 var(--book); color: var(--ink); }
 .dock .qopt { font-size: 12px; padding: 4px 7px; } .qopt.picked { background: var(--sel); border-color: var(--olive-5); box-shadow: inset 0 0 0 1px var(--olive-5); font-weight: 700; }
 .dock-dots { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
-.dock-dots button { width: 17px; height: 17px; padding: 0; border: 1px solid #B9B6A4; border-radius: 2px; background: #fff; font-size: 10px; cursor: pointer; }
-.dock-dots button.ans { background: var(--green-bg); border-color: #9CCFB1; } .dock-dots button.on { border-color: var(--hot); box-shadow: 0 0 0 1px var(--hot); font-weight: 700; }
-#root:has(.dock:not(.min)) .taskpane { padding-bottom: calc(100vh - 220px); } #root:has(.dock.min) .taskpane { padding-bottom: 50px; }
-#root:has(.dock) .main > .page { padding-left: 250px; }
+.dock-dots button { min-width: 19px; height: 19px; padding: 0 2px; border: 1px dashed #A9A592; border-radius: 2px; background: #fff; font-size: 11px; line-height: 1; cursor: pointer; }
+/* answered: solid outline and a tick after the number, not only the green (exam panel in js/missions.js, rounds in js/shift.js) */
+.dock-dots button.ans { background: var(--green-bg); border-color: #9CCFB1; border-style: solid; } .dock-dots button.ans::after { content: "\2713"; margin-left: 1px; font-weight: 700; color: var(--green); } .dock-dots button.on { border-color: var(--hot); box-shadow: 0 0 0 1px var(--hot); font-weight: 700; }
+
 
 /* ---------- mission and check results ---------- */
 .result-head { display: flex; align-items: center; gap: 16px; margin-bottom: 4px; } .result-head > div { display: flex; flex-direction: column; gap: 2px; }
@@ -483,7 +520,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .w-band.foot { height: auto; min-height: 52px; display: grid; place-items: center; padding: 8px 16px; color: #F1F5E2; text-align: center; border-bottom: 0; border-top: 2px solid #F0B040; }
 .w-mid { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; gap: 44px; padding: 28px 32px;
   background: var(--g-sky) 0 0 / 8px 640px repeat-x, #E3F1FC; image-rendering: pixelated; position: relative; }
-.w-mid > .music-btn { position: absolute; top: 14px; right: 16px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; font: 700 12px var(--ui); color: var(--ink); background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; box-shadow: 2px 3px 5px rgba(18, 35, 63, .3); }
+.w-mid > .music-btn { position: absolute; top: 14px; right: 16px; z-index: 2; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 6px; border: 1px solid #47571F; border-radius: 3px; cursor: pointer; font: 700 12px var(--ui); color: var(--ink); background: var(--g-btn) 0 0 / 8px 23px repeat-x, #D6D4C2; box-shadow: 2px 3px 5px rgba(18, 35, 63, .3); }
 .music-btn[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #B4CB7C, 2px 3px 5px rgba(18, 35, 63, .3); } .music-btn:hover { box-shadow: inset 0 0 0 2px var(--hot-2), 2px 3px 5px rgba(18, 35, 63, .3); }
 .w-left { width: 480px; max-width: 100%; color: #14233A; }
 /* the left-hand scene: five icons scattered around the SIM EHR block, which sits in the middle */
@@ -557,6 +594,12 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .qopt.right { background: var(--green-bg); border-color: var(--green); font-weight: 700; } .qopt.wrong { background: var(--red-bg); border-color: #D98D85; }
 .why { padding: 6px 10px; background: var(--note); border: 1px solid var(--line); margin-top: 4px; } .why.ok b { color: var(--green); } .why.no b { color: var(--red); }
 .ev-note { border: 1px solid var(--line-2); padding: 5px 10px; margin-bottom: 5px; } .ev-note summary { cursor: pointer; } .ev-note pre { margin-top: 8px; }
+/* a missed question can be answered again for the badge; the line says so beside the question */
+.retry { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; color: var(--muted); } .retry.ok { color: var(--green); font-weight: 700; }
+/* the attending's feedback on a work sample */
+.fb { margin: 4px 0 0; padding: 4px 8px; background: var(--note); border-left: 3px solid #8C9A66; } .ev-note .fb { margin-top: 8px; }
+/* what the next rank asks for besides points, and ranks kept from the old rule */
+.rank-need { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 0; padding: 6px 10px; max-width: 520px; background: rgba(255, 255, 255, .82); border: 1px solid #fff; color: #12233F; line-height: 1.4; } .rank-need .gl { flex: none; }
 .printonly { display: none; }
 
 @media print {
@@ -567,7 +610,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 
 /* ---------- note blanks, inbox actions ---------- */
 .blanks { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 6px; background: #FFF6D6; border: 1px solid #C9A227; font-size: 12px; }
-.blanks span { flex: 1; } .blanks code { background: #fff; border: 1px solid #C9A227; padding: 0 3px; font-weight: 700; } .blanks kbd, .btn kbd { font: 700 10px var(--ui); border: 1px solid currentColor; border-radius: 2px; padding: 0 3px; margin-left: 4px; opacity: .8; }
+.blanks span { flex: 1; } .blanks code { background: #fff; border: 1px solid #C9A227; padding: 0 3px; font-weight: 700; } .blanks kbd, .btn kbd { font: 700 11px var(--ui); border: 1px solid currentColor; border-radius: 2px; padding: 0 3px; margin-left: 4px; opacity: .8; }
 .doc-acts { display: flex; gap: 6px; align-items: center; flex: none; }
 
 /* ---------- patient messages: a thread in the Inbox ---------- */
@@ -631,7 +674,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .dock-shift .dock-list a { color: var(--ink); } .dock-shift .dock-score { flex-wrap: wrap; gap: 4px; }
 .notice.harm { background: var(--red-bg); border-color: #D98D85; color: #4A0E0A; } .notice > span { flex: 1; min-width: 0; } .notice > .btn { flex: none; align-self: center; } p.notice { margin-top: 0; }
 .rounds-q { font-size: 16px; margin: 10px 0; } .rounds-dots { margin-top: 10px; } .rounds-dots button { width: 22px; height: 22px; font-size: 11px; }
-.ph-tag { font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 4px; }
+.ph-tag { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 4px; }
 .modal-b .result-score small { text-transform: lowercase; }
 
 /* ---------- suspension: the gift shop ---------- */
@@ -723,7 +766,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .tr-edge { display: block; color: var(--muted); margin-bottom: 2px; } .tree li.on > .tr-edge { color: var(--ink); font-weight: 700; }
 .tr-node { display: block; width: fit-content; max-width: 62ch; padding: 3px 9px; border: 1px solid var(--line); background: #fff; } .tr-node small { display: block; font-weight: 400; color: var(--muted); }
 .tr-node.on { border-color: var(--olive-5); background: var(--sel); box-shadow: inset 3px 0 0 var(--olive-5); } .tr-node.ref { border-style: dashed; font-style: italic; color: var(--muted); }
-.tr-you { margin-left: 4px; font: 700 10px var(--ui); text-transform: uppercase; letter-spacing: .05em; color: var(--green); }
+.tr-you { margin-left: 4px; font: 700 11px var(--ui); text-transform: uppercase; letter-spacing: .05em; color: var(--green); }
 
 /* ---------- the banner stage: time of day, the ruler, the two buildings and whatever is crossing ---------- */
 .banner > .spacer { align-self: stretch; min-width: 0; container-type: inline-size; }
@@ -749,7 +792,8 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 /* The two buildings are links: the hospital opens Patient Lists (or, under a beacon, the patient in trouble); the lit lab opens the
    results of what it is working on. Hovering lifts one a pixel; a delivery landing squashes it. */
 .wl-hosp, .wl-lab { transform-origin: 50% 100%; transition: transform .12s cubic-bezier(.2, .8, .3, 1.4); }
-.wl-hosp[href]:hover, .wl-lab[href]:hover { transform: translateY(-2px); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 1px 0 rgba(18, 35, 63, .35)); }
+.wl [data-go] { cursor: pointer; }   /* the stage is aria-hidden, so its "links" are spans that cannot take focus (js/world.js follows the click) */
+.wl-hosp[data-go]:hover, .wl-lab[data-go]:hover { transform: translateY(-2px); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 1px 0 rgba(18, 35, 63, .35)); }
 .wl-hosp.got, .wl-lab.got { animation: wl-got .45s cubic-bezier(.3, 0, .4, 1) both; }
 @keyframes wl-got { 0% { transform: scale(1); } 30% { transform: scale(1.14, .82); } 62% { transform: translateY(-3px) scale(.94, 1.08); } 100% { transform: scale(1); } }
 .wl-hosp { left: 62px; bottom: 6px; width: 36px; height: 32px; background: var(--wl-hosp) 0 0 / 36px 32px no-repeat; pointer-events: auto; }
@@ -764,27 +808,34 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 /* the lab is busy: it squashes and hops from its base for as long as a test is in it */
 .wl-lab.on:not(.got) { animation: wl-busy .62s cubic-bezier(.3, 0, .4, 1) infinite; }
 @keyframes wl-busy { 0%, 100% { transform: translateY(0) scale(1); } 18% { transform: translateY(0) scale(1.12, .84); } 48% { transform: translateY(-5px) scale(.93, 1.1); } 74% { transform: translateY(0) scale(1.07, .92); } 88% { transform: translateY(-1px) scale(.98, 1.03); } }
-@media (prefers-reduced-motion: reduce) { .wl-lab.on, .wl-hosp.got, .wl-lab.got, .wl-hosp b.pop, .wl-flag.new { animation: none !important; } .wl-hosp, .wl-lab { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .wl-lab.on, .wl-hosp.got, .wl-lab.got, .wl-hosp b.pop, .wl-flag.new, .wl-beacon, .wl-load.sheet.crit { animation: none !important; } .wl-hosp, .wl-lab { transition: none; } }   /* the beacon stays lit, steady */
 .wl-act { animation-timing-function: linear; animation-fill-mode: both; }
-a.wl-act[href] { pointer-events: auto; cursor: pointer; }
+.wl .wl-act[data-go] { pointer-events: auto; cursor: pointer; }
 /* the courier: up out of the hospital roof, a long glide, down into the lab. Eased at both ends so it takes off and lands. */
 .wl-pig { width: 24px; height: 24px; animation-timing-function: cubic-bezier(.45, .05, .55, .95); } .wl-pig.out { animation-name: wl-out; } .wl-pig.back { animation-name: wl-back; }
 .wl-pig .gl { position: absolute; left: 0; top: 0; animation: flap-a .34s steps(1, end) infinite; image-rendering: auto; } .wl-pig .gl + .gl { animation-name: flap-b; } .wl-pig.back .gl { transform: scaleX(-1); }
-.wl-pig[href]:hover { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
+.wl-pig[data-go]:hover { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
 .wl-load { position: absolute; left: 10px; top: 19px; } .wl-load.tube { width: 5px; height: 10px; background: var(--wl-tube) 0 0 / 5px 10px no-repeat; }
 .wl-load.sheet { width: 8px; height: 10px; background: var(--wl-sheet) 0 0 / 8px 10px no-repeat; } .wl-load.sheet.crit { background-image: var(--wl-sheet-crit); animation: wl-blink .5s steps(1, end) infinite; }
 @keyframes wl-out { 0% { left: 70px; bottom: 22px; opacity: 0; } 6% { opacity: 1; } 15% { bottom: 40px; } 85% { bottom: 40px; } 94% { opacity: 1; } 100% { left: calc(100% - 34px); bottom: 20px; opacity: 0; } }
 @keyframes wl-back { 0% { left: calc(100% - 34px); bottom: 20px; opacity: 0; } 6% { opacity: 1; } 15% { bottom: 40px; } 85% { bottom: 40px; } 94% { opacity: 1; } 100% { left: 70px; bottom: 22px; opacity: 0; } }
-/* the ambulance comes in from the right with its light going and pulls up at the door; the car pulls away from it */
-.wl-van { bottom: 5px; width: 30px; height: 16px; background: 0 0 / 30px 16px no-repeat; } .wl-van.amb { width: 32px; background-size: 32px 16px; background-image: var(--wl-amb); animation-name: wl-amb; animation-timing-function: cubic-bezier(.25, .6, .35, 1); } .wl-van.car { background-image: var(--wl-car); animation-name: wl-car; animation-timing-function: cubic-bezier(.5, 0, .9, .6); }
+/* THE ROAD (js/world.js placeRoad): arrivals and departures travel between the hospital door and beyond the page's left
+   edge. It is laid inside the banner's sky layer, which spans the whole banner behind the lockup, so walkers and vehicles
+   pass behind the Epig lettering and never take a click. Its right end is the hospital door (its width is set from the
+   code); the hospital on the stage stands in front of it, so whoever reaches the door goes in behind the building. */
+.wl-road { position: absolute; left: 0; bottom: 0; height: 44px; overflow: hidden; pointer-events: none; image-rendering: pixelated; }
+.wl-road > * { position: absolute; pointer-events: none; }
+/* the ambulance comes in from the left with its light going and pulls up beside the hospital; a car going home drives off
+   to the left. Both sprites are mirrored to face the way they go. */
+.wl-van { bottom: 5px; width: 30px; height: 16px; background: 0 0 / 30px 16px no-repeat; } .wl-van.amb { width: 32px; background-size: 32px 16px; background-image: var(--wl-amb); animation-name: wl-amb; animation-timing-function: cubic-bezier(.25, .6, .35, 1); transform: scaleX(-1); } .wl-van.car { background-image: var(--wl-car); animation-name: wl-car; animation-timing-function: cubic-bezier(.5, 0, .9, .6); transform: scaleX(-1); }
 .wl-siren { position: absolute; left: 11px; top: 0; width: 3px; height: 2px; background: #FF2A1A; box-shadow: 15px 0 0 #FF2A1A; animation: wl-blink .4s steps(1, end) infinite; }   /* the two roof lights flash, hard-edged like the rest of the pixel art */
-@keyframes wl-amb { 0% { left: 100%; } 88% { left: 100px; opacity: 1; } 100% { left: 100px; opacity: 0; } }
-@keyframes wl-car { 0% { left: 100px; opacity: 0; } 10% { opacity: 1; } 100% { left: 100%; } }
-/* patients on foot: in from the left edge to the hospital door, and out the same way. Two frames, swapped like the pigs' wings. */
+@keyframes wl-amb { 0% { left: -34px; } 88% { left: calc(100% - 52px); opacity: 1; } 100% { left: calc(100% - 52px); opacity: 0; } }
+@keyframes wl-car { 0% { left: calc(100% - 50px); opacity: 0; } 8% { opacity: 1; } 100% { left: -34px; } }
+/* patients on foot: in from beyond the left edge to the hospital door, and out the same way. Two frames, swapped like the pigs' wings. */
 .wl-person { bottom: 5px; width: 10px; height: 18px; } .wl-person.walk { animation-name: wl-walk; } .wl-person.leave { animation-name: wl-leave; transform: scaleX(-1); }
 .wl-person i { position: absolute; inset: 0; background: 0 0 / 10px 18px no-repeat; animation: flap-a .3s steps(1, end) infinite; } .wl-person i + i { animation-name: flap-b; }
-@keyframes wl-walk { 0% { left: -12px; } 90% { left: 75px; opacity: 1; } 100% { left: 77px; opacity: 0; } }
-@keyframes wl-leave { 0% { left: 77px; opacity: 0; } 10% { left: 72px; opacity: 1; } 100% { left: -12px; } }
+@keyframes wl-walk { 0% { left: -12px; } 94% { left: calc(100% - 6px); opacity: 1; } 100% { left: calc(100% - 5px); opacity: 0; } }
+@keyframes wl-leave { 0% { left: calc(100% - 5px); opacity: 0; } 6% { left: calc(100% - 8px); opacity: 1; } 100% { left: -12px; } }
 
 /* with the ruler off, what has already happened stands as small flags on the grass */
 .wl-flag { bottom: 5px; width: 8px; height: 12px; border-left: 1px solid #12233F; pointer-events: auto; cursor: pointer; transform-origin: 0 100%; } .wl-flag::after { content: ""; position: absolute; left: 0; top: 0; width: 7px; height: 5px; background: #F7C948; box-shadow: 0 0 0 1px #12233F; }
@@ -816,6 +867,8 @@ a.wl-act[href] { pointer-events: auto; cursor: pointer; }
   box-shadow: 40px 18px #fff, 96px 40px #fff, 150px 12px #fff, 230px 30px #fff, 290px 16px #fff, 356px 44px #fff, 410px 20px #fff, 468px 36px #fff, 520px 14px #fff, 580px 30px #fff, 318px 62px #fff, 610px 58px #fff, 20px 60px #fff; }
 .cut-stars.on { opacity: 1; animation: none; }
 .cut-stage.still *, .cut-stage.still { animation: none !important; } .cut-stage.still .cut-van.amb { left: 214px; }
+/* a still consequence picture rests on the first frame of its loop (staff at the bed, the story complete), never the empty room the intro starts on */
+.cut-stage.still .cut-anim { background-position: 0 var(--i1) !important; }
 .cut-box { display: flex; gap: 10px; align-items: flex-end; min-height: 70px; margin-top: 10px; padding: 10px 12px; background: var(--note); border: 1px solid #000; border-radius: 4px; box-shadow: 2px 3px 0 rgba(0, 0, 0, .25); }
 #cut-text { flex: 1; margin: 0; align-self: flex-start; font: 700 15px/1.45 var(--book); color: var(--ink); } .cut-n { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .modal.cut .modal-h .cap .gl { filter: brightness(0) invert(1); }
@@ -836,6 +889,8 @@ a.wl-act[href] { pointer-events: auto; cursor: pointer; }
 @keyframes cut-pig-in { from { transform: translate(460px, -40px); } to { transform: translate(0, 0); } }
 @keyframes cut-hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 @keyframes cut-drip { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(14px); opacity: 0; } }
+/* the near miss: the pig's stamp comes down on the order as the loop starts (js/world.js sets the delay), lifts, and comes down again */
+@keyframes cut-stamp { 0%, 12% { transform: translateY(8px); } 24%, 84% { transform: translateY(0); } 92% { transform: translateY(-4px); } 100% { transform: translateY(8px); } }
 .cut-ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px 44px; text-align: center; color: #fff; background: repeating-linear-gradient(45deg, #5B1F1A 0 8px, #69251F 8px 16px); }
 .cut-ph.amber { background: repeating-linear-gradient(45deg, #6B4A0E 0 8px, #7A5612 8px 16px); }
 .cut-ph.green { background: repeating-linear-gradient(45deg, #1F4D2C 0 8px, #265934 8px 16px); } .cut-ph-g .gl { display: block; }

@@ -10,7 +10,13 @@
      end    the case is over: 'well', 'rocky' or 'icu'.
 
    Every way out has a grade (best, ok, poor, late, harm) and a one-line reason. Grades are not shown while
-   playing. The debrief shows the path taken and then the whole tree, with learning issues to take to a group.
+   playing. The debrief shows the path taken, with learning issues to take to a group; the whole tree with its
+   grades opens once the learner has reached a good ending on that case (owner's decision, 2026-11-24), so the
+   map is a reward for solving the case and not a walkthrough for the next attempt.
+
+   A case can also carry `interview`: questions the learner can ask the patient (appended to the standard list
+   by E.interview below) with answers that hold facts the chart does not. W.asked(question) is true once the
+   learner has asked one.
 
    A case patient carries `sim.labs` and `sim.reports`: what a test would show if it were ordered now. A node
    can change them (`enter.truth`), so the same ECG reads differently at 13:10 and at 15:30.
@@ -42,7 +48,7 @@
     E.save();
     return true;
   }
-  const say = (text, title, glyph) => { if (E.app) E.app.toast(text, title, glyph); };
+  const say = (text, title, glyph, tone) => { if (E.app) E.app.toast(text, title, glyph, tone); };
   const pose = (name, ms) => { if (E.pal) E.pal.pose(name, ms || 4000); };
   /** Hospital time for a running case, in hours since midnight of its first day (so it can pass 24). */
   const hosp = (a) => a.startHour + a.elapsed / hourMs();
@@ -58,7 +64,17 @@
     const own = p.sim && p.sim.reports && p.sim.reports[c.id];
     return own ? `${c.name.toUpperCase()}\nPatient: ${p.name} · MRN ${p.mrn}\nIndication: ${p.cc}\n\n${own}\n\n(Simulated report for training.)` : rep0(p, c);
   };
-  E.interview = (p) => { const qs = int0(p), s = p.sim && p.sim.story; if (s) [1, 5, 7].forEach((i, n) => { if (qs[i] && s[n]) qs[i].a = s[n]; }); return qs; };
+  /* A case patient's own questions go third, straight after "What brought you in", because the conversation
+     window offers only the first four not yet asked: at the end of the list they would stay hidden until the
+     learner had asked five others. js/sim.js may append them too; they are matched by text, so they are never
+     listed twice. The list is renumbered, so `i` (what the Inbox thread stores) is always the position. */
+  E.interview = (p) => {
+    let qs = int0(p);
+    const s = p.sim && p.sim.story, cs = (E.CASES || []).find((c) => c.pid === p.id), own = (cs && cs.interview) || [];
+    if (s) [1, 5, 7].forEach((i, n) => { if (qs[i] && s[n]) qs[i].a = s[n]; });
+    if (own.length) { qs = qs.filter((x) => !own.some((o) => o.q === x.q)); qs.splice(Math.min(2, qs.length), 0, ...own.map((o) => ({ q: o.q, a: o.a }))); }
+    return qs.map((x, i) => Object.assign({}, x, { i }));
+  };
 
   /* =====================================================================================================
      2. CONDITIONS a path can wait for. Each reads what the learner did in this patient's chart since the
@@ -68,8 +84,9 @@
   /* Each condition carries the catalogue ids it was built with: `ids` for every order it looks at, `wait` for the
      ones it needs to reach the patient (not W.tried). The validator, the focused work-up credit and the harm
      bookkeeping read them, so nothing has to be listed twice by hand. */
-  const tag = (f, ids, wait) => Object.assign(f, { ids: ids || [], wait: wait || [] });
+  const tag = (f, ids, wait, asks) => Object.assign(f, { ids: ids || [], wait: wait || [], asks: asks || [] });
   const kids = (fs, k) => [].concat(...fs.map((f) => f[k] || []));
+  const norm = (t) => String(t || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const W = {
     /** Entered an order for any of these (a student's pended order counts: it shows intent). */
     ordered: (...ids) => tag((c) => c.orders.some((o) => o.ts >= c.from && ids.includes(o.catId) && live(o)), ids, ids),
@@ -83,11 +100,18 @@
     tried: (...ids) => tag((c) => c.orders.some((o) => o.ts >= c.from && ids.includes(o.catId) && o.status !== 'Draft'), ids),
     viewed: (label) => tag((c) => c.audit.some((x) => x.ts >= c.from && x.action === 'Viewed ' + label)),
     note: (...words) => tag((c) => c.notes.some((n) => n.ts >= c.from && words.every((w) => [].concat(w).some((alt) => n.text.toLowerCase().includes(alt))))),
-    all: (...fs) => tag((c) => fs.every((f) => f(c)), kids(fs, 'ids'), kids(fs, 'wait')),
-    any: (...fs) => tag((c) => fs.some((f) => f(c)), kids(fs, 'ids'), kids(fs, 'wait')),
-    now: (f) => tag((c) => f(Object.assign({}, c, { from: c.nodeAt })), f.ids, f.wait),
+    /** Asked the patient this question in the message thread (js/app.js msgAsk stores each one as
+        { who: 'you', text }). Matched on the question's text, so it must be one of the case's `interview` questions;
+        E.caseCheck says so if it is not. The thread is the patient's, not the learner's, but it is cleared when a
+        case starts and only the learner on the case talks to that patient. */
+    asked: (text) => tag((c) => (E.db.inbox || []).some((m) => m.patientId === c.p.id && (m.thread || []).some((t) => t.who === 'you' && (t.ts == null || t.ts >= c.from) && norm(t.text) === norm(text))), [], [], [text]),
+    all: (...fs) => tag((c) => fs.every((f) => f(c)), kids(fs, 'ids'), kids(fs, 'wait'), kids(fs, 'asks')),
+    any: (...fs) => tag((c) => fs.some((f) => f(c)), kids(fs, 'ids'), kids(fs, 'wait'), kids(fs, 'asks')),
+    now: (f) => tag((c) => f(Object.assign({}, c, { from: c.nodeAt })), f.ids, f.wait, f.asks),
   };
-  const same = (x, y) => (E.sameUser ? E.sameUser(x, y) : x === y);
+  /** Every comparison of a name with the learner's (orders, notes, the audit trail, harm events) goes through the
+      one rule in js/core.js, so " Ana" and "ana" are the same learner here as they are for progress. */
+  const same = (x, y) => E.sameUser(x, y);
   /** What the learner has done in the case patient's chart. Null when the patient is gone (see orphan()). */
   function context(a) {
     const cs = def(a.id), p = cs && E.pt(cs.pid), me = E.db.user.name;
@@ -95,6 +119,10 @@
     return { p, from: a.start, nodeAt: a.nodeAt, orders: p.orders.filter((o) => same(o.by, me)), notes: p.notes.filter((n) => same(n.author, me)),
       audit: E.db.audit.filter((x) => same(x.user, me) && x.patientId === p.id && x.ts >= a.start) };
   }
+  /* The learner's own pause holds the rest of the hospital too (results, the simulated attending and nurses:
+     js/core.js E.simPaused). Read straight from the record, not through myCase(), because myCase() can end an
+     orphaned case and a pause check must have no side effects. */
+  (E.pauseChecks = E.pauseChecks || []).push(() => { const a = E.db && E.db.user && E.progress().active; return !!(a && a.type === 'case' && a.paused && !a.done); });
 
   /* =====================================================================================================
      3. THE ENGINE
@@ -123,8 +151,10 @@
       for chart work, or an explicit `id` on the option or path. The debrief matches the learner's road by this id
       (by label only for plays stored before ids existed), so a label can be reworded without breaking old
       debriefs. Reordering options or paths changes a derived id: give the edge an explicit `id` first. */
-  const edgesOf = (n, key) => (n.ask ? n.ask.options.map((o, i) => ({ id: o.id || `${key}:a${i}`, label: o.text, to: o.to, grade: o.grade, why: o.why, ids: [], wait: [] }))
-    : (n.paths || []).map((x, i) => ({ id: x.id || `${key}:p${i}`, label: x.label, to: x.to, grade: x.grade, why: x.why, after: x.after, ids: (x.when && x.when.ids) || [], wait: (x.when && x.when.wait) || [] })));
+  const edgesOf = (n, key) => (n.ask ? n.ask.options.map((o, i) => ({ id: o.id || `${key}:a${i}`, label: o.text, to: o.to, grade: o.grade, why: o.why, ids: [], wait: [], asks: [] }))
+    : (n.paths || []).map((x, i) => ({ id: x.id || `${key}:p${i}`, label: x.label, to: x.to, grade: x.grade, why: x.why, after: x.after, ids: (x.when && x.when.ids) || [], wait: (x.when && x.when.wait) || [], asks: (x.when && x.when.asks) || [] })));
+  /** The hours after which a node's timed exits open, smallest first. */
+  const timesOf = (n) => [...new Set((n.paths || []).filter((x) => x.after != null).map((x) => x.after))].sort((x, y) => x - y);
   /** A step graded harm goes on the learner's safety record (owner's decision: harm inside a case counts toward the
       three strikes), unless a global harm rule (js/shift.js) is already counting the same order: one act, one strike. */
   function harmed(p, e) {
@@ -138,7 +168,7 @@
     const cs = def(a.id), n = cs.nodes[key], p = E.pt(cs.pid);
     if (e) a.path.push({ from: a.node, to: key, edge: e.id, label: e.label, grade: e.grade, why: e.why || '', at: hhmm(hosp(a)) });
     if (e && e.grade === 'harm') harmed(p, e);
-    Object.assign(a, { node: key, nodeAt: Date.now(), nodeEl: a.elapsed, asked: false });
+    Object.assign(a, { node: key, nodeAt: Date.now(), nodeEl: a.elapsed, asked: false, opts: null, skip: false });
     apply(a, p, n.enter || {});
     E.db.audit.unshift({ ts: Date.now(), user: 'Case', role: 'sim', patientId: p.id, action: `${cs.title}: ${n.title}` });
     if (n.end) a.done = { outcome: n.end, at: Date.now() };
@@ -146,6 +176,20 @@
     if (sc && E.world && E.world.scenesOn && E.world.scenesOn()) a.scene = sc;
     else say(n.story, `${hhmm(hosp(a))} · ${n.title}`, n.end === 'icu' || n.urgent ? 'alert' : n.end ? 'check' : 'info');
     pose(n.end === 'icu' ? 'sad' : n.end === 'well' ? 'cheer' : n.urgent ? 'worry' : 'think', 4000);
+  }
+
+  /** The order the current question's options are shown in, as original indices. The data lists the best answer
+      first, so the options are shuffled the first time a question is shown, and the order is kept on the activity
+      so a reload or a reopened dialog shows the same order. The choice is still recorded by original index (the
+      edge id `<node>:a<i>`), so the debrief and stored history do not depend on the display order. */
+  function optOrder(a, n) {
+    const k = n.ask.options.length, o = a.opts;
+    if (o && o.node === a.node && Array.isArray(o.idx) && o.idx.length === k && o.idx.slice().sort((x, y) => x - y).every((v, i) => v === i)) return o.idx;
+    const idx = [...Array(k).keys()];
+    for (let i = k - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    if (k > 1 && idx[0] === 0) idx.push(idx.shift());   // never the source order's first: that is always the best answer
+    a.opts = { node: a.node, idx };
+    return idx;
   }
 
   /* ---------- the clock ---------- */
@@ -163,26 +207,72 @@
     const a = myCase();
     if (!a) return false;
     advance();
+    // a learner's pause freezes the case completely: no path is taken, no question or scene opens, no timer runs.
+    // Orders entered while paused are still in the chart when the case resumes, and count then.
+    if (a.paused && !a.done) return false;
     const cs = def(a.id), n = cs.nodes[a.node], free = !(E.app && E.app.busy());
     if (a.scene) { if (free) { const sc = a.scene; a.scene = null; E.world.scene(sc); return true; } return false; }
     if (E.ui.modal && WAIT.includes(E.ui.modal.type)) return false;
     if (a.done) { if (free) finish(); return free; }
-    if (n.ask) { if (!a.asked && free) { a.asked = true; E.ui.modal = { type: 'caseAsk' }; E.app.render(); return true; } return false; }
+    if (n.ask) { if (!a.asked && free) { a.asked = true; optOrder(a, n); E.ui.modal = { type: 'caseAsk' }; E.app.render(); return true; } return false; }
     if (Date.now() - a.nodeAt < CFG().settle * 1000) return false;
     const c = context(a), gone = (a.elapsed - a.nodeEl) / hourMs();
-    const i = (n.paths || []).findIndex((x) => (!x.when || x.when(c)) && (x.after == null || gone >= x.after));
+    const take = (h) => (n.paths || []).findIndex((x) => (!x.when || x.when(c)) && (x.after == null || h >= x.after));
+    let i = take(gone);
+    // "I have done what I can" (caseWait): nothing fires now, so run the clock on to the first timed exit that
+    // would fire, exactly as waiting would have. A condition that is already met has fired above, before this.
+    if (i < 0 && a.skip) { for (const h of timesOf(n).filter((t) => t > gone)) { i = take(h); if (i >= 0) { a.elapsed = a.nodeEl + h * hourMs(); break; } } }
+    a.skip = false;
     if (i < 0) return false;
     const e = edgesOf(n, a.node)[i]; enter(a, e.to, e);
     return true;
   };
+  /** The learner's own orders this node looks at that are still on their way (pended for the attending, or a test
+      in process). Skipping the clock past them would take a timed exit that waiting would not have. */
+  const onTheWay = (a, n) => { const c = context(a), ids = new Set([].concat(...edgesOf(n, a.node).map((e) => e.ids))); return c ? c.orders.filter((o) => o.ts >= a.start && ids.has(o.catId) && ['Pended', 'In process'].includes(o.status)) : []; };
+  /** Who is waiting at a chart-work node: neutral, so it names people and never the answer. */
+  const waitLine = (n, p) => {
+    if (n.waiting) return n.waiting;
+    const rn = String(p.rn || '').split(', ')[1];
+    return `Dr. ${String(p.attending || 'Attending').split(',')[0]} and ${rn ? `${rn.split(' ')[0]}, ${p.sex === 'M' ? 'his' : 'her'} nurse,` : 'the nurse'} are waiting to see what you do in the chart.`;
+  };
 
   /* ---------- scoring ---------- */
   const PTS = { best: 2, ok: 1 };
+  const memo = (fn) => { const m = new Map(); return (cs) => (m.has(cs) ? m.get(cs) : (m.set(cs, fn(cs)), m.get(cs))); };
+  /** Every catalogue id any way out or loose end of the case looks at. A lab or imaging order outside this set
+      is one no path in the case ever needed (the "Focused work-up" credit). */
+  const relevant = memo((cs) => new Set([].concat(...Object.entries(cs.nodes).map(([k, n]) => [].concat(...edgesOf(n, k).map((e) => e.ids)))).concat(...(cs.credits || []).map((x) => (x.test && x.test.ids) || []))));
+  const unneeded = (c, cs) => (c ? c.orders.filter((o) => o.ts >= c.from && ['lab', 'img'].includes(o.type) && o.status !== 'Draft' && !relevant(cs).has(o.catId)).length : 0);
+  /* A cost for ordering everything, as a credit, because points are never taken away: up to two extra tests is
+     curiosity or a reasonable hedge; more is a scattergun. `always` shows the reason even when the credit is earned. */
+  const FOCUS = { text: 'Focused work-up', always: true, test: (c, cs) => unneeded(c, cs) <= 2,
+    why: (c, cs) => { const k = unneeded(c, cs); return k === 0 ? 'No tests were ordered that this case did not need.' : k <= 2 ? `${k} test${k > 1 ? 's' : ''} ordered that this case did not need. Up to two is fine.` : `${k} tests ordered that this case did not need. Each one is a needle, a wait or a dose of radiation for the patient; order what will change what you do.`; } };
+  const creditsOf = (cs) => (cs.credits || []).concat(FOCUS);
+  /** The points a perfect play earns on the path: the most a clean road (only best or reasonable decisions) from
+      the start to a good ending can score. The old denominator was the learner's own path length times two, so a
+      short road to a bad ending had a small denominator and could show a higher percentage than a long good one.
+      A fixed number per case, taken from the data, means 100% is the best play the case allows. Clean, because a
+      road through a harm and its rescue has more steps and so more points to collect (in "chest", 9 against 8);
+      counting it would put 100% out of reach of the learner who never harmed anyone. Such a road is capped at
+      100%, and harm already rules out three stars. If a case had no clean road the best of any road is used. It
+      only feeds the percentage, and stars are best-of (finish() keeps rec.best), so nothing earned goes down. */
+  const bestRoad = memo((cs) => {
+    const go = (k, on, clean) => {
+      const n = cs.nodes[k]; if (!n) return -Infinity;
+      if (n.end) return n.end === 'well' ? 0 : -Infinity;
+      if (on.has(k)) return -Infinity;
+      on.add(k); const v = Math.max(-Infinity, ...edgesOf(n, k).filter((e) => !clean || PTS[e.grade]).map((e) => (PTS[e.grade] || 0) + go(e.to, on, clean))); on.delete(k);
+      return v;
+    };
+    const v = go(cs.start, new Set(), true);
+    return Math.max(0, v > -Infinity ? v : go(cs.start, new Set(), false));
+  });
   function result(a, abandoned) {
     const cs = def(a.id), n = cs.nodes[a.node], c = context(a);
-    const credits = (cs.credits || []).map((x) => ({ text: x.text, why: x.why, done: !!x.test(c) }));
-    const score = a.path.reduce((s, x) => s + (PTS[x.grade] || 0), 0) + credits.filter((x) => x.done).length, total = a.path.length * 2 + credits.length;
-    const pct = total ? Math.round((score / total) * 100) : 0, harm = a.path.filter((x) => x.grade === 'harm').length, outcome = abandoned ? 'left' : n.end;
+    const credits = creditsOf(cs).map((x) => ({ text: x.text, why: typeof x.why === 'function' ? x.why(c, cs) : x.why, done: !!x.test(c, cs), always: !!x.always }));
+    const score = a.path.reduce((s, x) => s + (PTS[x.grade] || 0), 0) + credits.filter((x) => x.done).length, total = bestRoad(cs) + credits.length;
+    const pct = total ? Math.min(100, Math.round((score / total) * 100)) : 0, harm = a.path.filter((x) => x.grade === 'harm').length, outcome = abandoned ? 'left' : n.end;
     const stars = outcome === 'well' ? (pct >= 85 && !harm ? 3 : 2) : outcome === 'rocky' ? 1 : 0;
     return { id: cs.id, title: cs.title, patient: E.pt(cs.pid).name, at: Date.now(), endedAt: hhmm(hosp(a)), outcome, ending: n.title, endText: n.story, steps: a.path, credits, score, total, pct, stars, harm };
   }
@@ -199,7 +289,7 @@
     const xp = E.game(pr).xp - before.xp;
     E.ui.modal = { type: 'caseResult', id: cs.id, xp };
     E.save();
-    if (xp) { say(`${OUT[r.outcome][0]} on “${cs.title}”.`, `+${xp} XP · Case`, 'star'); pose('cheer', 2600); }
+    if (xp) { say(`${OUT[r.outcome][0]} on “${cs.title}”.`, `+${xp} XP · Case`, 'star', r.outcome === 'well' ? 'big' : undefined); pose('cheer', 2600); }
     E.app.render();
   }
   E.caseXp = (pr) => Object.values(pr.cases || {}).reduce((n, r) => n + (r.best || 0), 0) * ((E.XP && E.XP.case) || 0);
@@ -229,23 +319,25 @@
         <p>${esc(cs.brief)}</p><footer>${stars(rec.best || 0)}${rec.last ? `<button class="btn xs" data-act="caseLast" data-id="${cs.id}">Last debrief</button>` : ''}<span class="spacer"></span>${on ? chip('In progress', 'amber') + ' ' : ''}${btn}</footer></article>`;
     }).join('');
     return `<h3 class="shelf-h">${icon('learning', 32)}Cases</h3>
-      <p class="muted shelf-p">A case is a new patient whose course depends on what you decide. Tests show something only if you order them, the attending asks what you want to do, and time matters. Each case can end three ways. Afterwards you see the path you took and the whole tree, with questions to take back to your group. One case, shift or mission at a time.</p>
-      ${a && a.type === 'case' ? `<div class="notice info">${icon('info', 24)}<span>A case is in progress. Finish or leave it from the case panel in the corner before starting anything else.</span></div>` : ''}
+      <p class="muted shelf-p">A case is a new patient whose course depends on what you decide. Tests show something only if you order them, the attending asks what you want to do, and time matters. Each case can end three ways. Afterwards you see the path you took, with questions to take back to your group. Once you reach a good ending, the whole tree opens too. One case, shift or mission at a time.</p>
+      ${a && a.type === 'case' ? `<div class="notice info">${icon('info', 24)}<span>A case is in progress. Finish or leave it from the case bar under the toolbar before starting anything else.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>`;
   };
 
-  /** The case panel in the bottom-left corner. It shows what is happening and what has happened, never the tree. */
+  /** The case strip under the toolbar (V.dockStrip, js/missions.js). It shows what is happening and what has happened, never the tree. */
   V.caseDock = (a) => {
     if (orphan(a)) return '';   // the patient is gone: the case has just been ended, and the next tick says so
-    const cs = def(a.id), n = cs.nodes[a.node], p = E.pt(cs.pid), min = !!E.ui.dockMin;
-    const body = `<p class="dock-pt">${icon('user', 16)}<a href="#/pt/${p.id}/summary">${esc(p.name)}</a></p>
+    const cs = def(a.id), n = cs.nodes[a.node], p = E.pt(cs.pid);
+    const sum = `<p class="dock-pt">${icon('user', 16)}<a href="#/pt/${p.id}/summary">${esc(p.name)}</a></p>
       ${a.paused ? `<p class="shift-paused">${icon('info', 16)}<span>Paused. Nothing changes until you resume.</span></p>` : ''}
-      <h5>Now · ${esc(n.title)}</h5><p class="dock-brief case-now">${esc(n.story)}</p>
+      <span class="dock-story" title="${esc(n.story)}"><b>Now · ${esc(n.title)}.</b> ${esc(n.story)}</span>
       ${n.urgent && !a.done ? `<p class="shift-now">${icon('alert', 16)}<a href="#/pt/${p.id}/orders">${p.sex === 'M' ? 'He' : 'She'} needs you now</a></p>` : ''}
-      ${n.ask && !a.done ? `<p class="shift-now">${icon('help', 16)}<button class="linkish" data-act="caseAskOpen">${esc(n.ask.who || 'The attending')} is waiting for your answer</button></p>` : ''}
-      ${a.path.length ? `<h5>So far</h5><ul class="dock-list">${a.path.map((s) => `<li class="done"><i class="tick1"></i><span>${esc(s.label)}<small>${s.at}</small></span></li>`).join('')}</ul>` : ''}
-      <div class="dock-acts">${a.done ? '<button class="btn xs primary" data-act="caseDebrief">See the debrief</button>' : `<button class="btn xs" data-act="casePause">${a.paused ? 'Resume' : 'Pause'}</button><button class="btn xs" data-act="caseLeave">Leave case</button>`}</div>`;
-    return `<aside class="dock${min ? ' min' : ''} dock-shift dock-case${a.paused ? ' paused' : ''}" aria-label="Case: ${esc(cs.title)}"><header class="dock-h">${icon('learning', 16)}<b>${esc(cs.title)}</b><span id="case-clock" class="dock-timer">${hhmm(hosp(a))}</span><button class="cap" data-act="dockToggle" title="${min ? 'Show' : 'Minimize'}" aria-label="${min ? 'Show panel' : 'Minimize panel'}">${min ? MAX_SVG : MIN_SVG}</button></header><div class="dock-b">${body}</div></aside>`;
+      ${n.ask && !a.done ? `<p class="shift-now">${icon('help', 16)}<button class="linkish" data-act="caseAskOpen">${esc(n.ask.who || 'The attending')} is waiting for your answer</button></p>` : ''}`;
+    const body = `<h5>Now · ${esc(n.title)}</h5><p class="dock-brief case-now">${esc(n.story)}</p>
+      ${n.paths && !a.done ? `<p class="dock-brief">${esc(waitLine(n, p))}</p>` : ''}
+      ${a.path.length ? `<h5>So far</h5><ul class="dock-list">${a.path.map((s) => `<li class="done"><i class="tick1"></i><span>${esc(s.label)}<small>${s.at}</small></span></li>`).join('')}</ul>` : ''}`;
+    const acts = `${a.done ? '<button class="btn xs primary" data-act="caseDebrief">See the debrief</button>' : `${n.paths && !a.paused && timesOf(n).length ? '<button class="btn xs" data-act="caseWait" title="Moves the case clock on to the next point where something happens, as if you had waited">I have done what I can for now</button>' : ''}<button class="btn xs" data-act="casePause">${a.paused ? 'Resume' : 'Pause'}</button><button class="btn xs" data-act="caseLeave">Leave case</button>`}`;
+    return V.dockStrip({ type: 'case', cls: `dock-shift dock-case${a.paused ? ' paused' : ''}`, label: `Case: ${cs.title}`, glyph: 'learning', title: cs.title, timer: `<span id="case-clock" class="dock-timer">${hhmm(hosp(a))}</span>`, sum, acts, body, more: 'The story so far' });
   };
 
   /** The whole tree as nested lists, with the learner's own path marked. */
@@ -255,7 +347,7 @@
     seen.add(key);
     const head = `<span class="tr-node${on ? ' on' : ''}">${n.end ? chip(OUT[n.end][0], OUT[n.end][1]) + ' ' : ''}<b>${esc(n.title)}</b>${n.ask ? `<small>${esc(n.ask.who || 'The attending')} asks: ${esc(n.ask.q)}</small>` : ''}</span>`;
     const edges = edgesOf(n, key);
-    return head + (edges.length ? `<ul>${edges.map((e) => { const mine = took.edges.has(`${key}>${e.to}|${e.label}`); const joins = !mine && took.nodes.has(e.to) && !seen.has(e.to);   // your road draws this node; here it is only named
+    return head + (edges.length ? `<ul>${edges.map((e) => { const mine = took.edges.has(e.id) || took.edges.has(`${key}>${e.to}|${e.label}`); const joins = !mine && took.nodes.has(e.to) && !seen.has(e.to);   // your road draws this node; here it is only named
       return `<li class="${mine ? 'on' : ''}"><span class="tr-edge">${chip(GRADE[e.grade][0], GRADE[e.grade][1])} ${esc(e.label)}${mine ? ' <b class="tr-you">your choice</b>' : ''}</span>${joins ? `<span class="tr-node ref">joins “${esc(cs.nodes[e.to].title)}”</span>` : tree(cs, e.to, took, seen)}</li>`; }).join('')}</ul>` : '');
   }
 
@@ -266,22 +358,26 @@
       return modal(`${n.ask.who || 'The attending'} is asking`, `
         <div class="g-pt">${icon('user', 32)}<div><b>${esc(p.name)}</b> · ${E.age(p.dob)} ${p.sex} · ${esc(p.bed)}<span>${esc(n.story)}</span></div></div>
         <p class="dock-qt rounds-q">“${esc(n.ask.q)}”</p>
-        ${n.ask.options.map((o, i) => `<button class="qopt" data-act="casePick" data-i="${i}">${esc(o.text)}</button>`).join('')}
+        ${optOrder(a, n).map((i) => `<button class="qopt" data-act="casePick" data-i="${i}">${esc(n.ask.options[i].text)}</button>`).join('')}
         <p class="fine">The hospital clock waits while you are being asked. If you want to look at the chart first, step out and come back from the case panel; the clock runs while you look. An answer is final.</p>`,
         '<button class="btn" data-act="closeModal">Step out to check the chart</button>', 'lg');
     },
     caseResult(m, modal) {
-      const pr = E.progress(), r = ((pr.cases || {})[m.id] || {}).last, cs = def(m.id); if (!r) return '';
-      const took = { nodes: new Set([cs.start].concat(r.steps.map((s) => s.to))), edges: new Set(r.steps.map((s) => `${s.from}>${s.to}|${s.label}`)) };
+      const pr = E.progress(), rec = (pr.cases || {})[m.id] || {}, r = rec.last, cs = def(m.id); if (!r || !cs) return '';
+      // the road is matched on the stored edge id; a play stored before edge ids existed falls back to its label
+      const took = { nodes: new Set([cs.start].concat(r.steps.map((s) => s.to))), edges: new Set(r.steps.map((s) => s.edge || `${s.from}>${s.to}|${s.label}`)) };
+      // the whole tree, with every grade, only once this learner has reached a good ending on this case (stars are
+      // best-of, and only a good ending earns two or more)
+      const open = (rec.history || []).some((h) => h.outcome === 'well') || (rec.best || 0) >= 2;
       return modal(`Case debrief — ${cs.title}`, `
         <div class="result-head">${stars(r.stars, 48)}<div><b>${esc(OUT[r.outcome][0])}</b><span>${esc(r.patient)} · ${esc(r.ending)} · ${r.endedAt}</span><span>${r.score} of ${r.total} points${m.xp ? ` <span class="xp">+${m.xp} XP</span>` : ''}</span></div></div>
         <p class="case-end">${esc(r.endText)}</p>
         <p class="fine">Three stars: a good outcome with 85% or more of the points and no harm. Two: a good outcome. One: a rocky course. Your best result on each case counts toward your level; points are never taken away.</p>
         <h4>Your path</h4><ol class="case-path">${r.steps.map((s) => `<li><span class="nowrap">${s.at}</span><div><b>${esc(s.label)}</b> ${chip(GRADE[s.grade][0], GRADE[s.grade][1])}<small>${esc(s.why)}</small></div></li>`).join('') || '<li><span></span><div>No decisions were made.</div></li>'}</ol>
-        ${r.credits.length ? `<h4>Loose ends</h4><ul class="dock-list wide">${r.credits.map((x) => `<li class="${x.done ? 'done' : 'bad'}">${icon(x.done ? 'check' : 'remove', 16)}<span>${esc(x.text)}${x.done ? '' : `<small>${esc(x.why)}</small>`}</span></li>`).join('')}</ul>` : ''}
-        <h4>The whole tree</h4><p class="fine">Every road this case could have taken. Yours is marked.</p><div class="tree"><ul><li class="on">${tree(cs, cs.start, took, new Set())}</li></ul></div>
+        ${r.credits.length ? `<h4>Loose ends</h4><ul class="dock-list wide">${r.credits.map((x) => `<li class="${x.done ? 'done' : 'bad'}">${icon(x.done ? 'check' : 'remove', 16)}<span>${esc(x.text)}${x.done && !x.always ? '' : `<small>${esc(x.why)}</small>`}</span></li>`).join('')}</ul>` : ''}
+        ${open ? `<h4>The whole tree</h4><p class="fine">Every road this case could have taken. Yours is marked.</p><div class="tree"><ul><li class="on">${tree(cs, cs.start, took, new Set())}</li></ul></div>` : ''}
         <h4>Learning issues for your group</h4><ol class="case-issues">${cs.issues.map((q) => `<li>${esc(q)}</li>`).join('')}</ol>
-        <div class="debrief shift-debrief">${icon('learning', 48)}<div><p>${esc(cs.debrief)}</p></div></div>`,
+        ${open ? `<div class="debrief shift-debrief">${icon('learning', 48)}<div><p>${esc(cs.debrief)}</p></div></div>` : `<p class="fine case-map-locked">The full map of this case, with every road and its grade, opens after you reach a good ending.</p>`}`,
         `${r.stars < 3 ? `<button class="btn" data-act="caseAsk" data-id="${cs.id}">Play again</button>` : ''}<a class="btn" href="#/missions" data-act="closeModal">All cases</a><button class="btn primary" data-act="closeModal">Close</button>`, 'xl');
     },
   });
@@ -307,14 +403,26 @@
       const p = buildPatient(cs); p.isNew = true; p.arrive = (cs.nodes[cs.start].scene || {}).kind === 'arrive' ? 'amb' : 'walk';   // by ambulance, or on foot (js/world.js)
       E.db.patients.push(p);
       const a = (pr.active = { type: 'case', id, start: Date.now(), startHour: cs.startHour, elapsed: 0, paused: false, path: [], node: null });
-      Object.assign(E.ui, { modal: null, dockMin: false });
+      Object.assign(E.ui, { modal: null, dockMin: false, dockOpen: false });
       last = Date.now();
       E.audit(`Started case: ${cs.title}`, cs.pid);
       enter(a, cs.start, null);
       E.save();
       E.app.go(`#/pt/${cs.pid}/summary`);
     },
-    caseAskOpen() { const a = myCase(); if (!a || !def(a.id).nodes[a.node].ask) return; E.ui.modal = { type: 'caseAsk' }; E.app.render(); },
+    caseAskOpen() { const a = myCase(), n = a && def(a.id).nodes[a.node]; if (!n || !n.ask) return; optOrder(a, n); E.ui.modal = { type: 'caseAsk' }; E.save(); E.app.render(); },
+    /** "I have done what I can for now": the learner says they are finished with this node, so the clock runs on
+        to its next timed exit (caseTick does it, after the usual settle, and only if no condition exit fires first). */
+    caseWait() {
+      const a = myCase(); if (!a || a.done || a.paused) return;
+      const cs = def(a.id), n = cs.nodes[a.node]; if (!n.paths || !timesOf(n).length) return;
+      const busy = onTheWay(a, n);
+      if (busy.length) return E.app.status(`${busy[0].name} is still on its way. The case waits for it, as it would if you waited.`);
+      a.skip = true;
+      E.audit('Said they had done what they could for now (case clock moved on)', cs.pid);
+      E.caseTick();
+      E.app.commit();
+    },
     casePick(d) {
       const a = myCase(); if (!a) return;
       const n = def(a.id).nodes[a.node], o = n.ask && n.ask.options[Number(d.i)]; if (!o) return;
@@ -377,24 +485,33 @@
   const BMP = (Na, K, Cl, CO2, BUN, Cr, Glu, Ca) => ({ Na, K, Cl, CO2, BUN, Cr, Glu, Ca });
   const CBC = (WBC, Hgb, Hct, Plt) => ({ WBC, Hgb, Hct, Plt });
   const STEMI = 'Sinus rhythm, rate 102. 3 mm ST-segment elevation in II, III and aVF with reciprocal ST depression in I and aVL. Compared with the earlier tracing these changes are new.\n\nIMPRESSION: ACUTE INFERIOR ST-ELEVATION MYOCARDIAL INFARCTION. The ordering team was called.';
-  const NITRO = { when: W.active('nitro_sl'), to: 'nitro', grade: 'harm', label: 'Nitroglycerin given', why: 'He took sildenafil last night; it is in the H&P under home medications. A nitrate within 24 hours of sildenafil can drop the blood pressure dangerously.' };
+  /* FACULTY: the sildenafil is no longer in the H&P (2026-11-24). It is on no list; he says so when asked about
+     pills he takes now and then (the chest case's `interview`), and erectile dysfunction is on his problem list as
+     the clue. Asking the patient is the reliable way to learn it before the nitroglycerin decision. */
+  const ASK_PRN = 'Do you take anything else, even pills you only take now and then?';
+  const NITRO = { when: W.active('nitro_sl'), to: 'nitro', grade: 'harm', label: 'Nitroglycerin given', why: 'He took sildenafil last night. It was on no medication list, but he says so when asked about pills he takes now and then, and erectile dysfunction is on his problem list. A nitrate within 24 hours of sildenafil can drop the blood pressure dangerously.' };
   const ACS_TX = [
     { when: W.all(W.ordered('heparin_gtt'), W.ordered('c_cards')), to: 'evolve', grade: 'best', label: 'Heparin infusion and a cardiology consult ordered', why: 'Anticoagulation and early cardiology input are the treatment for an NSTEMI. He had his aspirin in the emergency department.' },
     { when: W.any(W.ordered('heparin_gtt'), W.ordered('c_cards')), after: 0.75, to: 'evolve', grade: 'ok', label: 'Only half the plan was ordered', why: 'The plan had two parts: heparin and cardiology. A plan that is agreed but only half entered is half a plan.' },
     { after: 1.25, to: 'missed', grade: 'late', label: 'The plan was agreed but never ordered', why: 'Nothing reaches the patient until it is an order. An hour passed with no anticoagulant and no cardiologist.' },
   ];
   const DEX = (grade, label, why) => ({ when: W.ordered('dextrose50'), to: 'awake', grade, label, why });
+  /* The contrast CT is decided by the attempt (W.tried), not the result. At a creatinine of 2.3 the kidney harm rule
+     (js/shift.js) makes the simulated attending decline it for a student, so a road that waited for its result could
+     never be travelled by one; and a physician's signed CT would start the global harm crisis as well as the case's.
+     The attempt takes the poor road to "ctstop", where Dr. Tanaka stops the CT before it is done (for a physician,
+     inside the harm rule's delay, so it counts as stopped in time) and the V/Q scan is still needed. */
   const PE_TEST = [
     { when: W.resulted('vq'), to: 'pe', grade: 'best', label: 'V/Q lung scan', why: 'With a creatinine of 2.3 the contrast for a CT angiogram risks the kidneys. A V/Q scan answers the same question without contrast.' },
-    { when: W.resulted('ctpe'), to: 'pe', grade: 'poor', label: 'CT angiogram with contrast, at a creatinine of 2.3', why: 'It found the clot, and it cost kidney function she could not spare. The creatinine was in Results before the order was signed.' },
+    { when: W.tried('ctpe'), to: 'ctstop', grade: 'poor', label: 'CT angiogram with contrast, at a creatinine of 2.3', why: 'Contrast risks kidney function she cannot spare, and the creatinine was in Results before the order was entered. Dr. Tanaka stopped it, and time went by before the right test.' },
   ];
 
   E.CASES = [
     /* ---------------------------------------------------------------------------------------------- */
     {
       id: 'chest', n: 1, pid: 'p8', title: 'Pressure in the chest', level: 'Time-critical', glyph: 'vitals', startHour: 13,
-      brief: 'A 58-year-old man comes up from the emergency department with two hours of chest pressure. Their ECG was “nonspecific” and the first troponin was normal.',
-      debrief: 'One normal troponin early in chest pain rules out nothing: the story, a repeat ECG and a second troponin do the work. And the home medication list is a safety check, not paperwork: one line in it made a routine drug dangerous.',
+      brief: 'A 58-year-old man comes up from the emergency department with two hours of chest pressure. His ECG was “nonspecific” and the first troponin was normal.',
+      debrief: 'One normal troponin early in chest pain rules out nothing: the story, a repeat ECG and a second troponin do the work. And the medication history is a safety check, not paperwork: one pill he takes now and then, on no list, made a routine drug dangerous. Only he could tell you about it.',
       issues: [
         'How do unstable angina, NSTEMI and STEMI differ on the ECG and the troponin, and why does the difference change how fast you act?',
         'How soon after the start of chest pain can a troponin be normal in a heart attack? What does “serial” mean in practice?',
@@ -403,8 +520,13 @@
         'Where does the home medication list live in the record, who is responsible for it, and how would you check it with the patient?',
       ],
       credits: [
-        { text: 'Opened the H&P before treating him', why: 'The sildenafil was in the H&P, under home medications.', test: W.viewed('Notes') },
+        { text: 'Opened the H&P before treating him', why: 'The H&P holds his risk factors and the plan the team agreed: repeat the ECG and the troponin.', test: W.viewed('Notes') },
         { text: 'Signed a note about the event', why: 'A change of diagnosis from “rule out” to a heart attack needs a note the next team can find.', test: W.note(['troponin', 'stemi', 'nstemi', 'ecg', 'infarct']) },
+        { text: 'Asked the patient about pills he takes now and then', why: 'He took sildenafil last night and it was on no list. Asking him is how you learn it before anyone reaches for nitroglycerin.', test: W.asked(ASK_PRN) },
+      ],
+      interview: [
+        { q: ASK_PRN, a: 'Just the blood pressure one and the diabetes ones. Oh. And the blue pill, the Viagra, from the urology doctor. I took one last night, about ten. Does that matter?' },
+        { q: 'Have you ever had pain like this before?', a: 'Never like this. Sometimes a tightness on the hill to the bus stop these last few weeks, but it went when I stopped.' },
       ],
       patient: (K) => ({
         admitH: -2.2, attending: PARK,
@@ -418,7 +540,7 @@
             K.rep(-2, 'Cardiology', 'ECG 12-lead', 'Sinus rhythm, rate 94. Nonspecific T-wave flattening in the lateral leads. No ST-segment elevation.\n\nIMPRESSION: Nonspecific T-wave changes. Repeat if symptoms persist.', 'Cardiology'),
             K.rep(-1.8, 'Imaging', 'XR chest 1 view, portable', 'FINDINGS: Lungs clear. Heart size normal. The mediastinum is not widened. No pneumothorax.\n\nIMPRESSION: No acute cardiopulmonary process.'),
           ],
-          notes: [K.note(-0.8, 'H&P', PARK, 'physician', 'HISTORY & PHYSICAL\n\nCHIEF COMPLAINT: Chest pressure for 2 hours.\n\nHPI: 58 y.o. man with hypertension, type 2 diabetes, high cholesterol and a 30 pack-year smoking history. While carrying groceries up the stairs he developed a heavy pressure behind the breastbone, spreading to the left jaw, with sweating and nausea. It eased when he sat down and has not gone. Now 6/10. No tearing pain, no pain on breathing in, no leg swelling. His father had a heart attack at 54.\n\nHOME MEDICATIONS: amlodipine 10 mg daily; metformin 1,000 mg twice daily; atorvastatin 40 mg nightly; sildenafil 50 mg as needed (last dose yesterday evening, about 22:00).\nALLERGIES: none known.\n\nEXAM: HR 96, BP 158/94 (equal in both arms), RR 20, SpO2 96% on room air. Uncomfortable, sweaty. Heart sounds normal, no murmur. Lungs clear. No leg swelling.\n\nDATA: ECG in the emergency department: nonspecific T-wave flattening. First troponin 0.03 (normal), drawn 2 hours after onset. Chest X-ray clear, mediastinum normal. Aspirin 325 mg chewed in the emergency department.\n\nASSESSMENT & PLAN:\n1. Chest pain, concerning for acute coronary syndrome: several risk factors and a typical story. One normal troponin at 2 hours does not rule it out. Telemetry. Repeat ECG and troponin on arrival to the floor and with any change in pain.\n2. Hypertension, diabetes: continue home medications.\n3. Tobacco use: counselled.\nCode status: Full.')],
+          notes: [K.note(-0.8, 'H&P', PARK, 'physician', 'HISTORY & PHYSICAL\n\nCHIEF COMPLAINT: Chest pressure for 2 hours.\n\nHPI: 58 y.o. man with hypertension, type 2 diabetes, high cholesterol and a 30 pack-year smoking history. While carrying groceries up the stairs he developed a heavy pressure behind the breastbone, spreading to the left jaw, with sweating and nausea. It eased when he sat down and has not gone. Now 6/10. No tearing pain, no pain on breathing in, no leg swelling. His father had a heart attack at 54.\n\nHOME MEDICATIONS (from the emergency department triage list, not yet checked with the patient): amlodipine 10 mg daily; metformin 1,000 mg twice daily; atorvastatin 40 mg nightly.\nALLERGIES: none known.\n\nEXAM: HR 96, BP 158/94 (equal in both arms), RR 20, SpO2 96% on room air. Uncomfortable, sweaty. Heart sounds normal, no murmur. Lungs clear. No leg swelling.\n\nDATA: ECG in the emergency department: nonspecific T-wave flattening. First troponin 0.03 (normal), drawn 2 hours after onset. Chest X-ray clear, mediastinum normal. Aspirin 325 mg chewed in the emergency department.\n\nASSESSMENT & PLAN:\n1. Chest pain, concerning for acute coronary syndrome: several risk factors and a typical story. One normal troponin at 2 hours does not rule it out. Telemetry. Repeat ECG and troponin on arrival to the floor and with any change in pain.\n2. Hypertension, diabetes: continue home medications.\n3. Tobacco use: counselled.\nCode status: Full.')],
           encounters: [K.enc(60, 'Office Visit', 'Primary Care', 'Iwasaki, Glenn MD', 'Hypertension follow-up'), K.enc(400, 'Office Visit', 'Urology Clinic', 'Brandt, Colin MD', 'Erectile dysfunction')],
           sim: {
             labs: { Trop: 0.86 },
@@ -434,7 +556,7 @@
         arrive: {
           title: 'Up from the emergency department',
           scene: { kind: 'arrive', lines: ['Mr. Kealoha, 58, comes up to 5 West with two hours of pressure in his chest.', 'The emergency department ECG was “nonspecific”. The first troponin was normal.', 'He still has pain. He is yours now.'] },
-          story: 'He still has 6/10 chest pressure. The emergency department ECG was nonspecific and the first troponin, at 2 hours, was normal. Read the H&P, then decide what he needs.',
+          story: 'He still has 6/10 chest pressure. The emergency department ECG was nonspecific and the first troponin, at 2 hours, was normal. Read the H&P and talk to him, then decide what he needs.',
           paths: [NITRO,
             { when: W.all(W.resulted('ecg'), W.resulted('trop')), to: 'nstemi', grade: 'best', label: 'Repeated the ECG and the troponin', why: 'Ongoing pain earns a repeat ECG and a second troponin. One normal troponin two hours in rules out nothing.' },
             { when: W.any(W.resulted('ecg'), W.resulted('trop')), after: 0.75, to: 'nstemi', grade: 'ok', label: 'Repeated one of the two', why: 'The ECG shows ischemia now; the troponin shows injury over hours. They answer different questions and he needed both.' },
@@ -505,6 +627,11 @@
       credits: [
         { text: 'Ordered glucose checks to follow her', why: 'A sulfonylurea keeps working for a day or more. One normal glucose after dextrose is not the end of it.', test: W.ordered('poc_glu') },
         { text: 'Signed a note about the event', why: 'The night team needs to know she was hypoglycemic, why, and what to do if it happens again.', test: W.note(['glucose', 'hypoglyc', 'glipizide']) },
+        { text: 'Asked the patient about low spells at home', why: 'She had two shaky, sweaty spells before lunch last week. The glipizide was already too much before she was admitted, so it needs to stop for good, not only for today.', test: W.asked('Have you felt shaky or sweaty like this before, at home?') },
+      ],
+      interview: [
+        { q: 'Have you felt shaky or sweaty like this before, at home?', a: 'Yes. Twice last week, before lunch. I went shaky and sweaty and my heart was racing. A cookie fixed it, so I did not tell anyone.' },
+        { q: 'What have you had to eat today?', a: 'Nothing. A few bites of dinner last night. Nothing tastes right. I still took my pills this morning, like always.' },
       ],
       patient: (K) => ({
         admitH: -50, attending: VAS, given: [['acetaminophen', -7]],
@@ -631,6 +758,10 @@
       credits: [
         { text: 'Looked for the cause with an ultrasound', why: 'Gallstones and alcohol cause most pancreatitis. An ultrasound tells them apart and a gallstone changes the plan.', test: W.ordered('usruq') },
         { text: 'Ordered withdrawal scoring before he needed it', why: 'A man who drinks every night should be scored for withdrawal from admission, so the first tremor is treated and not the first seizure.', test: W.ordered('ciwa') },
+        { text: 'Asked the patient about past withdrawal', why: 'He had a withdrawal seizure two years ago and it was on no list. A past seizure is the strongest warning that the next withdrawal will be severe.', test: W.asked('Have you ever had the shakes, or a fit, when you stopped drinking?') },
+      ],
+      interview: [
+        { q: 'Have you ever had the shakes, or a fit, when you stopped drinking?', a: 'Once. Two years ago I tried to quit cold. The second day my hands would not stop shaking, and my girlfriend says I had a fit on the kitchen floor. I never saw a doctor about it.' },
       ],
       patient: (K) => ({
         admitH: -2.5, attending: VAS,
@@ -746,6 +877,11 @@
       credits: [
         { text: 'Asked the surgeons to see her', why: 'Anticoagulating a two-day-old bowel join is the surgeon’s risk as much as yours. They need to hear it from you.', test: W.ordered('c_surg') },
         { text: 'Ordered a CBC to watch for bleeding on heparin', why: 'A fresh wound on a heparin infusion is watched with a daily hemoglobin and platelet count.', test: W.ordered('cbc') },
+        { text: 'Asked the patient about her legs', why: 'Her right calf has ached since yesterday and she told nobody. A painful calf two days after surgery makes a clot the likeliest cause of her breathlessness.', test: W.asked('Have you had any pain or swelling in your legs?') },
+      ],
+      interview: [
+        { q: 'Have you had any pain or swelling in your legs?', a: 'My right calf has ached since yesterday, like a cramp that will not go away. I thought it was from lying in bed, so I did not say anything.' },
+        { q: 'Has anyone in your family had a blood clot?', a: 'My mother had one in her lung, after she broke her hip. She was in the hospital a long time.' },
       ],
       patient: (K) => ({
         admitH: -54, attending: TAN, given: [['oxycodone', -9], ['oxycodone', -4]],
@@ -801,6 +937,14 @@
           paths: PE_TEST.concat([
             { when: W.resulted('ddimer'), to: 'dd', grade: 'poor', label: 'D-dimer', why: 'Nearly everyone has a raised D-dimer two days after surgery. A positive result cannot tell you anything, and she is too likely to have a clot for a negative one to reassure.' },
             { after: 1.5, to: 'crash', grade: 'late', label: 'No test for a clot in ninety minutes', why: 'A likely pulmonary embolism sat on oxygen with no diagnosis and no treatment.' }]),
+        },
+        ctstop: {
+          title: 'The CT is stopped', urgent: true,
+          enter: { stop: ['ctpe'], msg: { from: TAN, subject: 'Tavares, Grace — CT angiogram stopped', body: 'I have stopped the CT angiogram. Her creatinine is 2.3, up from 1.8, and the contrast could push her kidneys into failure.\n\nShe still needs a test that shows a clot. A V/Q scan answers the same question without contrast.\n\nMiriam Tanaka' } },
+          story: 'Dr. Tanaka has stopped the contrast CT: at a creatinine of 2.3 it could push her kidneys into failure. She still needs a test that shows a clot.',
+          paths: [
+            { when: W.resulted('vq'), to: 'pe', grade: 'ok', label: 'V/Q scan, once the CT was stopped', why: 'The right test in the end, after time spent on one her kidneys could not afford.' },
+            { after: 1, to: 'crash', grade: 'late', label: 'No test for a clot after the CT was stopped', why: 'Stopping the wrong test is not the same as ordering the right one.' }],
         },
         dd: {
           title: 'A D-dimer of 4.8', urgent: true,
@@ -873,6 +1017,11 @@
       credits: [
         { text: 'Checked the MAR for new medicines', why: 'Diphenhydramine was started last night and given twice. It causes both confusion and urinary retention in older men.', test: W.viewed('MAR') },
         { text: 'Sent a urinalysis', why: 'Infection is one of the common causes, and a retained bladder is a set-up for one.', test: W.ordered('ua') },
+        { text: 'Asked the patient about passing water', why: 'He needed to go and could not, and his lower belly hurt. In an older man with a large prostate that is retention until a scan says otherwise.', test: W.asked('When did you last pass water? Does anything hurt?') },
+      ],
+      interview: [
+        { q: 'When did you last pass water? Does anything hurt?', a: 'I need to go and nothing comes. It hurts, down here, low down. Since this morning. Nobody will let me go.' },
+        { q: 'Did they give you anything new to help you sleep?', a: 'A little pink pill. Last night, and again today. My mouth is so dry I can hardly talk.' },
       ],
       patient: (K) => ({
         admitH: -68, attending: VAS, given: [['diphenhydramine', -19.5, 'For sleep'], ['oxycodone', -18], ['oxycodone', -7], ['diphenhydramine', -2.5, 'Restless, asking to go home']],
@@ -988,6 +1137,10 @@
       credits: [
         { text: 'Rechecked his potassium and kidney function', why: 'Burst red cells release potassium, and free hemoglobin injures the kidney. Both need a number today.', test: W.ordered('bmp', 'cmp') },
         { text: 'Signed a note about the reaction', why: 'A transfusion reaction is documented the same day: what was seen, what was stopped, what was sent.', test: W.note(['transfusion', 'hemoly', 'reaction']) },
+        { text: 'Asked the patient how the bag was checked', why: 'Only his surname was checked before the second unit. That points to the wrong blood before any test comes back, and to another patient.', test: W.asked('Did the nurse check your name band before this bag?') },
+      ],
+      interview: [
+        { q: 'Did the nurse check your name band before this bag?', a: 'The nurse with this one just said “Mr. Fonoti?” and I said yes. She did not look at my band. The first nurse read out my birthday and checked my band twice.' },
       ],
       patient: (K) => ({
         admitH: -9, attending: PARK,
@@ -1086,6 +1239,11 @@
       credits: [
         { text: 'Checked her thyroid', why: 'An overactive thyroid is a treatable cause of new atrial fibrillation and is easy to miss in an older patient.', test: W.ordered('tsh') },
         { text: 'Kept her on telemetry', why: 'A new fast rhythm on a rate-controlling drug is watched on a monitor.', test: W.ordered('tele') },
+        { text: 'Asked the patient about falls and bleeding', why: 'She walks every day, has not fallen and has never bled badly. That is the bedside half of deciding an anticoagulant is safe for her.', test: W.asked('Have you had a fall, or any bleeding, in the last year?') },
+      ],
+      interview: [
+        { q: 'Have you had a fall, or any bleeding, in the last year?', a: 'No falls. I walk to the market every morning. No bleeding either, apart from my gums now and then when I floss.' },
+        { q: 'Has your heart raced like this before?', a: 'Never. Not once in seventy-six years. That is why it frightened me.' },
       ],
       patient: (K) => ({
         admitH: -22, attending: VAS,
@@ -1178,11 +1336,56 @@
     },
   ];
 
+  /** The case patient's starting chart, read from the case data without building the real patient (no ids, no
+      MAR, nothing put on the ward): enough for the advisories and harm rules to judge an order against. */
+  function specOf(cs) {
+    const K = { T: (h) => h, vit: () => [], rep: () => ({}), note: () => ({}), enc: () => ({}),
+      labs: (rows) => rows.map(([h, name, values]) => ({ id: 'l' + h, ts: h, name, values })),
+      al: (agent, cls, reaction, severity, type) => ({ agent, cls, reaction, severity, type: type || 'Drug allergy', status: 'Active', verified: true }),
+      prob: (name) => ({ name, status: 'Active' }) };
+    return cs.patient(K);
+  }
   /* A check for faculty editing the trees: every destination exists, every node can be reached, every node has
-     one way out. Run EHR.caseCheck() in the browser console; it returns a list of problems (empty when sound). */
+     one way out, every catalogue id exists, every question W.asked looks for is one the patient can be asked, and
+     no path waits on an order the simulated attending would decline for this patient (a high advisory or a harm
+     rule): a student could never travel that road; use W.tried for it. The chart it judges against is the
+     patient's starting chart plus the labs the node itself files, which is close enough for the creatinine and
+     potassium the harm rules read. Run EHR.caseCheck() in the browser console; it returns a list of problems
+     (empty when sound). It also runs once at load and warns in the console, never to learners. */
   E.caseCheck = () => {
     const out = [];
     E.CASES.forEach((cs) => {
+      let spec = null;
+      try { spec = specOf(cs); } catch (err) { out.push(`${cs.id}: the patient could not be read (${err.message})`); }
+      const cat = (id, where) => { if (!E.cat(id)) out.push(`${cs.id}: ${where} uses "${id}", which is not in the order catalogue`); };
+      const qs = (cs.interview || []).map((x) => norm(x.q));
+      (cs.interview || []).forEach((x, i) => { if (!x.q || !x.a) out.push(`${cs.id}: interview question ${i + 1} needs both q and a`); });
+      const asks = (f, where) => ((f && f.asks) || []).forEach((t) => { if (!qs.includes(norm(t))) out.push(`${cs.id}: ${where} waits for the question “${t}”, which is not in the case's interview`); });
+      (cs.credits || []).forEach((x) => { ((x.test && x.test.ids) || []).forEach((id) => cat(id, `credit “${x.text}”`)); asks(x.test, `credit “${x.text}”`); });
+      if (spec) {
+        spec.orders.forEach(([id]) => cat(id, 'the starting orders'));
+        (spec.given || []).forEach(([id]) => cat(id, 'the MAR'));
+        const sim = (spec.chart && spec.chart.sim) || {};
+        Object.keys(sim.reports || {}).concat(Object.keys(sim.consults || {})).forEach((id) => cat(id, 'sim'));
+      }
+      Object.entries(cs.nodes).forEach(([k, n]) => {
+        const en = n.enter || {};
+        (en.orders || []).forEach(([id]) => cat(id, `node "${k}" (enter.orders)`));
+        (en.stop || []).forEach((id) => cat(id, `node "${k}" (enter.stop)`));
+        Object.keys((en.truth && en.truth.reports) || {}).forEach((id) => cat(id, `node "${k}" (enter.truth)`));
+        (n.paths || []).forEach((x, i) => { asks(x.when, `node "${k}" path ${i + 1}`); ((x.when && x.when.ids) || []).forEach((id) => cat(id, `node "${k}" path ${i + 1}`)); });
+        if (!spec || !n.paths || !E.checkDraft) return;
+        const own = !en.labs ? [] : Array.isArray(en.labs[0]) ? en.labs : [en.labs];
+        const p = Object.assign({ allergies: [], problems: [], dob: '1950-01-01' }, spec.chart, { id: cs.pid, attending: spec.attending,
+          labs: (spec.chart.labs || []).concat(own.map(([name, values], j) => ({ id: 'n' + j, ts: 1e6 + j, name, values }))),
+          orders: spec.orders.map(([catId]) => ({ id: 'o_' + catId, catId, status: 'Active', type: (E.cat(catId) || {}).type })) });
+        (n.paths || []).forEach((x, i) => ((x.when && x.when.wait) || []).forEach((id) => {
+          if (!E.cat(id)) return;
+          const o = E.newOrder(id, { by: 'caseCheck', byRole: 'student', status: 'Pended' });
+          const high = E.checkDraft(p, o, []).find((al) => al.level === 'high'), rule = E.harmRule && E.harmRule(p, o);
+          if (high || rule) out.push(`${cs.id}: node "${k}" path ${i + 1} (“${x.label}”) waits on ${id}, which the attending declines for a student here (${(rule && rule.title) || high.title}). Use W.tried.`);
+        }));
+      });
       const seen = new Set(), walk = (k) => { if (seen.has(k)) return; seen.add(k); const n = cs.nodes[k]; if (!n) { out.push(`${cs.id}: no node called "${k}"`); return; } edgesOf(n, k).forEach((e) => walk(e.to)); };
       walk(cs.start);
       Object.entries(cs.nodes).forEach(([k, n]) => {
@@ -1194,4 +1397,7 @@
     });
     return out;
   };
+  // once at load, for whoever edits the data: a console warning, never an error and never shown to learners
+  try { const bad = E.caseCheck(); if (bad.length && window.console) console.warn(`SIM+EHR cases: ${bad.length} problem(s) in the case data\n- ${bad.join('\n- ')}`); }
+  catch (err) { if (window.console) console.warn('SIM+EHR cases: the case check could not run', err); }
 })();

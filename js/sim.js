@@ -181,27 +181,83 @@
     return null;
   }
 
+  /* ================= 6a. overrides the attending agrees with =================
+     Most advisories are right, and the safe answer is to remove the order. A few are not a reason to stop: an
+     "allergy" that is really a side effect, a contrast reaction that a steroid beforehand covers, a duplicate that
+     is a deliberate change of dose. Each entry names the advisory it answers (by the allergy behind it, or by the
+     advisory's title), what a sound reason looks like, and what the attending says either way. The reason is the
+     option chosen in the advisory box plus anything typed in the order's comment, so a learner can say why in
+     their own words. An order that trips a harm rule (js/shift.js) or a high-severity advisory never reaches this
+     list: those keep their hard stop. An overridden advisory with no entry here is cosigned as before.
+     FACULTY: clinical content, not yet reviewed. Edit or add entries here.
+       allergy  fields the patient's allergy must match (type, severity, cls); or title: a pattern for the advisory
+       type     the order type it applies to; reasons: advisory-box options that count; words: a pattern for typed text
+       needs    catalogue ids: any one of them live for this patient also counts (the premedication, say)
+       replaces true: on cosign the older active order of the same drug is discontinued */
+  E.OVERRIDE_OK = [
+    { id: 'intolerance', label: 'A side effect recorded as an intolerance, not an allergy',
+      allergy: { type: 'Intolerance', severity: 'Low' }, reasons: ['Benefit outweighs risk', 'Discussed with attending / pharmacy'],
+      words: /intoleran|nause|vomit|side.?effect|not (an? )?(true )?allerg|antiemetic|ondansetron/i,
+      ok: (p, o, a) => `Override accepted. ${a.agent} caused ${a.reaction.toLowerCase()}. That is an intolerance, a side effect, not an allergic reaction, and it does not rule out ${o.name}. Ask the nurse to offer something for nausea if it upsets the stomach.`,
+      no: (p, o, a) => `${a.agent} is listed as an intolerance (${a.reaction.toLowerCase()}), so an override can be right here. Your reason does not say why. Say that it is a side effect and not an allergy, and how you will handle it: choose "Benefit outweighs risk", or write it in the order comment.` },
+    { id: 'contrast-premed', label: 'Contrast after a steroid given beforehand',
+      allergy: { cls: 'contrast', severity: 'Moderate' }, needs: ['prednisone'], words: /pre-?medicat|steroid|predniso/i,
+      ok: () => 'Override accepted. A hives reaction to contrast is not a reason never to scan. With a steroid given beforehand, as you planned, the scan can go ahead. Make sure radiology knows about the reaction.',
+      no: () => 'A hives reaction to contrast does not rule out the scan, but the usual answer is a steroid given beforehand. Order it, then override with that as your reason. "Benefit outweighs risk" on its own leaves the reaction unprotected.' },
+    { id: 'dose-change', label: 'A deliberate change of dose, with the old order stopped',
+      title: /^Duplicate order$/, type: 'med', replaces: true, words: /dose|increas|decreas|chang|replac|switch|instead|discontinu|stop the (old|other|first)/i,
+      ok: (p, o) => `Override accepted. A new dose of ${o.name} is a change, not a duplicate. I have discontinued the old order, so only one is active.`,
+      no: (p, o) => `${o.name} is already active. If you mean to change the dose, say so in the order comment and I will stop the old order when I sign the new one. Two active orders for one drug is how a patient gets a double dose.` },
+  ];
+  /** What the attending makes of this order's overridden advisories: null when no entry in E.OVERRIDE_OK applies,
+      else { ok, ids, text }. ok is true only when every advisory that has an entry was given a sound reason. */
+  E.overrideCheck = (p, o) => {
+    if (!o.overrides || !o.overrides.length || (E.harmRule && E.harmRule(p, o))) return null;
+    const live = (id) => p.orders.some((x) => x !== o && x.catId === id && ['Active', 'Pended', 'In process'].includes(x.status)), hits = [];
+    o.overrides.forEach((ov) => {
+      const a = E.allergiesOf(p).find((x) => `${x.type}: ${x.agent}` === ov.title), said = `${ov.reason || ''} ${o.comment || ''}`.trim();
+      E.OVERRIDE_OK.forEach((r) => {
+        if (r.allergy ? !(a && Object.keys(r.allergy).every((k) => a[k] === r.allergy[k])) : !(r.title && r.title.test(ov.title))) return;
+        if (r.type && o.type !== r.type) return;
+        const ok = !!said && ((r.reasons || []).includes(ov.reason) || !!(r.words && r.words.test(said)) || (r.needs || []).some(live));
+        hits.push({ r, ok, text: (ok ? r.ok : r.no)(p, o, a) });
+      });
+    });
+    return hits.length ? { ok: hits.every((h) => h.ok), ids: hits.map((h) => h.r.id), replaces: hits.some((h) => h.r.replaces), text: hits.map((h) => h.text).join(' ') } : null;
+  };
+
   /* ================= 6. the attending reviews student work ================= */
   const RESIDENT = 'Covering resident (PGY-2)';
   function reviewOrders(p, list, out) {
-    const ok = [], no = [], rushed = [];
+    const ok = [], no = [], rushed = [], asked = [];
     list.forEach((o) => {
       const high = E.checkDraft(p, o, []).filter((a) => a.level === 'high');
       // an order that would harm this patient (js/shift.js) is stopped here too, and counted as a near miss
       const rule = E.harmRule ? E.harmRule(p, o) : null, stop = high[0] || (rule && { title: rule.title, detail: rule.why(p, o) });
+      const v = stop ? null : E.overrideCheck(p, o);
       // during a shift's Day work the attending is busy: an order whose advisory the student overrode is
       // cosigned by a hurried resident and reaches the patient
       if (stop && o.overrides && o.overrides.length && E.shiftRushed && E.shiftRushed()) { E.activate(p, o, RESIDENT); o.rushed = true; o.feedback = 'Cosigned by the covering resident without the usual review, because the advisory was overridden.'; rushed.push(o); auditAs(RESIDENT, `Cosigned order without review: ${o.name} (entered by ${o.by}, advisory overridden)`, p.id); }
       else if (stop) { o.status = 'Declined'; o.declinedBy = p.attending; o.declineReason = stop.title; o.feedback = `${stop.title}. ${stop.detail}`; /* kept in the learner's evidence */ no.push({ o, a: stop }); auditAs(p.attending, `Declined pended order: ${o.name} (${stop.title})`, p.id); if (E.nearMiss) E.nearMiss(p, o, stop.title, p.attending); }
-      else { E.activate(p, o, p.attending); ok.push(o); auditAs(p.attending, `Cosigned order: ${o.name} (entered by ${o.by})`, p.id); }
+      // an override that can be right, but the reason does not say why: sent back, and not a near miss (nothing unsafe was about to happen)
+      else if (v && !v.ok) { o.status = 'Declined'; o.declinedBy = p.attending; o.declineReason = 'Override reason does not address the advisory'; o.feedback = v.text; asked.push(o); auditAs(p.attending, `Declined pended order: ${o.name} (override reason does not address the advisory)`, p.id); }
+      else {
+        E.activate(p, o, p.attending); ok.push(o); auditAs(p.attending, `Cosigned order: ${o.name} (entered by ${o.by})${v ? ', override accepted' : ''}`, p.id);
+        if (v) {
+          o.sanctioned = v.ids; o.feedback = v.text;   // kept in the learner's evidence, and read by a shift's expectations
+          if (v.replaces) p.orders.forEach((x) => { if (x !== o && x.catId === o.catId && x.status === 'Active') Object.assign(x, { status: 'Discontinued', dcTs: Date.now(), dcBy: p.attending }); });
+        }
+      }
     });
     const body = [
-      ok.length ? `Cosigned and now active:\n${ok.map((o) => `- ${o.name} ${E.orderDetail(o)}`).join('\n')}` : '',
+      ok.length ? `Cosigned and now active:\n${ok.map((o) => `- ${o.name} ${E.orderDetail(o)}${o.sanctioned ? `\n  ${o.feedback}` : ''}`).join('\n')}` : '',
       rushed.length ? `I am in a procedure. The covering resident cosigned these between pages, without the usual review, because you had overridden the advisory:\n${rushed.map((o) => `- ${o.name} ${E.orderDetail(o)}`).join('\n')}\nThey are active now. You own what happens next.` : '',
       no.length ? `Declined:\n${no.map(({ o, a }) => `- ${o.name}: ${a.title}. ${a.detail}${o.overrides && o.overrides.length ? ` You overrode this advisory ("${o.overrides[0].reason}"); it was a hard stop for me.` : ''}`).join('\n')}\n\nCome find me and we will pick a safer alternative together.` : '',
+      asked.length ? `Not signed yet, because the reason for the override does not answer the advisory:\n${asked.map((o) => `- ${o.name}: ${o.feedback}`).join('\n')}\n\nEnter it again with a reason that does.` : '',
       ok.some((o) => o.type === 'lab' || o.type === 'img') ? 'Tests are in process. Watch your Inbox for the results and follow them up.' : '',
     ].filter(Boolean).join('\n\n');
-    E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'orders', critical: !!no.length && !ok.length && !rushed.length, subject: `${no.length ? (ok.length || rushed.length ? 'Some orders declined' : 'Orders declined') : 'Orders cosigned'} — ${p.name}`, body });
+    const nOk = ok.length + rushed.length, nNo = no.length + asked.length;
+    E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'orders', critical: !!no.length && !nOk, subject: `${nNo ? (nOk ? 'Some orders declined' : 'Orders declined') : 'Orders cosigned'} — ${p.name}`, body });
     out.push(`${p.attending} reviewed your orders — ${p.name}`);
   }
   function reviewNote(p, n, out) {
@@ -226,13 +282,19 @@
      left. The timestamps the learner sees are never changed. Kept in E.db so it survives a reload. */
   const FRESH = 15 * 60 * 1000, GAP = 90 * 1000;   // GAP: longer than any throttled timer in a background tab
   const age = (x, t) => Date.now() - t - (x.simHold || 0);
+  /* Each item gets only the held time it existed for. An order pended in the middle of a long pause is owed the
+     rest of that pause, not all of it: given all of it, its review would slip far past the moment play resumed
+     (past the end of a shift's Day work, say) and be judged against a later state than the one the learner
+     came back to. */
   function release(since, d) {
+    const held = (t) => Math.max(0, Math.min(d, since + d - (t || 0)));
     E.db.patients.forEach((p) => {
       p.orders.forEach((o) => {
-        if (o.status === 'In process' && o.resultAt) o.resultAt += d;
-        else if (o.status === 'Pended' || (o.status === 'Active' && o.signedTs && since - o.signedTs - (o.simHold || 0) < FRESH)) o.simHold = (o.simHold || 0) + d;
+        if (o.status === 'In process' && o.resultAt) o.resultAt += held(o.signedTs || o.ts);
+        else if (o.status === 'Pended') o.simHold = (o.simHold || 0) + held(o.ts);
+        else if (o.status === 'Active' && o.signedTs && since - o.signedTs - (o.simHold || 0) < FRESH) o.simHold = (o.simHold || 0) + held(o.signedTs);
       });
-      p.notes.forEach((n) => { if (n.status === 'Cosign needed') n.simHold = (n.simHold || 0) + d; });
+      p.notes.forEach((n) => { if (n.status === 'Cosign needed') n.simHold = (n.simHold || 0) + held(n.ts); });
     });
   }
   /** Called every two seconds by js/app.js, even when nobody is logged in. Returns true while the hospital is held. */
@@ -287,7 +349,7 @@
     const s = STORY[p.id] || [`It is the ${p.cc.toLowerCase()}. That is why I came in.`, 'I live at home with family.', 'I just want to feel better and go home.'];
     const al = E.allergiesOf(p), meds = p.orders.filter((o) => o.type === 'med' && o.status === 'Active').slice(0, 3).map((o) => o.name.split(' ')[0].toLowerCase());
     const hx = p.problems.filter((x) => x.status === 'Active').slice(1, 4).map((x) => x.name.replace(/\s*\(.*?\)/g, '').replace(/,.*$/, '').toLowerCase());
-    return [
+    const list = [
       ['Can you tell me your full name and date of birth?', `${first(p)} ${last(p)}. ${E.fmtDob(p.dob)}.`],
       ['What brought you into the hospital?', s[0]],
       ['What medical problems do you have?', hx.length ? `Let me think. ${hx.join(', ')}. That is what my doctors tell me, anyway.` : 'Nothing much, I have been pretty healthy.'],
@@ -296,6 +358,10 @@
       ['Tell me about home. Who do you live with? Do you smoke or drink?', s[1]],
       ['If your heart were to stop, what would you want us to do?', p.codeStatus === 'Full Code' ? 'I would want you to do everything you can.' : 'No. I have decided I do not want CPR or a breathing tube. Keep me comfortable. My family knows.'],
       ['What worries you most right now?', s[2]],
-    ].map(([q, a], i) => ({ i, q, a }));
+    ].map(([q, a]) => ({ q, a }));
+    // a PBL case patient (js/cases.js) has questions of its own, with answers the chart does not hold
+    const cs = E.CASES && E.CASES.find((c) => c.pid === p.id);
+    if (cs && cs.interview) list.push(...cs.interview.filter((x) => x && x.q && !list.some((y) => y.q === x.q)).map((x) => ({ q: x.q, a: x.a })));
+    return list.map((x, i) => Object.assign(x, { i }));
   };
 })();

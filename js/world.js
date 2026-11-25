@@ -7,18 +7,21 @@
       shows the time: the sky changes through the day, the sun crosses, an hour ruler carries a pin for
       everything that has already happened. A small hospital shows the census and a red beacon while a patient
       is in a crisis; a small lab lights up while a test is in process; a pig flies each tube out and each
-      result back; an ambulance brings a new patient and a car takes one home.
+      result back. Arriving patients (on foot or by ambulance) come in from beyond the page's left edge, and a
+      patient going home leaves that way, on a road that runs the whole width of the banner behind the lockup.
       It is driven by watching the data once a second for differences, so no other file has to tell it anything.
 
    2. THE CUTSCENE WINDOW. A dialog with a small stage, a caption typed out a letter at a time, and sound
-      synthesised in the browser: EHR.world.scene({ kind, title, lines }). Kinds: arrive, page, night, rapid, home.
+      synthesised in the browser through the shared EHR.audio (js/audio.js) when it is loaded:
+      EHR.world.scene({ kind, title, lines }). Kinds: arrive, page, night, rapid, home, dawn, dusk. A window asked
+      for while the tab is hidden waits until the tab is visible again.
 
    3. CONSEQUENCES. When an action in the sim has a result worth showing (a patient harmed by an order, a
-      rescue, a transfer to intensive care) the same window opens with a picture of that result. Each one is an
-      entry in EHR.CONSEQUENCES with a `media` slot: empty shows a placeholder card with the art brief; a path
-      to an image or a video shows that instead. See docs/cases-and-world-plan.md.
+      rescue, a transfer to intensive care) the same window opens with an animated picture of that result, built
+      by tools/build-scenes.js into assets/cut (counts in js/cuts.js). An entry without a built picture falls back
+      to its `media` file, or a placeholder card with the art brief. See docs/cases-and-world-plan.md.
 
-   The sprites are drawn in code at the screen's pixel ratio. They are placeholders until art is supplied. */
+   The banner sprites are drawn in code at the screen's pixel ratio. They are placeholders until art is supplied. */
 (function () {
   const E = window.EHR, V = E.V || (E.V = {}), esc = E.esc;
   const CFG = () => Object.assign({ banner: true, ruler: false, cutscenes: true, sound: true, consequences: true }, (E.CONFIG && E.CONFIG.world) || {});
@@ -28,20 +31,34 @@
   const root = document.documentElement.style;
 
   /* =====================================================================================================
-     1. SOUND: short effects, synthesised. One preference, remembered on this computer.
+     1. SOUND: short effects, synthesised. With js/audio.js loaded (the normal case) every effect goes through
+     its shared context, sfx bus, mute and volume: E.audio.sfx() is null when muted, when the tab is hidden or
+     without Web Audio, and then nothing plays. Without it (an old page) the effects keep their own context and
+     their own remembered switch, as before.
      ===================================================================================================== */
   const PREF = 'epig-sfx';
   let ac = null, sfxOn = (() => { try { return localStorage.getItem(PREF) !== '0'; } catch (e) { return true; } })();
   const ctx = () => { if (ac) return ac; const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; try { ac = new AC(); } catch (e) { ac = null; } return ac; };
+  /** Where a sound goes: { ctx, out } from the shared audio, or (fallback only) this file's own context. */
+  function sink() {
+    if (E.audio) return E.audio.sfx();
+    const c = ctx(); if (!c) return null;
+    if (c.state === 'suspended') c.resume().catch(() => {});
+    return { ctx: c, out: c.destination };
+  }
+  let dest = null;   // the sink of the sound being played (set by E.sfx.play for the length of one effect)
   /** One note: frequency (or [from, to] for a slide), start offset and length in seconds. */
   function tone(f, at, len, type, vol) {
-    const c = ctx(); if (!c) return;
-    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + at, [f0, f1] = [].concat(f);
+    const s = dest; if (!s) return;
+    const c = s.ctx, o = c.createOscillator(), g = c.createGain(), t = c.currentTime + at, [f0, f1] = [].concat(f);
     o.type = type || 'square'; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + len);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.06, t + 0.008); g.gain.setValueAtTime(vol || 0.06, t + len * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
-    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + len + 0.02);
+    o.connect(g); g.connect(s.out); o.start(t); o.stop(t + len + 0.02);
   }
+  /* Levels: square waves at 0.05 or under, the softer triangle and sawtooth up to 0.07, so no effect stands out from the rest. */
   const SOUNDS = {
+    pager: () => { [0, 0.14, 0.28].forEach((t) => tone(2093, t, 0.08, 'square', 0.035)); },                               // a page: three short high beeps
+    critical: () => { [880, 880, 659].forEach((f, i) => tone(f, i * 0.2, 0.17, 'triangle', 0.065)); tone(523, 0.62, 0.3, 'triangle', 0.06); },   // a critical result: falling and insistent
     blip: () => tone(1250, 0, 0.022, 'square', 0.02),
     siren: () => { for (let i = 0; i < 6; i++) tone(i % 2 ? 620 : 830, i * 0.28, 0.27, 'triangle', 0.07); },
     ring: () => { for (let i = 0; i < 3; i++) { tone(1480, i * 0.42, 0.07, 'square', 0.05); tone(1480, i * 0.42 + 0.11, 0.07, 'square', 0.05); } },
@@ -53,9 +70,18 @@
     phew: () => { tone([330, 494], 0, 0.3, 'triangle', 0.07); tone(659, 0.3, 0.4, 'triangle', 0.07); },
   };
   E.sfx = {
-    get on() { return sfxOn && CFG().sound; },
-    play(name) { if (!this.on || !SOUNDS[name]) return; const c = ctx(); if (!c) return; if (c.state === 'suspended') c.resume().catch(() => {}); try { SOUNDS[name](); } catch (e) { /* no sound */ } },
-    toggle() { sfxOn = !sfxOn; try { localStorage.setItem(PREF, sfxOn ? '1' : '0'); } catch (e) { /* not remembered */ } return sfxOn; },
+    /** Sound is wanted: the shared mute (or this file's own switch) is on, and the sim's config allows effects. */
+    get on() { return (E.audio ? !E.audio.muted() : sfxOn) && CFG().sound; },
+    play(name) {
+      if (!this.on || !SOUNDS[name] || document.hidden) return;
+      dest = sink(); if (!dest) return;
+      try { SOUNDS[name](); } catch (e) { /* no sound */ } finally { dest = null; }
+    },
+    /** The one mute: the shared one when it exists. Returns whether sound is now on. */
+    toggle() {
+      if (E.audio) { E.audio.toggle(); return !E.audio.muted(); }
+      sfxOn = !sfxOn; try { localStorage.setItem(PREF, sfxOn ? '1' : '0'); } catch (e) { /* not remembered */ } return sfxOn;
+    },
   };
 
   /* =====================================================================================================
@@ -195,16 +221,27 @@
     // the cutscene's own vehicles, the sun and the moon are never toned: the cutscene tones its whole stage with a filter
     root.setProperty('--wl-amb2', draw(32, 16, ambulance(false), 2)); root.setProperty('--wl-car2', draw(30, 16, van('#F7C948', '#B8860B', false), 2));
     spritesReady = true; skyKey = null; toneKey = null;   // if the light was set before the sprites existed, set it again on the next tick
-    /* what the pig carries into a consequence picture: drawn at the pictures' doubled size (js/cuts.js), never toned */
+    /* what the pig carries into a consequence picture: drawn at the pictures' doubled size (js/cuts.js), never toned. Each
+       is 11 to 16 art pixels across, so it reads at a glance at 2x (22 to 32 screen pixels) under a 48px pig. */
+    const DIG = { 4: ['101', '101', '111', '001', '001'], 6: ['111', '100', '111', '101', '111'] };
+    const digit = (R, d, x, y, c) => DIG[d].forEach((row, j) => [...row].forEach((b, i) => { if (b === '1') R(c, x + i, y + j, 1, 1); }));
+    const paper = (c, crit) => (R) => {
+      R(INK, 0, 0, 11, 14); R('#FFFFFF', 1, 1, 9, 12); [3, 5, 7].forEach((y) => R(c, 2, y, 7, 1)); R(c, 2, 9, 4, 1);
+      if (crit) { R('#D2323F', 7, 7, 3, 6); R('#FFFFFF', 8, 8, 1, 2); R('#FFFFFF', 8, 11, 1, 1); }   // a red "!" in the corner
+    };
     const CARGO = {
-      kit: [9, 8, (R) => { R(INK, 3, 0, 3, 2); R(INK, 0, 1, 9, 7); R('#FFFFFF', 1, 2, 7, 5); R('#E5372B', 4, 2, 1, 5); R('#E5372B', 2, 4, 5, 1); }],
-      blood: [7, 11, (R) => { R(INK, 3, 0, 1, 2); R(INK, 0, 2, 7, 8); R('#C42430', 1, 3, 5, 6); R('#EA323C', 1, 3, 2, 2); R('#FFFFFF', 2, 6, 3, 1); R(INK, 3, 10, 1, 1); }],
-      mask: [10, 7, (R) => { R('#5A6A8A', 0, 2, 10, 1); R(INK, 2, 1, 6, 6); R('#BDE8D4', 3, 2, 4, 4); R('#7CCFAE', 3, 4, 4, 2); R('#FFFFFF', 3, 2, 1, 1); }],
-      stamp: [8, 11, (R) => { R(INK, 2, 0, 4, 5); R('#8A4836', 3, 1, 2, 3); R(INK, 0, 5, 8, 3); R('#5D2C28', 1, 5, 6, 2); R('#E5372B', 0, 8, 8, 3); R('#FF8A80', 1, 9, 2, 1); }],
-      phew: [4, 6, (R) => { R('#5FB8F0', 1, 0, 2, 2); R('#5FB8F0', 0, 2, 4, 3); R('#CFEFFF', 1, 2, 1, 1); R('#3A8CC8', 1, 5, 2, 1); }],
+      kit: [14, 12, (R) => { R(INK, 4, 0, 6, 1); R(INK, 4, 0, 1, 3); R(INK, 9, 0, 1, 3); R(INK, 0, 2, 14, 10); R('#E5372B', 1, 3, 12, 8); R('#F57A6E', 1, 3, 12, 1); R('#FFFFFF', 6, 4, 2, 6); R('#FFFFFF', 4, 6, 6, 2); }],
+      blood: [11, 15, (R) => { R(INK, 4, 0, 3, 2); R(INK, 0, 2, 11, 12); R('#B0202C', 1, 3, 9, 10); R('#E5484A', 2, 4, 2, 4); R('#FFFFFF', 2, 9, 7, 3); R('#B0202C', 3, 10, 5, 1); R(INK, 5, 14, 1, 1); }],
+      sheet: [11, 14, paper('#3B7BC8')],
+      sheetCrit: [11, 14, paper('#D2323F', true)],
+      o2: [7, 16, (R) => { R(INK, 2, 0, 3, 3); R('#C7CFDD', 3, 1, 1, 1); R(INK, 0, 3, 7, 13); R('#33B04B', 1, 4, 5, 3); R('#E8ECF0', 1, 7, 5, 8); R('#FFFFFF', 1, 7, 1, 8); R('#33B04B', 2, 10, 3, 2); }],
+      meter: [11, 15, (R) => { R(INK, 0, 0, 11, 15); R('#5A6070', 1, 1, 9, 13); R('#BFE3C0', 1, 1, 9, 7); digit(R, 4, 2, 2, INK); digit(R, 6, 6, 2, INK); R('#E5372B', 4, 10, 3, 2); R(INK, 4, 14, 3, 1); }],   // the glucose meter reading 46
+      chart: [12, 14, (R) => { R(INK, 0, 0, 12, 14); R('#FFFFFF', 1, 1, 10, 12); R('#5A6070', 2, 2, 1, 9); R('#5A6070', 2, 10, 8, 1); [[3, 8], [4, 8], [5, 7], [6, 6], [7, 5], [8, 3], [9, 2]].forEach(([x, y]) => R('#D2323F', x, y, 1, 2)); }],   // creatinine climbing
+      stamp: [12, 14, (R) => { R(INK, 4, 0, 4, 6); R('#8A4836', 5, 1, 2, 4); R(INK, 1, 6, 10, 3); R('#5D2C28', 2, 6, 8, 2); R(INK, 0, 9, 12, 5); R('#E5372B', 1, 10, 10, 3); R('#FF8A80', 2, 10, 3, 1); }],
+      ambu: [15, 11, (R) => { R(INK, 0, 3, 4, 6); R('#BDE8D4', 1, 4, 2, 4); R(INK, 4, 5, 2, 2); R(INK, 6, 1, 9, 10); R('#3A8CC8', 7, 2, 7, 8); R('#7CC0F0', 8, 3, 3, 3); R(INK, 10, 0, 2, 1); }],   // a bag-valve mask
+      phew: [5, 7, (R) => { R('#5FB8F0', 1, 0, 3, 2); R('#5FB8F0', 0, 2, 5, 4); R('#CFEFFF', 1, 2, 1, 2); R('#3A8CC8', 1, 6, 3, 1); }],
       tube: [5, 10, (R) => { R(INK, 0, 0, 5, 2); R('#B13A6B', 0, 0, 5, 1); R(INK, 0.5, 2, 4, 8); R('#F4F8FB', 1.5, 2, 2, 7); R('#D2323F', 1.5, 5, 2, 4); }],
-      sheet: [8, 10, (R) => { R(INK, 0, 0, 8, 10); R('#FFFFFF', 1, 1, 6, 8); [3, 5, 7].forEach((y) => R('#3B7BC8', 2, y, 4, 1)); }],
-      sheetCrit: [8, 10, (R) => { R(INK, 0, 0, 8, 10); R('#FFFFFF', 1, 1, 6, 8); [3, 5, 7].forEach((y) => R('#D2323F', 2, y, 4, 1)); }],
+      mask: [10, 7, (R) => { R('#5A6A8A', 0, 2, 10, 1); R(INK, 2, 1, 6, 6); R('#BDE8D4', 3, 2, 4, 4); R('#7CCFAE', 3, 4, 4, 2); R('#FFFFFF', 3, 2, 1, 1); }],
     };
     Object.entries(CARGO).forEach(([k, [w, h, fn]]) => root.setProperty(`--cut-${k}`, draw(w, h, fn, 2)));
     W.cargoSize = (k) => (CARGO[k] ? [CARGO[k][0] * 2, CARGO[k][1] * 2] : [0, 0]);
@@ -239,11 +276,26 @@
     return { census: E.db.patients.filter((p) => !p.icu && !p.discharged).length, labs, crisisPid: crisis ? crisis.pid : null,
       beacon: !!crisis || !!(cs && !a.done && cs.nodes[a.node] && cs.nodes[a.node].urgent) };
   };
-  /* Everything crossing the stage moves at a steady speed, so on a wide screen the pig takes longer to reach the lab
-     instead of streaking across it. Walkers have a fixed path (the left edge to the door). */
+  /* Everything crossing the banner moves at a steady speed, so on a wide screen the pig takes longer to reach the lab
+     instead of streaking across it.
+     THE ROAD. Arrivals and departures do not use the stage: they travel between the hospital door and beyond the page's
+     left edge (the side that is off the page), on a road laid inside the banner's own sky layer (.skyfx), which spans the
+     whole banner and sits behind the lockup. So a walker or the ambulance passes behind the Epig lettering, never over it,
+     and the road never takes a click (pointer-events none). The pig courier between hospital and lab stays on the stage. */
   const stageW = () => { const el = document.getElementById('wl'); return (el && el.clientWidth) || 900; };
   const lim = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const travel = (kind) => (kind === 'out' || kind === 'back' ? lim((stageW() - 130) / 210, 3, 9) : kind === 'amb' || kind === 'car' ? lim((stageW() - 100) / 260, 3.5, 9) : 5);
+  const ROAD = { walk: 1, leave: 1, amb: 1, car: 1 };
+  let doorX = 0;   // the hospital door, in pixels from the banner's left edge (measured when the road is laid)
+  /** Where the door is: the stage's left edge in the banner, plus the hospital's place on the stage (62px) and its door (18px in). */
+  function measure() {
+    const el = document.getElementById('wl'), bn = el && el.closest && el.closest('.banner');
+    if (!bn || !el.getBoundingClientRect) return 0;
+    const x = el.getBoundingClientRect().left - bn.getBoundingClientRect().left + 62 + 18;
+    if (x > 0) doorX = Math.round(x);
+    return doorX;
+  }
+  const roadW = () => doorX || measure() || 200;
+  const travel = (kind) => (kind === 'out' || kind === 'back' ? lim((stageW() - 130) / 210, 3, 9) : kind === 'amb' || kind === 'car' ? lim(roadW() / 120, 3, 8) : lim(roadW() / 42, 4, 13));
   const ARRIVE = { amb: 1, walk: 1 };                   // arrivals: their pins wait for them to reach the door
   const ends = (a) => a.t0 + a.dur * 1000;
   let bump = { hosp: -1e9, lab: -1e9 }, lastCensus = null;
@@ -251,6 +303,14 @@
   const once = (since, ms) => { const d = performance.now() - since; return d < ms ? `animation-delay:-${(d / 1000).toFixed(2)}s` : null; };
   /** A looping animation that survives a redraw: in step with the page clock rather than restarting. */
   const loop = (sec) => `animation-delay:-${((performance.now() / 1000) % sec).toFixed(2)}s`;
+  /* The stage is aria-hidden (it repeats what the chart says), so nothing in it may take focus: its "links" are spans
+     with data-go, followed by one click handler (below) for the mouse. */
+  const go = (href) => (href ? ` data-go="${esc(href)}"` : '');
+  /** Where the sun (or moon) and the time chip under it stand. Updated in place every tick, without a rebuild. */
+  function sunAt(c) {
+    const night = isNight(c.hour), day = Math.max(0, Math.min(1, (c.hour - 5.75) / 13.5)), alt = night ? 0.75 : Math.sin(Math.PI * day);
+    return { night, left: X(c, c.hour), top: CFG().ruler ? Math.round(15 + (1 - alt) * 22) : Math.round(5 + (1 - alt) * 16) };
+  }
   function inner() {
     const c = clock(), st = state(), t = performance.now(), still = reduce();
     actors = actors.filter((a) => t < ends(a));
@@ -261,52 +321,82 @@
       (c.bands || []).forEach(([from, cls], i, all) => { const to = all[i + 1] ? all[i + 1][0] : c.r1; h += `<i class="wl-band ${cls}" style="left:${X(c, from)};width:calc((100% - 198px) * ${(F(c, to) - F(c, from)).toFixed(4)})"></i>`; });
       const span = c.r1 - c.r0, major = span > 14 ? 6 : 3;
       for (let hr = Math.ceil(c.r0); hr <= c.r1; hr += span > 14 ? 2 : 1) h += `<i class="wl-tk${hr % major === 0 ? ' big' : ''}" style="left:${X(c, hr)}"></i>${hr % major === 0 ? `<b class="wl-hr" style="left:${X(c, hr)}">${pad(hr % 24)}</b>` : ''}`;
-      shown(t).forEach((p) => { h += `<a class="wl-pin k-${p.kind}" style="left:${X(c, p.hour)}" ${p.href ? `href="${esc(p.href)}"` : ''} tabindex="-1" title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></a>`; });
+      shown(t).forEach((p) => { h += `<span class="wl-pin k-${p.kind}" style="left:${X(c, p.hour)}"${go(p.href)} title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></span>`; });
       h += `<b class="wl-now${c.paused ? ' paused' : ''}" style="left:${X(c, c.hour)}">${esc(c.text)}</b>`;
     }
     // a flag that has just been planted springs up out of the grass
-    if (c && !CFG().ruler) shown(t).forEach((p) => { const s = once(p.show, 500); h += `<a class="wl-flag k-${p.kind}${s ? ' new' : ''}" style="left:${X(c, p.hour)}${s ? ';' + s : ''}" ${p.href ? `href="${esc(p.href)}"` : ''} tabindex="-1" title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></a>`; });
+    if (c && !CFG().ruler) shown(t).forEach((p) => { const s = once(p.show, 500); h += `<span class="wl-flag k-${p.kind}${s ? ' new' : ''}" style="left:${X(c, p.hour)}${s ? ';' + s : ''}"${go(p.href)} title="${esc(hhmm(p.hour) + ' · ' + p.title)}"></span>`; });
     if (c) {
-      const night = isNight(c.hour), day = Math.max(0, Math.min(1, (c.hour - 5.75) / 13.5)), alt = night ? 0.75 : Math.sin(Math.PI * day);
-      const top = CFG().ruler ? Math.round(15 + (1 - alt) * 22) : Math.round(5 + (1 - alt) * 16);
-      h += `<i class="wl-orb ${night ? 'moon' : 'sun'}" style="left:${X(c, c.hour)};top:${top}px"></i>`;
-      if (!CFG().ruler) h += `<b class="wl-now free${c.paused ? ' paused' : ''}" style="left:${X(c, c.hour)};top:${top + 20}px">${esc(c.text)}</b>`;   // no ruler: the time rides under the sun
+      const o = sunAt(c);
+      h += `<i class="wl-orb ${o.night ? 'moon' : 'sun'}" style="left:${o.left};top:${o.top}px"></i>`;
+      if (!CFG().ruler) h += `<b class="wl-now free${c.paused ? ' paused' : ''}" style="left:${o.left};top:${o.top + 20}px">${esc(c.text)}</b>`;   // no ruler: the time rides under the sun
     }
     // THE HOSPITAL. The census counts a new patient when the ambulance or the walker reaches the door, not when they set off.
     const coming = still ? 0 : actors.filter((a) => a.adds).length, census = Math.max(0, st.census - coming);
     if (lastCensus != null && census !== lastCensus) bump.hosp = Math.max(bump.hosp, t);
     lastCensus = census;
     const hb = once(bump.hosp, 450), pop = once(bump.hosp, 600);
-    const hHref = st.crisisPid ? `#/pt/${esc(st.crisisPid)}/orders` : '#/home';
+    const hHref = st.crisisPid ? `#/pt/${st.crisisPid}/orders` : '#/home';
     const hTitle = st.beacon ? 'A patient needs you now. Open the chart.' : `${census} patient${census === 1 ? '' : 's'} on your list. Open Patient Lists.`;
-    h += `<a class="wl-hosp${st.beacon ? ' alarm' : ''}${hb ? ' got' : ''}" href="${hHref}" tabindex="-1" title="${esc(hTitle)}"${hb ? ` style="${hb}"` : ''}>${st.beacon ? `<i class="wl-beacon" style="${loop(0.6)}"></i>` : ''}<b class="${pop ? 'pop' : ''}"${pop ? ` style="${pop}"` : ''}>${census}</b></a>`;
+    h += `<span class="wl-hosp${st.beacon ? ' alarm' : ''}${hb ? ' got' : ''}"${go(hHref)} title="${esc(hTitle)}"${hb ? ` style="${hb}"` : ''}>${st.beacon ? `<i class="wl-beacon" style="${loop(0.6)}"></i>` : ''}<b class="${pop ? 'pop' : ''}"${pop ? ` style="${pop}"` : ''}>${census}</b></span>`;
     // THE LAB lights only once a tube has landed in it: a test whose pig is still flying is not in the lab yet.
     const flying = new Set(actors.filter((a) => a.kind === 'out' && !still).map((a) => a.oid)), inLab = st.labs.filter((o) => !flying.has(o.id));
     const lb = once(bump.lab, 450), lit = inLab.length > 0;
     const lTitle = lit ? `In the lab: ${inLab.slice(0, 4).map((o) => `${o.name} (${o.who})`).join(', ')}${inLab.length > 4 ? ` and ${inLab.length - 4} more` : ''}` : flying.size ? 'A tube is on its way to the lab' : 'Laboratory: nothing in process';
     const lStyle = lb || (lit ? loop(0.62) : '');
-    h += `<a class="wl-lab${lit ? ' on' : ''}${lb ? ' got' : ''}"${lit && inLab[0].pid ? ` href="#/pt/${esc(inLab[0].pid)}/results"` : ''} tabindex="-1" title="${esc(lTitle)}"${lStyle ? ` style="${lStyle}"` : ''}>${lit && inLab.length > 1 ? `<b>${inLab.length}</b>` : ''}</a>`;
+    h += `<span class="wl-lab${lit ? ' on' : ''}${lb ? ' got' : ''}"${go(lit && inLab[0].pid ? `#/pt/${inLab[0].pid}/results` : '')} title="${esc(lTitle)}"${lStyle ? ` style="${lStyle}"` : ''}>${lit && inLab.length > 1 ? `<b>${inLab.length}</b>` : ''}</span>`;
     if (!still) actors.forEach((a) => {
+      if (ROAD[a.kind]) return;   // on the road, not the stage
       const at = `animation-duration:${a.dur.toFixed(2)}s;animation-delay:-${((t - a.t0) / 1000).toFixed(2)}s`;
-      const link = a.pid ? ` href="#/pt/${esc(a.pid)}/${a.kind === 'out' || a.kind === 'back' ? 'results' : 'summary'}" tabindex="-1"` : '', tip = a.label ? ` title="${esc(a.label)}"` : '';
-      if (a.kind === 'out' || a.kind === 'back') h += `<a class="wl-act wl-pig ${a.kind}"${link}${tip} style="${at}">${E.icon('pig1', 24)}${E.icon('pig2', 24)}<i class="wl-load ${a.kind === 'out' ? 'tube' : a.crit ? 'sheet crit' : 'sheet'}"></i></a>`;
-      else if (a.kind === 'walk' || a.kind === 'leave') h += `<a class="wl-act wl-person ${a.kind}"${link}${tip} style="${at}"><i style="background-image:var(--wl-p${a.v}a)"></i><i style="background-image:var(--wl-p${a.v}b)"></i></a>`;
-      else h += `<a class="wl-act wl-van ${a.kind}"${link}${tip} style="${at}">${a.kind === 'amb' ? `<i class="wl-siren" style="${loop(0.4)}"></i>` : ''}</a>`;
+      h += `<span class="wl-act wl-pig ${a.kind}"${go(a.pid ? `#/pt/${a.pid}/results` : '')}${a.label ? ` title="${esc(a.label)}"` : ''} style="${at}">${E.icon('pig1', 24)}${E.icon('pig2', 24)}<i class="wl-load ${a.kind === 'out' ? 'tube' : a.crit ? 'sheet crit' : 'sheet'}"></i></span>`;
     });
     return h;
   }
+  /** What is on the road: patients on foot, the ambulance, a car going home. Nothing here is clickable. */
+  function roadHtml() {
+    if (reduce()) return '';
+    const t = performance.now();
+    return actors.filter((a) => ROAD[a.kind] && t < ends(a)).map((a) => {
+      const at = `animation-duration:${a.dur.toFixed(2)}s;animation-delay:-${((t - a.t0) / 1000).toFixed(2)}s`;
+      if (a.kind === 'walk' || a.kind === 'leave') return `<i class="wl-act wl-person ${a.kind}" style="${at}"><i style="background-image:var(--wl-p${a.v}a)"></i><i style="background-image:var(--wl-p${a.v}b)"></i></i>`;
+      return `<i class="wl-act wl-van ${a.kind}" style="${at}">${a.kind === 'amb' ? `<i class="wl-siren" style="${loop(0.4)}"></i>` : ''}</i>`;
+    }).join('');
+  }
+  /** Lay the road in the banner's sky layer (made again by every redraw of the shell) and fill it. */
+  function placeRoad() {
+    const el = document.getElementById('wl'), bn = el && el.closest && el.closest('.banner');
+    const sky = bn && bn.querySelector && bn.querySelector('.skyfx.bn'); if (!sky) return;
+    let road = sky.querySelector('.wl-road');
+    if (!road) { road = document.createElement('i'); road.className = 'wl-road'; sky.appendChild(road); }
+    const visible = el.getClientRects ? el.getClientRects().length > 0 : true;   // the stage hides itself on a narrow banner; so does the road
+    measure();
+    road.style.width = `${doorX}px`;
+    road.innerHTML = visible && doorX ? roadHtml() : '';
+  }
   /** Pins wait for whatever is carrying their news: a result's flag goes up when the pig lands, an admission's when the ambulance does. */
   const shown = (t) => pins.filter((p) => p.show <= t);
-  /** Called by the shell for every redraw: the stage that sits in the banner's spacer. */
-  W.banner = () => (CFG().banner ? `<span class="wl" id="wl" aria-hidden="true">${inner()}</span>` : '');
+  /** Called by the shell for every redraw: the stage that sits in the banner's spacer. The road is laid just after the shell
+      has put this in the page (a microtask: before the browser paints). */
+  W.banner = () => {
+    if (!CFG().banner) return '';
+    Promise.resolve().then(placeRoad);
+    return `<span class="wl" id="wl" aria-hidden="true">${inner()}</span>`;
+  };
+  /** The sun, the moon and the time move every tick; that is done in place. The stage is rebuilt only when what is on it changes. */
+  function tickClock(el, c) {
+    if (!c) return;
+    const o = sunAt(c), orb = el.querySelector('.wl-orb'), now = el.querySelector('.wl-now');
+    if (orb) { orb.style.left = o.left; orb.style.top = `${o.top}px`; }
+    if (now) { if (now.textContent !== c.text) now.textContent = c.text; now.style.left = X(c, c.hour); if (now.classList.contains('free')) now.style.top = `${o.top + 20}px`; }
+  }
   function refresh(force) {
     const c = clock(), st = state();
     paintBanner(CFG().banner ? c : null);
     const el = document.getElementById('wl'); if (!el) return;
     const t = performance.now();
-    const s = [c && c.text, c && c.paused, actors.filter((a) => t < ends(a)).map((a) => a.id).join(), shown(t).length, st.census, st.beacon, st.labs.map((o) => o.id).join()].join('|');
-    if (s === sig && !force) return;
-    sig = s; el.innerHTML = inner();
+    const s = [c ? [c.kind, c.r0, c.r1, c.paused, isNight(c.hour), c.hour < 6.25 || c.hour >= 19, CFG().ruler].join() : '-', actors.filter((a) => t < ends(a)).map((a) => a.id).join(), shown(t).length, st.census, st.beacon, st.labs.map((o) => o.id).join()].join('|');
+    if (s === sig && !force) return tickClock(el, c);
+    sig = s; el.innerHTML = inner(); placeRoad();
   }
   W.refresh = () => refresh(true);
   /* What happens when something reaches where it was going: the building it lands at gives a small squash. */
@@ -316,8 +406,9 @@
     refresh(true);
     setTimeout(() => refresh(true), 650);   // once the squash and the census pop are over, back to the building's resting (or busy) state
   }
-  /** Something happened in the world. kind: out | back (the pig courier), amb (an emergency arrival), walk | leave (a patient on foot, in from
-      the left and out the same way), car, or pin (a mark on the ruler).
+  /** Something happened in the world. kind: out | back (the pig courier, on the stage), amb (an emergency arrival), walk | leave (a patient on
+      foot), car (a patient driven home), or pin (a mark on the ruler). amb, walk, leave and car use the road: in from beyond the page's
+      left edge to the hospital door, or out the same way.
       o: { oid, pid, label } say which order or patient it is, so the sprite can link to the chart; crit marks a critical result;
       adds: false for an arrival of a patient already on the list (an admission order), so the census does not count them twice;
       pin/title/href plant a pin, which waits until this arrival lands. */
@@ -344,7 +435,7 @@
   const seen = { orders: null, patients: null, inbox: null, safety: null, icu: null, home: null };
   const queue = [];
   function watch() {
-    if (W.demo) return refresh();
+    if (W.demo) { drain(); return refresh(); }
     if (!E.db || !E.db.user || !E.app) { paintBanner(null); return; }
     const c = clock(), a = E.progress().active, key = a && (a.type === 'shift' || a.type === 'case') ? a.type + a.id + a.start : null;
     if (key !== runKey) { runKey = key; pins = []; }
@@ -384,8 +475,14 @@
     }
     Object.assign(seen, { patients: ids, icu, home, created: E.db.createdAt });
     // the inbox: every page and result that arrives while a clock is running leaves a pin
-    const top = E.db.inbox.map((m) => m.id);
-    if (seen.inbox && c && E.db.createdAt === seen.inboxAt) E.db.inbox.filter((m) => !seen.inbox.includes(m.id) && ['Page', 'Result', 'Staff Message', 'Safety'].includes(m.type)).forEach((m) => W.emit('pin', { pin: m.critical ? 'crit' : m.type === 'Result' ? 'result' : 'page', result: m.type === 'Result', title: m.subject, href: m.patientId ? `#/pt/${m.patientId}/${m.act || 'summary'}` : '#/inbox' }));
+    const top = E.db.inbox.map((m) => m.id), fresh = seen.inbox && E.db.createdAt === seen.inboxAt ? E.db.inbox.filter((m) => !seen.inbox.includes(m.id)) : [];
+    if (c) fresh.filter((m) => ['Page', 'Result', 'Staff Message', 'Safety'].includes(m.type)).forEach((m) => W.emit('pin', { pin: m.critical ? 'crit' : m.type === 'Result' ? 'result' : 'page', result: m.type === 'Result', title: m.subject, href: m.patientId ? `#/pt/${m.patientId}/${m.act || 'summary'}` : '#/inbox' }));
+    // and it sounds: a pager tone for a page, a sharper one for anything critical. Only for unread messages meant for this
+    // role (a mini-game's acknowledged pages arrive read), and not over a cutscene, which has its own sound.
+    const mine = fresh.filter((m) => !m.read && (!m.roles || m.roles.includes(E.db.user.role)));
+    if (mine.length && !(E.ui && E.ui.modal && E.ui.modal.type === 'scene')) {
+      if (mine.some((m) => m.critical)) E.sfx.play('critical'); else if (mine.some((m) => m.type === 'Page')) E.sfx.play('pager');
+    }
     seen.inbox = top; seen.inboxAt = E.db.createdAt;   // messages already waiting on a reset ward are not news
     // the safety record: harm, and rescue
     const ev = ((E.progress().safety || {}).events || []).map((e) => e.id + ':' + (e.outcome || ''));
@@ -403,10 +500,14 @@
       if (sh.phase === 'signout') queue.push({ kind: 'dusk', hour: 18.25, title: '17:30 · Sign-out', lines: ['17:30. The light is going and the night team is on its way up.', 'Write a Handoff note on your sickest patient: what happened, and what to do if it happens again.'] });
     }
     seen.phase = ph; seen.primed = true;
-    // show the next waiting window once nothing else is open
-    if (queue.length && !E.app.busy() && !(E.suspended && E.suspended())) W.scene(queue.shift());
+    drain();
     refresh();
   }
+  /** Show the next waiting window once nothing else is open and someone is looking at the tab. */
+  function drain() {
+    if (queue.length && !document.hidden && E.app && !E.app.busy() && !(E.suspended && E.suspended())) W.scene(queue.shift());
+  }
+  if (document.addEventListener) document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(drain, 400); });
 
   /* =====================================================================================================
      5. CONSEQUENCES: what the learner sees when an action has a result.
@@ -430,9 +531,12 @@
   function consequence(id, o) {
     const def = E.CONSEQUENCES[id]; if (!def || !CFG().consequences || !CFG().cutscenes) return;
     const p = o.p, sub = { name: p.name, mrms: (p.sex === 'M' ? 'Mr. ' : 'Ms. ') + p.name.split(', ')[0], he: p.sex === 'M' ? 'He' : 'She', him: p.sex === 'M' ? 'him' : 'her', order: o.order || 'the order' };
-    queue.push({ kind: def.kind || 'result', cid: id, title: `${def.title} — ${p.name}`, lines: def.lines.map((l) => l.replace(/\{(\w+)\}/g, (m, k) => sub[k] || m)), go: id === 'icu' ? '' : `#/pt/${p.id}/orders`, hour: (clock() || {}).hour });
+    queue.push({ kind: def.kind || 'result', cid: id, title: `${def.title} — ${p.name}`, lines: fill(def.lines, sub), go: id === 'icu' ? '' : `#/pt/${p.id}/orders`, hour: (clock() || {}).hour });
   }
-  W.consequence = consequence; W.who = who;
+  /** The caption lines with the placeholders filled in. A line that starts with one ({order}: "the order", or an order
+      name typed in lower case) still starts with a capital. */
+  const fill = (lines, sub) => lines.map((l) => { const s = l.replace(/\{(\w+)\}/g, (m, k) => sub[k] || m); return s.charAt(0).toUpperCase() + s.slice(1); });
+  W.consequence = consequence; W.who = who; W.fill = fill;
 
   /* =====================================================================================================
      6. THE CUTSCENE WINDOW
@@ -442,6 +546,7 @@
   /** Open the window. { kind, title, lines, hour, cid } Returns true if it opened. */
   W.scene = (sc) => {
     if (!CFG().cutscenes) return false;
+    if (document.hidden) { queue.push(sc); return true; }   // nobody is looking: it opens (and sounds) when the tab is shown again
     const def = sc.cid && E.CONSEQUENCES[sc.cid];
     E.ui.modal = Object.assign({ type: 'scene', i: 0, t0: performance.now(), s0: performance.now(), hour: 12 }, sc);   // s0: the picture's clock; t0 restarts for each caption line
     if (E.ui.modal.hour == null) E.ui.modal.hour = 12;
@@ -452,16 +557,22 @@
   const SPEED = 26;   // milliseconds a letter
   /* An animated consequence picture built by tools/build-scenes.js (js/cuts.js): the intro once, then the loop, shown at exactly
      twice its art size (the recorded exception to the asset rule for the bought Mucho Pixels packs). Its clock is the
-     window's own opening time, so a redraw (the sound button, say) carries on instead of starting over. The pig is ours and
-     is drawn live: it flies in from the right with what it is carrying and hovers there. */
+     window's own opening time, so a redraw carries on instead of starting over. The pig is ours and is drawn live: it flies
+     in from the right with what it is carrying and hovers there; its load hangs centred under it, and the near miss's
+     stamp comes down on the order in step with the picture's loop.
+     Under reduced motion (or m.still) nothing moves: the picture rests on the first frame of its loop, where the staff are
+     already at the bed and the whole story is in view, and the pig is in its place. */
   const cutHtml = (m, id) => {
-    const c = E.CUTS, s = c.scenes[id], fh = c.h * 2, ms = 1000 / c.fps, el = Math.round(performance.now() - (m.s0 || performance.now()));
-    const anim = [s.intro ? `cut-intro ${s.intro * ms}ms steps(${s.intro}) ${-el}ms both` : '', `cut-loop ${s.loop * ms}ms steps(${s.loop}) ${s.intro * ms - el}ms infinite`].filter(Boolean).join(', ');
+    const c = E.CUTS, s = c.scenes[id], fh = c.h * 2, ms = 1000 / c.fps, el = Math.round(performance.now() - (m.s0 || performance.now())), still = !!m.still || reduce();
+    const anim = still ? 'none' : [s.intro ? `cut-intro ${s.intro * ms}ms steps(${s.intro}) ${-el}ms both` : '', `cut-loop ${s.loop * ms}ms steps(${s.loop}) ${s.intro * ms - el}ms infinite`].filter(Boolean).join(', ');
     const st = `width:${c.w * 2}px;height:${fh}px;background-image:url('assets/cut/${esc(id)}.png');background-size:${c.w * 2}px auto;background-position:0 ${-s.intro * fh}px;--i1:${-s.intro * fh}px;--l1:${-(s.intro + s.loop) * fh}px;animation:${anim}`;
-    const p = s.pig, [cw, ch] = p ? W.cargoSize(p.carry) : [0, 0];
-    const pig = p ? `<span class="cut-pig${p.carry === 'phew' ? ' phew' : ''}" style="left:${p.at[0] * 2}px;top:${p.at[1] * 2}px;animation-delay:${300 - el}ms, ${2100 - el}ms">${E.icon('pig1', 48)}${E.icon('pig2', 48)}<i class="cut-cargo ${esc(p.carry)}" style="width:${cw}px;height:${ch}px;background-image:var(--cut-${esc(p.carry)})"></i></span>` : '';
+    const p = s.pig, [cw, ch] = p ? W.cargoSize(p.carry) : [0, 0], k = p ? esc(p.carry) : '';
+    const place = p && p.carry !== 'phew' ? `left:${24 - cw / 2}px;top:34px;` : '';
+    const stamp = p && p.carry === 'stamp' && !still ? `;animation:cut-stamp ${s.loop * ms}ms ${s.intro * ms - el}ms infinite` : '';
+    const pig = p ? `<span class="cut-pig${p.carry === 'phew' ? ' phew' : ''}" style="left:${p.at[0] * 2}px;top:${p.at[1] * 2}px;${still ? 'animation:none' : `animation-delay:${300 - el}ms, ${2100 - el}ms`}">${E.icon('pig1', 48)}${E.icon('pig2', 48)}<i class="cut-cargo ${k}" style="${place}width:${cw}px;height:${ch}px;background-image:var(--cut-${k})${stamp}"></i></span>` : '';
     return `<div class="cut-anim" style="${st}">${pig}</div>`;
   };
+  W.cutHtml = cutHtml;   // the prototype page plays the same markup
   const mediaHtml = (m, def) => {
     if (m.cid && E.CUTS && E.CUTS.scenes[m.cid]) return cutHtml(m, m.cid);
     const src = def && def.media;
@@ -480,26 +591,68 @@
   V.modalExt = Object.assign(V.modalExt || {}, {
     scene(m) {
       const def = m.cid && E.CONSEQUENCES[m.cid], last = m.i >= m.lines.length - 1, result = m.kind === 'result';
-      return `<div class="modal-bg"><div class="modal cut${result ? ' result ' + esc((def && def.tone) || '') : ''}" role="dialog" aria-modal="true" aria-label="${esc(m.title || '')}"><header class="modal-h">${E.icon('brand', 16)}<h3>${esc(m.title || '')}</h3><button class="cap" data-act="sfxToggle" title="${E.sfx.on ? 'Sound on' : 'Sound off'}" aria-label="${E.sfx.on ? 'Turn sound off' : 'Turn sound on'}" aria-pressed="${E.sfx.on}">${E.icon(E.sfx.on ? 'music' : 'mute', 16)}</button></header>
+      // the typed caption is hidden from screen readers: the whole line is announced once, from #wl-say (see the typing timer)
+      return `<div class="modal-bg"><div class="modal cut${result ? ' result ' + esc((def && def.tone) || '') : ''}" role="dialog" aria-modal="true" aria-label="${esc(m.title || '')}"><header class="modal-h">${E.icon('brand', 16)}<h3>${esc(m.title || '')}</h3>${soundButton()}</header>
         <div class="modal-b cut-b"><div class="cut-stage ${esc(m.kind)}${reduce() ? ' still' : ''}">${result ? mediaHtml(m, def) : diorama(m)}</div>
-        <div class="cut-box"><p id="cut-text" aria-live="polite" data-full="${esc(m.lines[m.i] || '')}">${reduce() ? esc(m.lines[m.i] || '') : ''}</p><span class="cut-n">${m.i + 1} / ${m.lines.length}</span></div></div>
-        <footer class="modal-f"><span id="modalErr" class="err"></span>${last ? '' : '<button class="btn" data-act="sceneSkip">Skip</button>'}${last && m.go ? `<a class="btn" href="${esc(m.go)}" data-act="sceneSkip">Go to the patient</a>` : ''}<button class="btn primary" data-act="sceneNext">${last ? (result ? 'Close' : 'Continue') : 'Next'}</button></footer></div></div>`;
+        <div class="cut-box"><p id="cut-text" aria-hidden="true" data-full="${esc(m.lines[m.i] || '')}">${reduce() ? esc(m.lines[m.i] || '') : ''}</p><span class="cut-n">${m.i + 1} / ${m.lines.length}</span></div></div>
+        <footer class="modal-f">${sceneFoot(m)}</footer></div></div>`;
     },
   });
+  function sceneFoot(m) {
+    const last = m.i >= m.lines.length - 1, result = m.kind === 'result';
+    return `<span id="modalErr" class="err"></span>${last ? '' : '<button class="btn" data-act="sceneSkip">Skip</button>'}${last && m.go ? `<a class="btn" href="${esc(m.go)}" data-act="sceneSkip">Go to the patient</a>` : ''}<button class="btn primary" data-act="sceneNext">${last ? (result ? 'Close' : 'Continue') : 'Next'}</button>`;
+  }
+  /* The next caption line is put into the open window in place. Drawing the whole window again would start its picture
+     over: the ambulance would drive in once for every line. */
+  function sceneLine(m) {
+    const q = (sel) => document.querySelector && document.querySelector('.modal.cut ' + sel), t = q('#cut-text'), n = q('.cut-n'), f = q('.modal-f');
+    if (!t || !n || !f) return false;
+    t.setAttribute('data-full', m.lines[m.i] || ''); t.textContent = reduce() ? m.lines[m.i] || '' : '';
+    n.textContent = `${m.i + 1} / ${m.lines.length}`; m.drawn = m.i;
+    if (m.i >= m.lines.length - 1) { f.innerHTML = sceneFoot(m); const b = f.querySelector('[data-act="sceneNext"]'); if (b && b.focus) b.focus(); }
+    return true;
+  }
+  /** The sound button in the window's title bar: the one shared mute (js/audio.js), shown as on or off. */
+  function soundButton() {
+    const on = E.sfx.on;
+    return `<button class="cap" data-act="sfxToggle" title="${on ? 'Sound on' : 'Sound off'}" aria-label="Sound" aria-pressed="${on}">${E.icon(on ? 'music' : 'mute', 16)}</button>`;
+  }
+  /** Update just that button, in place (so it keeps the focus), when the mute changes from here or from anywhere else. */
+  function syncSound() {
+    const b = document.querySelector && document.querySelector('.modal.cut [data-act="sfxToggle"]'); if (!b) return;
+    const on = E.sfx.on; b.title = on ? 'Sound on' : 'Sound off'; b.setAttribute('aria-pressed', String(on)); b.innerHTML = E.icon(on ? 'music' : 'mute', 16);
+  }
+  /* What a screen reader hears: each caption line once, whole, from a visually hidden live region that stays in the page
+     (a region created with its text already in it is not announced). */
+  function say(text) {
+    let el = document.getElementById('wl-say');
+    if (!el && document.body && text) { document.body.insertAdjacentHTML('beforeend', '<div id="wl-say" aria-live="polite" style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0"></div>'); el = document.getElementById('wl-say'); }
+    if (el && el.textContent !== text) el.textContent = text;
+  }
+  let said = '';
   /* The caption is typed by a timer that reads the modal's own start time, so a redraw does not restart it. */
   setInterval(() => {
-    const m = E.ui && E.ui.modal; if (!m || m.type !== 'scene') return;
+    const m = E.ui && E.ui.modal;
+    if (!m || m.type !== 'scene') { if (said) { said = ''; say(''); } return; }
+    const full = m.lines[m.i] || '', key = `${m.s0}:${m.i}`;
+    if (key !== said) { said = key; say(full); }
     const el = document.getElementById('cut-text'); if (!el) return;
-    const full = m.lines[m.i] || '', n = reduce() ? full.length : Math.min(full.length, Math.floor((performance.now() - m.t0) / SPEED));
+    const n = reduce() ? full.length : Math.min(full.length, Math.floor((performance.now() - m.t0) / SPEED));
     if (el.textContent.length !== n) { el.textContent = full.slice(0, n); if (n < full.length && n % 3 === 0 && full[n - 1] !== ' ') E.sfx.play('blip'); }
     m.full = n >= full.length;
   }, 30);
   const close = () => { E.ui.modal = null; if (E.app) E.app.render(); };
   E.worldActions = {
-    sceneNext() { const m = E.ui.modal; if (!m || m.type !== 'scene') return; if (!m.full) { m.t0 = -1e9; return; } if (m.i >= m.lines.length - 1) return close(); m.i++; m.t0 = performance.now(); m.full = false; E.app.render(); },
+    sceneNext() { const m = E.ui.modal; if (!m || m.type !== 'scene') return; if (!m.full) { m.t0 = -1e9; return; } if (m.i >= m.lines.length - 1) return close(); m.i++; m.t0 = performance.now(); m.full = false; if (!sceneLine(m)) E.app.render(); },
     sceneSkip() { close(); },
-    sfxToggle() { E.sfx.toggle(); if (E.ui.modal && E.ui.modal.type === 'scene') { const t = E.ui.modal.t0; E.app.render(); E.ui.modal.t0 = t; } },
+    sfxToggle() { E.sfx.toggle(); if (!E.audio) syncSound(); },   // with the shared audio, its onChange redraws the button
   };
+  /* The stage's buildings, pins and couriers are spans (the stage is aria-hidden, so they must not take focus); a click on
+     one follows its data-go like a link would. */
+  if (document.addEventListener) document.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest && e.target.closest('.wl [data-go]'); if (!t) return;
+    e.preventDefault(); location.hash = t.getAttribute('data-go');
+  });
 
-  (E.glyphsReady || Promise.resolve()).then(() => { sprites(); setInterval(watch, 1000); });
+  (E.glyphsReady || Promise.resolve()).then(() => { sprites(); if (E.audio) E.audio.onChange(syncSound); setInterval(watch, 1000); });
 })();

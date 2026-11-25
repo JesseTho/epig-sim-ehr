@@ -55,6 +55,14 @@
   const pausedAnywhere = () => (E.pauseChecks || []).some((f) => { try { return !!f(); } catch (e) { return false; } });
   /** Hospital time left on a crisis before the rapid response, such as "2 h 35 min". */
   const leftText = (c) => { const m = Math.ceil((Math.max(0, c.left || 0) / hourMs()) * 60); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; };
+  /** The shift, case or mission the learner is in, or null. Safety events inside one are assessed; outside, practice. */
+  const activityNow = () => { const act = E.db && E.db.user && E.progress().active; return act && ['shift', 'case', 'mission'].includes(act.type) ? { type: act.type, id: act.id } : null; };
+  /** Practice or assessed. Events saved before the split carry neither mark: one with a shift or case on it was assessed. */
+  const isPractice = (e) => (e.practice != null ? !!e.practice : !e.shift && !e.caseId);
+  /* The Triage the Pages tiers (js/games.js), so a shift and the game give the same reason for the same order.
+     games.js loads after this file and may publish its own labels as E.TRIAGE_TIERS; these are the same words. */
+  const TIERS = ['Now: airway, breathing or circulation is failing', 'Next: could become unstable within minutes', 'Soon: needs a plan within the hour', 'Later today: routine clinical work', 'Last: paperwork and messages'];
+  const tier = (i) => `“${(E.TRIAGE_TIERS && E.TRIAGE_TIERS[i]) || TIERS[i]}”`;
 
   /* =====================================================================================================
      1. HARM RULES
@@ -160,8 +168,13 @@
   E.safety = () => safety(E.progress());
   E.suspended = () => !!(E.db && E.db.user && (E.progress().safety || {}).suspended);
   const counts = (s, from) => { const ev = s.events.filter((e) => !from || e.ts >= from); return { harm: ev.filter((e) => e.kind === 'harm').length, near: ev.filter((e) => e.kind !== 'harm').length }; };
+  /* Every event counts toward the page, debrief and suspension, wherever it happened. Inside a shift, case or
+     mission it is marked assessed; outside one, practice, and the faculty report lists the two apart. A harm
+     from an order is judged by where the learner was when the order was signed (`act` on the crisis), not
+     30 seconds later when it took effect. */
   const record = (kind, p, o, title, extra) => {
-    const a = myShift(), ev = Object.assign({ id: E.uid('se'), kind, ts: Date.now(), pid: p.id, patient: p.name, order: o ? o.name : '', title, shift: a ? a.id : null, hosp: a ? hhmm(hosp(a)) : null }, extra || {});
+    const x = Object.assign({}, extra || {}), act = 'act' in x ? x.act : activityNow(); delete x.act;
+    const a = myShift(), ev = Object.assign({ id: E.uid('se'), kind, ts: Date.now(), pid: p.id, patient: p.name, order: o ? o.name : '', title, shift: a ? a.id : null, hosp: a ? hhmm(hosp(a)) : null, practice: !act, assessed: !!act, activity: act ? act.type : null }, x);
     E.safety().events.push(ev);
     return ev;
   };
@@ -191,6 +204,8 @@
   };
 
   /* ---------- escalation ---------- */
+  /** "by your orders", "by your decisions in a case", or both: a strike from a case was not an order. */
+  const harmedBy = (list) => { const c = list.filter((e) => e.source === 'case').length; return !c ? 'by your orders' : c === list.length ? 'by your decisions in cases' : 'by your orders and your decisions in cases'; };
   function escalate(ev, p) {
     const s = E.safety(), max = CFG().strikes, att = p.attending;
     s.strikes++;
@@ -198,7 +213,7 @@
       s.suspended = { ts: Date.now(), eventId: ev.id };
       s.suspensions.push({ at: Date.now(), after: ev.title + ' — ' + ev.patient, unlockedAt: null, attempts: 0 });
       E.audit(`Ordering privileges suspended after ${s.strikes} harm events`);
-      E.message({ type: 'Safety', from: att, patientId: p.id, act: 'orders', critical: true, subject: 'Privileges suspended', body: `That is ${s.strikes} patients harmed by your orders. Your ordering privileges are suspended and you have been reassigned to the gift shop until you pass a remediation round.\n\nThe suspension stays on your safety record.` });
+      E.message({ type: 'Safety', from: att, patientId: p.id, act: 'orders', critical: true, subject: 'Privileges suspended', body: `That is ${s.strikes} patients harmed ${harmedBy(s.events.filter((e) => e.kind === 'harm').slice(-s.strikes))}. Your ordering privileges are suspended and you have been reassigned to the gift shop until you pass a remediation round.\n\nThe suspension stays on your safety record.` });
       E.ui.lock = null; E.ui.modal = null;
       pose('sad', 6000);
     } else if (s.strikes === max - 1) {
@@ -246,6 +261,9 @@
     E.ui.modal = { type: 'safetyDebrief', evId: ev.id, wrong: 0, picked: {}, missed: {}, qs };
     if (E.app) E.app.render();
   }
+  /** Why a wrong pick in the debrief is wrong, shown before the learner tries again. A harm-rule option says which
+      other harm it belongs to; a general question gives its reason. */
+  const debriefWhyNot = (q, a) => (q.src && q.src[a] ? `That one belongs to a different harm: ${q.src[a].toLowerCase()}. It is not what happened here. Try again.` : `${q.why} Try again.`);
 
   /* ---------- remediation: the round that lifts a suspension ---------- */
   E.REMEDIATION = [
@@ -257,6 +275,9 @@
     { rule: 'insulin', q: 'Before ordering new insulin for a patient, what must you look at first?', options: ['The most recent glucose, and whether they are eating', 'The white cell count', 'Yesterday’s weight', 'Nothing, if the dose is small'], answer: 0, why: 'Insulin given on top of a low or falling glucose causes hypoglycemia.' },
     { rule: 'nephro', q: 'A creatinine has risen from 1.6 to 2.1. Which order needs a second thought?', options: ['Ketorolac for pain', 'Acetaminophen for pain', 'A daily weight', 'A repeat metabolic panel'], answer: 0, why: 'NSAIDs such as ketorolac reduce blood flow to the kidney and worsen a kidney injury.' },
     { q: 'When is it acceptable to override a high-risk advisory?', options: ['When there is a real clinical reason and your supervisor agrees', 'When you are busy', 'When the nurse is waiting for the order', 'Whenever the drug is commonly used'], answer: 0, why: 'An override is a decision you can defend out loud, with someone senior who agrees. It is never a way to save time.' },
+    // FACULTY: the next two are new and not yet reviewed (when an override is and is not right; see E.OVERRIDE_OK in js/sim.js)
+    { q: 'A chart lists codeine: nausea and vomiting, recorded as an intolerance. The patient needs an opioid for pain and the advisory fires. What is a sound response?', options: ['Override it, with a reason: nausea is a side effect, not an allergy, and it can be treated', 'Remove the order, because every advisory means the drug is unsafe', 'Delete codeine from the allergy list so the advisory stops', 'Override it with "will monitor closely" and nothing more'], answer: 0, why: 'An intolerance is a side effect, not an allergic reaction. Overriding it is reasonable when the reason says so. Deleting the entry hides it from everyone after you.' },
+    { q: 'A septic patient with penicillin anaphylaxis needs antibiotics fast. An allergy advisory fires on piperacillin-tazobactam. Is an override right?', options: ['No: choose a drug from another class, however rushed you are', 'Yes, because sepsis is an emergency', 'Yes, if you watch the patient closely', 'Yes, at half the dose'], answer: 0, why: 'A reason for an override has to answer the advisory itself. Being rushed, or the patient being very sick, does not make anaphylaxis less likely, and there is almost always a drug from another class.' },
     { q: 'A nurse pages you: the patient got worse minutes after a drug you ordered. What comes first?', options: ['Go to the patient, stop the drug and call for help', 'Finish the note you were writing', 'Wait to see whether it passes', 'Take the order out of the record'], answer: 0, why: 'Stop what is causing the harm and get help. The record is corrected honestly afterwards, never erased.' },
     { q: 'Your attending stops one of your orders before it reaches the patient. What is that, and what do you do with it?', options: ['A near miss: report it and find out what you missed', 'Nothing happened, so there is nothing to do', 'An adverse event, because the patient was harmed', 'A system problem, so not your concern'], answer: 0, why: 'A near miss is free information. The same gap will reach a patient one day if nobody looks at it.' },
     { q: 'Two patients on the unit have nearly the same name. How do you make sure you are in the right chart?', options: ['Check two identifiers, such as full name and date of birth', 'Check the room number', 'Ask "Are you Ms. Santos?" and wait for a nod', 'Use whichever chart is already open'], answer: 0, why: 'Rooms change and people nod. Two identifiers, read from the wristband or the chart, are what stop a wrong-patient error.' },
@@ -279,7 +300,7 @@
       o.harmChk = true; ch = true;
       if (p.icu) return;
       const r = E.harmRule(p, o);
-      if (r) crises().push({ id: E.uid('cr'), kind: 'harm', pid: p.id, orderId: o.id, rule: r.id, state: 'pending', wait: CFG().harmDelay * 1000, who: u.name, at: Date.now() });
+      if (r) crises().push({ id: E.uid('cr'), kind: 'harm', pid: p.id, orderId: o.id, rule: r.id, state: 'pending', wait: CFG().harmDelay * 1000, who: u.name, at: Date.now(), act: activityNow() });
     }));
     return ch;
   }
@@ -306,7 +327,7 @@
         ch = true;
         if (!o || ['Discontinued', 'Declined'].includes(o.status)) {   // stopped in time: it never reached the patient
           c.state = 'averted';
-          record('nearmiss', p, o, r.title, { by: me, outcome: 'stopped', rule: r.id });
+          record('nearmiss', p, o, r.title, Object.assign({ by: me, outcome: 'stopped', rule: r.id }, 'act' in c ? { act: c.act } : {}));
           E.audit(`Near miss recorded: ${o ? o.name : 'order'} stopped before it reached the patient`, p.id);
           say(`You stopped ${o ? o.name : 'the order'} before it reached the patient. That is a near miss, not harm.`, `Near miss — ${p.name}`, 'warn');
           pose('unsure');
@@ -314,7 +335,7 @@
         }
         const page = r.onset(p, o);
         c.state = 'open'; c.onsetTs = Date.now(); c.left = CFG().rescueHours * hourMs(); o.harm = c.id;
-        const ev = record('harm', p, o, r.title, { rule: r.id, outcome: 'open' });
+        const ev = record('harm', p, o, r.title, Object.assign({ rule: r.id, outcome: 'open' }, 'act' in c ? { act: c.act } : {}));
         c.eventId = ev.id;
         E.db.audit.unshift({ ts: Date.now(), user: p.rn, role: 'sim', patientId: p.id, action: `Paged the team: ${page.subject} after ${o.name}` });
         E.message({ type: 'Page', from: p.rn, patientId: p.id, act: 'orders', critical: true, subject: `${p.name} — ${page.subject}`, body: page.body + `\n\n${p.rn.split(',')[1].trim().split(' ')[0]}` });
@@ -358,15 +379,22 @@
     rescued: (evId) => (c) => c.crises.some((x) => x.evId === evId && x.state === 'rescued'),
     /** Never tried to order anything with these tags for this patient during the shift (declined attempts count as trying). */
     avoided: (...tags) => (c) => !c.tried.some((o) => tagsOf(o).some((t) => tags.includes(t))),
-    /** Of two pages that arrived together, the learner acted on this patient's (opened the chart, ordered, wrote)
-        before acting on the other one, the `other` event. Reading both messages first is triage, not a choice, so
-        reading does not count as acting. Never acting on this one fails; never acting on the other is fine. */
-    first: (other) => (c) => {
-      const acted = (pid, from) => { const t = c.all.filter((x) => x.patientId === pid && x.ts >= from && !/^Read message|^Marked message/.test(x.action)).map((x) => x.ts); return t.length ? Math.min(...t) : Infinity; };
-      const mine = c.seen ? c.from : acted(c.pid, c.from), od = c.def(other), oFrom = od && c.fired[other];
-      const theirs = oFrom ? (c.seenOf(other) ? oFrom : acted(od.pid, oFrom)) : Infinity;
+    /** Triage. Of the pages in a cluster (this event and the `others`), the learner acted on this patient's first
+        (opened the chart, ordered, wrote) once they had all landed. Reading the messages first is triage, not a
+        choice, so reading does not count as acting. Being in this patient's chart when the cluster landed counts as
+        going there first; being in another one's does not count against, until the learner does something there.
+        Never acting on this one fails; never acting on the others is fine. */
+    first: (...others) => (c) => {
+      const ids = others.filter((id) => c.fired[id] && c.def(id)), start = Math.max(c.from, ...ids.map((id) => c.fired[id]));
+      // the urgent page counts from when it landed (going to it before the rest arrive is going first); the others
+      // only from when the whole cluster had landed (a click on a routine page in the seconds before is not a choice)
+      const acted = (pid, from) => { const t = c.everything.filter((x) => x.patientId === pid && x.ts >= from && !/^Read message|^Marked message/.test(x.action)).map((x) => x.ts); return t.length ? Math.min(...t) : Infinity; };
+      const mine = c.seen ? c.from : acted(c.pid, c.from), theirs = Math.min(Infinity, ...ids.filter((id) => c.def(id).pid !== c.pid).map((id) => acted(c.def(id).pid, start)));
       return mine < Infinity && mine <= theirs;
     },
+    /** An overridden advisory with a reason the attending accepted (E.OVERRIDE_OK in js/sim.js). A physician's own
+        order has no review, so the same check is read straight from the order. */
+    sanctioned: () => (c) => c.orders.some((o) => (o.sanctioned && o.sanctioned.length) || (o.byRole !== 'student' && E.overrideCheck && (E.overrideCheck(E.pt(c.pid), o) || {}).ok)),
   };
   const lv = (k) => (p) => { const l = E.latestLab(p, k), d = E.LABS[k]; return `${E.labVal(k, l.value)}${d.unit ? ' ' + d.unit : ''}`; };
   const older = (k) => (p) => { const d = E.LABS[k], vals = p.labs.filter((l) => k in l.values).sort((a, b) => b.ts - a.ts).slice(1).map((l) => l.values[k]); return vals.concat([vals[0] * 1.2, vals[0] * 0.8, vals[0] * 1.35]).map((v) => `${E.labVal(k, v)}${d.unit ? ' ' + d.unit : ''}`); };
@@ -394,11 +422,16 @@
         { pid: 'p5', q: 'What is his code status?', answer: 'DNR/DNI', pool: ['Full Code', 'DNR only, intubation allowed', 'Comfort care only'], where: 'Code Status at the top of the chart sidebar, and the matching order.' },
         { pid: 'p6', q: 'What oxygen saturation are we aiming for?', answer: '88 to 92%', pool: ['92% or higher', '95 to 100%', 'Whatever keeps her comfortable'], where: 'The comment on her oxygen order, and the H&P plan.' },
       ],
+      // Gentle: three pages one at a time to learn the rhythm, a quiet hour and more, then one small cluster with an
+      // obvious priority. The drowsy patient lands a few seconds after the sore knees, so answering in order of
+      // arrival goes the wrong way.
       events: [
-        { id: 'pain', at: 10.5, type: 'page', pid: 'p5', from: RN1, subject: 'Chen, Robert — sore knees, asking for naproxen', body: 'Mr. Chen’s knees are sore. His daughter asks if he can have the naproxen he takes at home. He has nothing ordered for pain.\n\nTomas' },
-        Object.assign({ id: 'bcx', at: 12 }, BCX),
-        { id: 'glu', at: 13.5, type: 'problem', pid: 'p6', from: RN2, subject: 'Kowalski, Diane — glucose 268 before lunch', labs: ['POC glucose', { Glu: 268 }], body: 'Ms. Kowalski’s point-of-care glucose is 268 before lunch. She is on prednisone and has no insulin or glucose checks ordered. Would you like both?\n\nHana' },
-        { id: 'co2', at: 15, type: 'det', pid: 'p6', from: RN2, subject: 'Kowalski, Diane — hard to wake', vitals: { hr: 88, rr: 10, sbp: 132, dbp: 78, spo2: 99, o2: '6 L NC' },
+        Object.assign({ id: 'bcx', at: 10.5 }, BCX),
+        // FACULTY: new page, not yet reviewed. Her pleuritic pain and the codeine nausea are from the seeded H&P.
+        { id: 'pleur', at: 11.75, type: 'page', pid: 'p2', from: RN2, subject: 'Santos, Maria — chest hurts when she breathes in', body: 'Ms. Santos’s right-sided chest pain is 7 out of 10 when she breathes in. Acetaminophen has not helped. She is taking shallow breaths and not coughing up her sputum because it hurts. She says codeine once made her sick to her stomach. Can she have something stronger?\n\nHana' },
+        { id: 'glu', at: 12.75, type: 'problem', pid: 'p6', from: RN2, subject: 'Kowalski, Diane — glucose 268 before lunch', labs: ['POC glucose', { Glu: 268 }], body: 'Ms. Kowalski’s point-of-care glucose is 268 before lunch. She is on prednisone and has no insulin or glucose checks ordered. Would you like both?\n\nHana' },
+        { id: 'pain', at: 14.5, cluster: 'A', type: 'page', pid: 'p5', from: RN1, subject: 'Chen, Robert — sore knees, asking for naproxen', body: 'Mr. Chen’s knees are sore. His daughter asks if he can have the naproxen he takes at home. He has nothing ordered for pain.\n\nTomas' },
+        { id: 'co2', at: 14.55, cluster: 'A', type: 'det', pid: 'p6', from: RN2, subject: 'Kowalski, Diane — hard to wake', vitals: { hr: 88, rr: 10, sbp: 132, dbp: 78, spo2: 99, o2: '6 L NC' },
           body: 'Ms. Kowalski is hard to wake. A float nurse turned her oxygen up to 6 L when she looked short of breath. She is now 99% and breathing 10 a minute. I have turned the oxygen back down to 2 L.\n\nCan you come and see her? Do you want a blood gas?\n\nHana',
           crisis: { title: 'Drowsy from carbon dioxide retention', need: [['vbg']], needText: 'a venous blood gas', settle: { hr: 90, rr: 16, sbp: 136, dbp: 80, spo2: 90, o2: '2 L NC' }, settleText: 'More awake with the oxygen back at 2 L. SpO2 90%, breathing 16 a minute. The gas is on its way to the lab. I have put a sign on her oxygen: target 88 to 92%.' } },
       ],
@@ -412,6 +445,9 @@
         { ev: 'glu', pid: 'p6', text: 'Ordered sliding-scale insulin for a glucose of 268', why: 'Checks without a way to treat the number only document the problem.', test: X.ordered('lispro_ss') },
         { ev: 'co2', pid: 'p6', text: 'Got a blood gas when Ms. Kowalski became drowsy', why: 'Drowsiness after extra oxygen in COPD is carbon dioxide retention until a gas says otherwise.', test: X.rescued('co2') },
         { ev: 'co2', pid: 'p6', text: 'Looked at her vital signs in Flowsheets', why: 'The flowsheet showed the oxygen at 6 L and the breathing at 10 before anyone explained it.', test: X.viewed('Flowsheets') },
+        { ev: 'co2', pid: 'p6', triage: true, text: 'Handled Ms. Kowalski first', why: () => `Two pages landed together. Hard to wake and breathing 10 a minute is ${tier(0)}. Sore knees are ${tier(3)}. The one who cannot wait goes first, whichever page came in first.`, test: X.first('pain') },
+        // FACULTY: new expectation, not yet reviewed: a correct, reasoned override (E.OVERRIDE_OK 'intolerance' in js/sim.js)
+        { ev: 'pleur', pid: 'p2', text: 'Treated Ms. Santos’s pain, with a reason for the codeine advisory that the attending accepted', why: 'Codeine made her sick to her stomach. That is an intolerance, not an allergy, so overriding the advisory for another opioid is right when the reason says so. Pain that stops her coughing holds the pneumonia back.', test: X.sanctioned() },
       ],
       handoffWords: [['88', 'co2', 'carbon dioxide', 'oxygen']],
     },
@@ -436,12 +472,14 @@
         { pid: 'p5', q: 'What did his endoscopy find?', answer: 'A duodenal ulcer with a visible vessel, treated with clips', pool: ['Esophageal varices, treated with bands', 'A stomach tumour, biopsied', 'Nothing abnormal'], where: 'Results: the EGD report.' },
         { pid: 'p6', q: 'Which virus was found on her respiratory panel?', answer: 'Rhinovirus/enterovirus', pool: ['Influenza A', 'RSV', 'SARS-CoV-2'], where: 'Results: the respiratory viral panel report.' },
       ],
+      // Steady: two clusters. In each the urgent page lands a few seconds after a routine one. A lone result in
+      // between, then three quiet hours before the deterioration.
       events: [
-        Object.assign({ id: 'gap', at: 10 }, GAP),
-        Object.assign({ id: 'bcx', at: 11.5 }, BCX),
-        { id: 'cp', at: 13, type: 'problem', pid: 'p1', from: RN1, subject: 'Akana, Keoni — chest tightness for 20 minutes', vitals: { hr: 96, rr: 20, sbp: 150, dbp: 88, pain: 4 }, body: 'Mr. Akana has had tightness across his chest for 20 minutes. It started at rest. HR 96, BP 150/88, SpO2 95% on 2 L. He is not sweaty. This is new for him.\n\nTomas' },
-        { id: 'asa', at: 14.5, type: 'page', pid: 'p5', from: RN1, subject: 'Chen, Robert — daughter asks about his aspirin', body: 'Mr. Chen’s daughter is worried that he has been off his aspirin since admission, because of his heart stent. She asks whether he can restart it today.\n\nTomas' },
-        { id: 'sepsis', at: 15.5, type: 'det', pid: 'p2', from: RN2, subject: 'Santos, Maria — shaking chills, BP 86/50', vitals: { temp: 39.4, hr: 126, rr: 26, sbp: 86, dbp: 50, spo2: 91 },
+        Object.assign({ id: 'gap', at: 10.5, cluster: 'A' }, GAP),
+        { id: 'cp', at: 10.55, cluster: 'A', type: 'problem', pid: 'p1', from: RN1, subject: 'Akana, Keoni — chest tightness for 20 minutes', vitals: { hr: 96, rr: 20, sbp: 150, dbp: 88, pain: 4 }, body: 'Mr. Akana has had tightness across his chest for 20 minutes. It started at rest. HR 96, BP 150/88, SpO2 95% on 2 L. He is not sweaty. This is new for him.\n\nTomas' },
+        Object.assign({ id: 'bcx', at: 12 }, BCX),
+        { id: 'asa', at: 15, cluster: 'B', type: 'page', pid: 'p5', from: RN1, subject: 'Chen, Robert — daughter asks about his aspirin', body: 'Mr. Chen’s daughter is worried that he has been off his aspirin since admission, because of his heart stent. She asks whether he can restart it today.\n\nTomas' },
+        { id: 'sepsis', at: 15.05, cluster: 'B', type: 'det', pid: 'p2', from: RN2, subject: 'Santos, Maria — shaking chills, BP 86/50', vitals: { temp: 39.4, hr: 126, rr: 26, sbp: 86, dbp: 50, spo2: 91 },
           body: 'Ms. Santos has shaking chills and is more confused than this morning. T 39.4, HR 126, BP 86/50, RR 26, SpO2 91% on 2 L.\n\nShe looks septic again. Do you want a lactate, cultures and a fluid bolus?\n\nHana',
           crisis: { title: 'Sepsis getting worse', need: [['lactate'], ['ns_bolus']], needText: 'a lactate and an IV fluid bolus', settle: { temp: 38.6, hr: 104, rr: 20, sbp: 104, dbp: 62, spo2: 94 }, settleText: 'The bolus is in. HR 104, BP 104/62, and she knows where she is again. The lactate has gone to the lab.' } },
       ],
@@ -451,11 +489,14 @@
         { pid: 'p3', text: 'Ordered a CBC to recheck after the blood', why: 'One unit is expected to raise the hemoglobin by about 1. The recheck shows whether he is still bleeding.', test: X.ordered('cbc') },
         GAP_X,
         { ev: 'bcx', pid: 'p2', text: 'Read the blood culture result', why: 'A positive blood culture is read the hour it arrives.', test: X.read(/Blood culture/) },
-        { ev: 'cp', pid: 'p1', text: 'Ordered an ECG for new chest tightness', why: 'New chest pain gets an ECG within minutes.', test: X.ordered('ecg') },
+        // within: hospital hours from the page; the ECG counts only if it was ordered inside that window (the cost of going elsewhere first)
+        { ev: 'cp', pid: 'p1', within: 1, text: 'Ordered an ECG within the hour for new chest tightness', why: 'New chest pain gets an ECG within minutes. Answering the other page first used up that time.', test: X.ordered('ecg') },
+        { ev: 'cp', pid: 'p1', triage: true, text: 'Handled Mr. Akana first', why: () => `Two pages landed together. New chest tightness at rest is ${tier(1)}: he needs an ECG within minutes. A closed anion gap is ${tier(2)}: the drip keeps her safe until you get there.`, test: X.first('gap') },
         { ev: 'cp', pid: 'p1', text: 'Ordered a troponin', why: 'A normal ECG does not rule out heart injury. The troponin does the rest.', test: X.ordered('trop') },
         { ev: 'asa', pid: 'p5', text: 'Asked cardiology about the timing of Mr. Chen’s aspirin', why: 'The endoscopy report says to hold aspirin and discuss the timing with cardiology. That is a consult, not a guess.', test: X.ordered('c_cards') },
         { ev: 'asa', pid: 'p5', text: 'Did not restart aspirin on a fresh ulcer', why: 'Aspirin on a day-old clipped ulcer can make it bleed again.', test: X.avoided('nsaid'), safety: true },
         { ev: 'sepsis', pid: 'p2', text: 'Answered Ms. Santos’s sepsis with a lactate and a fluid bolus', why: 'Fever, a fast heart rate and a low blood pressure are sepsis until proven otherwise. A lactate and fluids come first.', test: X.rescued('sepsis') },
+        { ev: 'sepsis', pid: 'p2', triage: true, text: 'Handled Ms. Santos first', why: () => `Two pages landed together. Fever with a blood pressure of 86/50 is ${tier(0)}. A question about restarting aspirin is ${tier(3)}: it can wait an hour, and she cannot.`, test: X.first('asa') },
         { ev: 'sepsis', pid: 'p2', text: 'Sent blood cultures', why: 'Cultures before any change of antibiotic give the best chance of finding the organism.', test: X.ordered('bcx') },
         { ev: 'sepsis', pid: 'p2', text: 'Stayed away from penicillins', why: 'She had anaphylaxis to penicillin. Broadening her antibiotics in a hurry is exactly when that gets missed.', test: X.avoided('penicillin'), safety: true },
       ],
@@ -481,27 +522,32 @@
         { pid: 'p5', q: 'What is his hemoglobin this morning?', answer: lv('Hgb'), pool: older('Hgb'), where: 'Results: the newest column is on the left.' },
         { pid: 'p6', q: 'How much oxygen does she use at home?', answer: '2 L', pool: ['None', '4 L', 'Only at night'], where: 'The problem list and the H&P.' },
       ],
+      // Busy: three clusters, two hours apart. The first has the least obvious priority (a rising potassium with no
+      // symptoms against a request for sleep); in the second the urgent page comes first, so the trap is being
+      // pulled away by the next one; the third is the deterioration, after a two-hour rest.
       events: [
-        { id: 'sleep', at: 10, type: 'page', pid: 'p6', from: RN2, subject: 'Kowalski, Diane — cannot sleep, asks for "something strong"', body: 'Ms. Kowalski did not sleep and is anxious about tonight. She asks for "something strong, like the oxycodone my neighbour takes". She has nothing ordered for sleep.\n\nHana' },
-        { id: 'k', at: 11, type: 'result', pid: 'p1', from: 'Laboratory', subject: 'Abnormal: Potassium 5.7 mmol/L — Akana, Keoni', labs: ['BMP', { Na: 135, K: 5.7, Cl: 97, CO2: 25, BUN: 52, Cr: 2.3, Glu: 150, Ca: 8.8 }], body: 'Abnormal values:\nPotassium 5.7 mmol/L (H)\nCreatinine 2.3 mg/dL (H)\nBUN 52 mg/dL (H)\n\nPotassium was 5.2 this morning.' },
-        { id: 'af', at: 12.5, type: 'problem', pid: 'p3', from: RN1, subject: 'Whitfield, James — heart rate 138 and irregular', vitals: { hr: 138, rr: 20, sbp: 104, dbp: 60 }, body: 'Mr. Whitfield came back from physical therapy with palpitations. HR 138 and irregular, BP 104/60, SpO2 96%. He is awake, talking and has no chest pain.\n\nTomas' },
-        { id: 'bleed', at: 14, type: 'det', pid: 'p5', from: RN1, subject: 'Chen, Robert — pale, dizzy, heart rate 118', vitals: { hr: 118, rr: 22, sbp: 88, dbp: 50, spo2: 95, pain: 3 },
+        { id: 'sleep', at: 10, cluster: 'A', type: 'page', pid: 'p6', from: RN2, subject: 'Kowalski, Diane — cannot sleep, asks for "something strong"', body: 'Ms. Kowalski did not sleep and is anxious about tonight. She asks for "something strong, like the oxycodone my neighbour takes". She has nothing ordered for sleep.\n\nHana' },
+        { id: 'k', at: 10.05, cluster: 'A', type: 'result', pid: 'p1', from: 'Laboratory', subject: 'Abnormal: Potassium 5.7 mmol/L — Akana, Keoni', labs: ['BMP', { Na: 135, K: 5.7, Cl: 97, CO2: 25, BUN: 52, Cr: 2.3, Glu: 150, Ca: 8.8 }], body: 'Abnormal values:\nPotassium 5.7 mmol/L (H)\nCreatinine 2.3 mg/dL (H)\nBUN 52 mg/dL (H)\n\nPotassium was 5.2 this morning.' },
+        { id: 'af', at: 12, cluster: 'B', type: 'problem', pid: 'p3', from: RN1, subject: 'Whitfield, James — heart rate 138 and irregular', vitals: { hr: 138, rr: 20, sbp: 104, dbp: 60 }, body: 'Mr. Whitfield came back from physical therapy with palpitations. HR 138 and irregular, BP 104/60, SpO2 96%. He is awake, talking and has no chest pain.\n\nTomas' },
+        Object.assign({ id: 'gap', at: 12.05, cluster: 'B' }, GAP),
+        { id: 'visit', at: 14, cluster: 'C', type: 'page', pid: 'p2', from: RN2, subject: 'Santos, Maria — family asking about visiting hours', body: 'Ms. Santos’s sister would like to know whether the children can visit this evening while she is on droplet precautions, and what they would need to wear. No rush. She is comfortable.\n\nHana' },
+        { id: 'bleed', at: 14.05, cluster: 'C', type: 'det', pid: 'p5', from: RN1, subject: 'Chen, Robert — pale, dizzy, heart rate 118', vitals: { hr: 118, rr: 22, sbp: 88, dbp: 50, spo2: 95, pain: 3 },
           body: 'Mr. Chen just passed a large black stool and nearly fainted getting back to bed. He is pale and clammy. HR 118, BP 88/50.\n\nCan you come now? He will need a CBC, and fluids or blood.\n\nTomas',
           crisis: { title: 'Bleeding again', need: [['cbc'], ['ns_bolus', 'lr', 'prbc']], needText: 'a CBC, and IV fluids or blood', settle: { hr: 96, rr: 18, sbp: 106, dbp: 62, spo2: 97, pain: 1 }, settleText: 'Fluids are running and the CBC has gone. HR 96, BP 106/62 and his colour is better. GI has been called.' } },
-        { id: 'visit', at: 14.1, type: 'page', pid: 'p2', from: RN2, subject: 'Santos, Maria — family asking about visiting hours', body: 'Ms. Santos’s sister would like to know whether the children can visit this evening while she is on droplet precautions, and what they would need to wear. No rush. She is comfortable.\n\nHana' },
-        Object.assign({ id: 'gap', at: 16 }, GAP),
       ],
       expect: [
         { pid: 'p5', text: 'Ordered a CBC to follow Mr. Chen’s falling hemoglobin', why: 'The hemoglobin had drifted from 8.3 to 7.8 with a dark stool overnight. That needed following before the afternoon.', test: X.ordered('cbc') },
         { pid: 'p2', text: 'Replaced Ms. Santos’s potassium', why: 'Her nurse asked about a potassium of 3.3 in a message waiting before rounds.', test: X.ordered('kcl_po') },
         { ev: 'sleep', pid: 'p6', text: 'Ordered melatonin for sleep', why: 'Melatonin helps sleep without slowing breathing.', test: X.ordered('melatonin') },
         { ev: 'sleep', pid: 'p6', text: 'Kept opioids away from a patient who retains carbon dioxide', why: 'Opioids slow breathing. In someone who already retains carbon dioxide that can mean a ventilator.', test: X.avoided('opioid'), safety: true },
-        { ev: 'k', pid: 'p1', text: 'Ordered an ECG for a potassium of 5.7', why: 'The ECG shows whether a high potassium is affecting the heart, which decides how fast it is treated.', test: X.ordered('ecg') },
+        { ev: 'k', pid: 'p1', within: 1, text: 'Ordered an ECG within the hour for a potassium of 5.7', why: 'The ECG shows whether a high potassium is affecting the heart, which decides how fast it is treated. A rising potassium gets one within the hour.', test: X.ordered('ecg') },
+        { ev: 'k', pid: 'p1', triage: true, text: 'Handled Mr. Akana first', why: () => `Two pages landed together. A potassium of 5.7 and rising is ${tier(2)}: an ECG and a plan within the hour. A request for something to help sleep is ${tier(3)}.`, test: X.first('sleep') },
         { ev: 'k', pid: 'p1', text: 'Ordered a repeat metabolic panel', why: 'A rising potassium is rechecked the same day.', test: X.ordered('bmp', 'cmp') },
-        { ev: 'af', pid: 'p3', text: 'Ordered an ECG for a fast, irregular heart rate', why: 'An ECG confirms the rhythm before anything is done about it.', test: X.ordered('ecg') },
+        { ev: 'af', pid: 'p3', within: 1, text: 'Ordered an ECG within the hour for a fast, irregular heart rate', why: 'An ECG confirms the rhythm before anything is done about it, and a rate of 138 does not wait for the afternoon.', test: X.ordered('ecg') },
+        { ev: 'af', pid: 'p3', triage: true, text: 'Handled Mr. Whitfield first', why: () => `Two pages landed together. A new heart rate of 138 and irregular is ${tier(1)}. A closed anion gap is ${tier(2)}: the drip keeps her safe until you get there. His page came first; the next one should not pull you away.`, test: X.first('gap') },
         { ev: 'af', pid: 'p3', text: 'Checked his electrolytes', why: 'Low potassium or magnesium makes a fast atrial fibrillation harder to control.', test: X.ordered('bmp', 'cmp', 'mg') },
         { ev: 'bleed', pid: 'p5', text: 'Answered Mr. Chen’s rebleed with a CBC and fluids or blood', why: 'A fast heart rate and a falling blood pressure after a GI bleed mean rebleeding until proven otherwise.', test: X.rescued('bleed') },
-        { ev: 'bleed', pid: 'p5', text: 'Went to Mr. Chen before the page about visiting hours', why: 'Two pages arrived together. The unstable patient goes first; the other can be told when you will come.', test: X.first('visit') },
+        { ev: 'bleed', pid: 'p5', triage: true, text: 'Handled Mr. Chen first', why: () => `Two pages landed together. A heart rate of 118 and a blood pressure of 88/50 after a GI bleed is ${tier(0)}. A question about visiting hours is ${tier(4)}: the family can be told when you will come.`, test: X.first('visit') },
         { ev: 'bleed', pid: 'p5', text: 'Ordered a type and screen so blood would be ready', why: 'Blood cannot be given until it is matched. Ordering early saves time if he needs it.', test: X.ordered('ts') },
         GAP_X,
       ],
@@ -509,33 +555,40 @@
     },
   ];
   const shiftDef = (id) => E.SHIFTS.find((s) => s.id === id);
-  const PHASES = [['pre', 'Pre-rounds', 'Overnight events and morning labs have posted. Read up on your patients before rounds.'], ['rounds', 'Rounds', 'The attending asks one question about each patient. The answers are in the charts.'], ['day', 'Day work', 'Pages and results arrive through the day. The attending is busy, so think before you override anything.'], ['signout', 'Sign-out', 'Write a Handoff (I-PASS) note on your sickest patient, then end the shift.'], ['over', 'Shift over', 'It is past 19:00 and the night team is waiting. Finish your handoff and end the shift.']];
+  const PHASES = [['pre', 'Pre-rounds', 'Overnight events and morning labs have posted. Read up on your patients before rounds.'], ['rounds', 'Rounds', 'The attending asks one question about each patient. The answers are in the charts.'], ['day', 'Day work', 'Several pages can land at once. You decide what cannot wait. A handoff note on your sickest patient is due by the end of the shift. The attending is busy, so think before you override anything.'], ['signout', 'Sign-out', 'Write a Handoff (I-PASS) note on your sickest patient, then end the shift.'], ['over', 'Shift over', 'It is past 19:00 and the night team is waiting. Finish your handoff and end the shift.']];
   const phaseName = (id) => (PHASES.find((x) => x[0] === id) || PHASES[0])[1];
   /** Hospital time for this shift, as a decimal hour. */
   function hosp(a) { const c = CFG(); return Math.min(c.endHour, c.startHour + a.elapsed / hourMs()); }
   E.shiftClock = () => { const a = myShift(); return a ? { hour: hosp(a), text: hhmm(hosp(a)), phase: a.phase, paused: !!a.paused, over: !!a.over } : null; };
-  /** True while the attending is too busy to review: the Day work phase of a running shift. */
-  E.shiftRushed = () => { const a = myShift(); return !!a && a.phase === 'day' && !a.paused; };
+  /** True while the attending is too busy to review: the Day work phase of a running shift. There is no "and not
+      paused" here on purpose: the attending reviews nothing while the learner has paused (js/sim.js holds, and an
+      order pended during a pause is owed only the part of the pause it existed for), so the review runs once play
+      has resumed and is judged by the phase then. A pause term here could only ever let a pause turn a hurried
+      cosign into a decline. */
+  E.shiftRushed = () => { const a = myShift(); return !!a && a.phase === 'day'; };
 
   /* ---------- the clock ---------- */
   let last = Date.now();
-  const holding = () => document.hidden || E.suspended() || (E.ui.modal && ['rounds', 'safetyDebrief', 'scene'].includes(E.ui.modal.type));   // 'scene': a cutscene or consequence window (js/world.js)
-  /** Move sim time on by however long has passed since the last call. Time does not pass while the shift is
-      paused, the tab is hidden, the attending is asking a question, or privileges are suspended. */
+  // dialogs that stop every clock: rounds, the debrief, a cutscene or consequence window (js/world.js), a case question (js/cases.js)
+  const holding = () => document.hidden || E.suspended() || (E.ui.modal && ['rounds', 'safetyDebrief', 'scene', 'caseAsk'].includes(E.ui.modal.type));
+  /** Move sim time on by however long has passed since the last call. Time does not pass while nobody is logged
+      in, while anything says the learner has paused (a shift, a case), the tab is hidden, a dialog above is open,
+      or privileges are suspended. The rescue timers on crises obey the same rule, in or out of a shift. */
   function advance() {
     const now = Date.now(), dt = Math.max(0, Math.min(now - last, 5000));
     last = now;
     if (!dt || !E.db || !E.db.user) return;
     const a = myShift();
-    if (holding() || (a && a.paused)) return;
+    if (holding() || pausedAnywhere()) return;
     if (a && !a.over) a.elapsed += dt;
-    crises().forEach((c) => { if (c.state === 'pending') c.wait -= dt; else if (c.state === 'open') c.left -= dt; });
+    crises().forEach((c) => { if (!same(c.who, E.db.user.name)) return; if (c.state === 'pending') c.wait -= dt; else if (c.state === 'open') c.left -= dt; });
   }
   function fire(a, sh, ev) {
     const p = E.pt(ev.pid);
-    a.fired[ev.id] = Date.now();
+    a.fired[ev.id] = Date.now(); (a.firedH = a.firedH || {})[ev.id] = hosp(a);
     a.seen[ev.id] = location.hash.indexOf(`#/pt/${ev.pid}/`) === 0;
-    if (p.icu) return;   // already with the ICU team: the ward nurse has nothing to page about
+    // already with the ICU team: the ward nurse has nothing to page about, and nothing this event expects can be done
+    if (p.icu) { (a.unreach = a.unreach || {})[ev.id] = true; return; }
     if (ev.labs) pushLab(p, ev.labs[0], ev.labs[1]);
     if (ev.vitals) pushVitals(p, ev.vitals);
     const res = ev.type === 'result';
@@ -559,7 +612,26 @@
     }
     if (a.roundsDue && a.phase === 'rounds' && !(E.app && E.app.busy())) { a.roundsDue = false; E.ui.modal = { type: 'rounds', i: Math.max(0, a.answers.indexOf(null)) }; ch = true; }
     sh.events.forEach((ev) => { if (!a.fired[ev.id] && h >= ev.at) { fire(a, sh, ev); ch = true; } });
+    // an expectation with a window (`within`, hospital hours from the page) is settled while the shift runs: met
+    // inside the window, or missed when the window closes. The cost of answering something else first.
+    const win = a.win || (a.win = {}); let cx = null;
+    sh.expect.forEach((x, i) => {
+      if (!x.within || win[i] != null || !a.fired[x.ev] || (a.unreach || {})[x.ev]) return;
+      if (x.test((cx = cx || ctxOf(a, sh))(x.pid, a.fired[x.ev], x.ev))) win[i] = true;
+      else if (h >= (a.firedH || {})[x.ev] + x.within) win[i] = false;
+    });
     return ch;
+  }
+  /** What a scoring test reads: the learner's own audit lines, orders and notes for one patient from `from` on. */
+  function ctxOf(a, sh) {
+    const me = E.db.user.name, mine = E.db.audit.filter((x) => same(x.user, me) && x.ts >= a.start);
+    return (pid, from, evId) => {
+      const p = E.pt(pid), all = mine.filter((x) => x.ts >= from);
+      return { pid, from, fired: a.fired, def: (id) => sh.events.find((e) => e.id === id), seenOf: (id) => !!a.seen[id], seen: !!(evId && a.seen[evId]), all, everything: mine, audit: all.filter((x) => x.patientId === pid),
+        orders: p.orders.filter((o) => same(o.by, me) && o.ts >= from && !['Declined', 'Draft'].includes(o.status)),
+        tried: p.orders.filter((o) => same(o.by, me) && o.ts >= a.start),
+        notes: p.notes.filter((n) => same(n.author, me) && n.ts >= from), crises: crises().filter((x) => x.pid === pid && x.shift === a.id && x.onsetTs >= a.start) };
+    };
   }
   /** Called every two seconds by the app. Returns true if anything changed. */
   E.shiftTick = () => {
@@ -573,16 +645,22 @@
   };
 
   /* ---------- scoring ---------- */
+  /** The part of a note the learner wrote. Lines the template or a dot phrase put there are left out (the problem
+      list, the vitals, the headings), and so is a template heading at the start of a line the learner finished,
+      so the Handoff template's own words can never answer for the learner. Lower case. */
+  function ownText(n, p) {
+    const tpl = (E.NOTE_TEMPLATES && E.NOTE_TEMPLATES[n.type]) || '', norm = (s) => String(s).trim().replace(/^[-*•]\s*/, '').replace(/\s+/g, ' ').toLowerCase();
+    const machine = new Set(), add = (t) => String(t || '').split('\n').forEach((l) => { const k = norm(l); if (k) machine.add(k); });
+    add(E.expandTemplate ? E.expandTemplate(tpl, p) : tpl);
+    Object.keys(E.DOT || {}).forEach((k) => { try { add(E.DOT[k](p)); } catch (e) { /* a phrase that needs more than a patient */ } });
+    p.problems.forEach((x) => add(x.name));
+    const heads = tpl.split('\n').filter((l) => l.includes('***')).map((l) => norm(l.split('***')[0])).filter(Boolean);
+    const stamped = /^(latest )?(vitals?: )?t [\d.]+ °c, hr \d+|^\d\d\/\d\d(\/\d{4})? \d\d:\d\d$/;   // a vitals line or a signature time from any hour of the day
+    return n.text.split('\n').map((l) => { let k = norm(l); if (machine.has(k) || stamped.test(k)) return ''; const h = heads.find((x) => k.startsWith(x)); if (h) k = k.slice(h.length).trim(); return k.replace(/\(if \.\.\. then \.\.\.\)/g, ''); }).filter(Boolean).join('\n');
+  }
   function evaluate(a) {
     const sh = shiftDef(a.id), me = E.db.user.name, now = Date.now(), items = [];
-    const mine = E.db.audit.filter((x) => x.user === me && x.ts >= a.start);
-    const ctx = (pid, from, evId) => {
-      const p = E.pt(pid), all = mine.filter((x) => x.ts >= from);
-      return { pid, from, fired: a.fired, def: (id) => sh.events.find((e) => e.id === id), seenOf: (id) => !!a.seen[id], seen: !!(evId && a.seen[evId]), all, audit: all.filter((x) => x.patientId === pid),
-        orders: p.orders.filter((o) => o.by === me && o.ts >= from && !['Declined', 'Draft'].includes(o.status)),
-        tried: p.orders.filter((o) => o.by === me && o.ts >= a.start),
-        notes: p.notes.filter((n) => n.author === me && n.ts >= from), crises: crises().filter((x) => x.pid === pid && x.shift === a.id && x.onsetTs >= a.start) };
-    };
+    const mine = E.db.audit.filter((x) => same(x.user, me) && x.ts >= a.start), ctx = ctxOf(a, sh);
     // pre-rounds
     const cut = a.phaseAt.rounds || now, readBy = (re) => mine.some((x) => x.ts <= cut && x.action.startsWith('Read message') && re.test(x.action));
     items.push({ phase: 'Pre-rounds', text: 'Read the overnight messages before rounds', done: sh.preRead.every(readBy), why: 'The Inbox is where overnight events are waiting. Reading it first tells you whom to see first.' });
@@ -590,23 +668,31 @@
     items.push({ phase: 'Pre-rounds', text: `Looked at every patient before rounds (${looked} of ${pids.length})`, done: looked === pids.length, why: 'Pre-rounding means opening each chart: the overnight vitals, the morning labs, the new notes.' });
     // rounds
     a.qs.forEach((q, i) => { const p = E.pt(q.pid), picked = a.answers[i]; items.push({ phase: 'Rounds', pid: q.pid, text: `${p.name}: ${q.q}`, done: picked === q.answer, why: `${picked == null ? 'Not answered. ' : `You said “${q.options[picked]}”. `}The answer was “${q.options[q.answer]}”. ${q.where}`, reached: !!a.phaseAt.rounds }); });
-    // day work
-    sh.expect.forEach((x) => {
-      const from = x.ev ? a.fired[x.ev] : a.start, reached = !!from;
-      items.push({ phase: 'Day work', pid: x.pid, text: x.text, why: x.why, reached, safety: !!x.safety, done: reached && !!x.test(ctx(x.pid, from, x.ev)) });
+    // day work. An event that fired for a patient already in intensive care could not be acted on: "not reachable",
+    // left out of the score. An expectation with a window was settled while the shift ran (shiftStep).
+    const unreach = a.unreach || {}, win = a.win || {};
+    sh.expect.forEach((x, i) => {
+      const from = x.ev ? a.fired[x.ev] : a.start, gone = !!(x.ev && unreach[x.ev]), reached = !!from && !gone;
+      const done = reached && (x.within && win[i] != null ? win[i] : !!x.test(ctx(x.pid, from, x.ev)));
+      items.push({ phase: 'Day work', pid: x.pid, text: x.text, why: typeof x.why === 'function' ? x.why() : x.why, reached, unreachable: gone, safety: !!x.safety, triage: !!x.triage, done });
     });
-    // sign-out
-    const so = a.phaseAt.signout, sick = E.pt(sh.sickest), hand = (p) => p.notes.filter((n) => n.author === me && /^Handoff/.test(n.type) && so && n.ts >= so);
-    const right = hand(sick), other = E.db.patients.filter((p) => p !== sick && hand(p).length)[0];
-    items.push({ phase: 'Sign-out', pid: sick.id, text: `Signed a handoff note on the sickest patient, ${sick.name}`, done: right.length > 0, reached: !!so, why: `${other ? `You handed off ${other.name}. ` : ''}${sh.sickWhy} A Handoff (I-PASS) note, signed during sign-out, is what the night team reads first.` });
-    const txt = right.map((n) => n.text.toLowerCase()).join('\n');
-    items.push({ phase: 'Sign-out', pid: sick.id, text: 'The handoff names the problem and says what to do if it happens again', done: right.length > 0 && /\bif\b/.test(txt.replace(/\(if \.\.\. then \.\.\.\)/g, '')) && sh.handoffWords.every((alts) => alts.some((w) => txt.includes(w))), reached: !!so, why: 'The part of a handoff most often missing is the contingency: "if this happens, do that".' });
+    // sign-out. The handoff counts from the moment the day's deterioration was paged (it has to say what happened),
+    // or from sign-out if the shift never got that far. One signed before that was written too early.
+    const det = sh.events.find((e) => e.type === 'det'), so = a.phaseAt.signout, from = (det && a.fired[det.id]) || so, sick = E.pt(sh.sickest);
+    const hand = (p) => p.notes.filter((n) => same(n.author, me) && /^Handoff/.test(n.type) && n.ts >= a.start);
+    const right = from ? hand(sick).filter((n) => n.ts >= from) : [], early = hand(sick).filter((n) => !from || n.ts < from);
+    const other = E.db.patients.filter((p) => p !== sick && hand(p).some((n) => from && n.ts >= from))[0];
+    const tooEarly = !right.length && early.length ? `Your handoff on ${sick.name} was signed before ${he(sick).toLowerCase()} got worse, so it was written too early to include what happened. ` : '';
+    items.push({ phase: 'Sign-out', pid: sick.id, text: `Signed a handoff note on the sickest patient, ${sick.name}`, done: right.length > 0, reached: !!from, early: !!tooEarly, why: `${tooEarly}${other ? `You handed off ${other.name}. ` : ''}${sh.sickWhy} A Handoff (I-PASS) note, signed after the day's events, is what the night team reads first.` });
+    // only what the learner wrote counts: the template's own problem list and vitals would otherwise name the problem for them
+    const txt = right.map((n) => ownText(n, sick)).join('\n');
+    items.push({ phase: 'Sign-out', pid: sick.id, text: 'The handoff names the problem and says what to do if it happens again', done: right.length > 0 && /\bif\b/.test(txt) && sh.handoffWords.every((alts) => alts.some((w) => txt.includes(w))), reached: !!from, why: 'The part of a handoff most often missing is the contingency: "if this happens, do that". Only your own words count; the template’s problem list and vitals do not.' });
     items.forEach((x) => { if (x.reached === undefined) x.reached = true; });
 
     const sf = E.safety(), evs = sf.events.filter((e) => e.ts >= a.start), harm = evs.filter((e) => e.kind === 'harm'), near = evs.filter((e) => e.kind !== 'harm');
     // orders that went through and should not have (the per-patient traps already written for the missions)
     const unsafe = [];
-    E.db.patients.forEach((p) => { const m = (E.MISSIONS || []).find((x) => x.pid === p.id); if (!m) return; p.orders.filter((o) => o.by === me && o.ts >= a.start && !['Declined', 'Draft'].includes(o.status)).forEach((o) => { const t = m.traps.find((tr) => (tr.ids || []).includes(o.catId) || (tr.tags || []).some((g) => tagsOf(o).includes(g))); if (t) unsafe.push({ patient: p.name, order: o.name, why: t.why }); }); });
+    E.db.patients.forEach((p) => { const m = (E.MISSIONS || []).find((x) => x.pid === p.id); if (!m) return; p.orders.filter((o) => same(o.by, me) && o.ts >= a.start && !['Declined', 'Draft'].includes(o.status)).forEach((o) => { const t = m.traps.find((tr) => (tr.ids || []).includes(o.catId) || (tr.tags || []).some((g) => tagsOf(o).includes(g))); if (t) unsafe.push({ patient: p.name, order: o.name, why: t.why }); }); });
     // how each patient did
     const patients = pids.map((pid) => {
       const p = E.pt(pid), h = harm.filter((e) => e.pid === pid), det = crises().filter((x) => x.kind === 'det' && x.pid === pid && x.shift === a.id && x.onsetTs >= a.start)[0];
@@ -620,7 +706,7 @@
       else { how = 'Stable. Nothing was missed'; tone = 'green'; }
       return { pid, name: p.name, how, tone };
     });
-    const total = items.length, score = items.filter((x) => x.done).length, pct = Math.round((score / total) * 100);
+    const scored = items.filter((x) => !x.unreachable), total = scored.length, score = scored.filter((x) => x.done).length, pct = Math.round((score / total) * 100);
     const grade = pct >= 90 && !harm.length ? 'Honors' : pct >= 70 ? 'Pass' : 'Not yet';
     return { id: sh.id, title: sh.title, at: now, start: a.start, endedAt: hhmm(hosp(a)), early: !a.over, items, score, total, pct, grade, patients, unsafe,
       harm: harm.map((e) => ({ patient: e.patient, order: e.order, title: e.title, outcome: e.outcome, at: e.hosp })), near: near.map((e) => ({ patient: e.patient, order: e.order, title: e.title, by: e.by, at: e.hosp })), debrief: sh.debrief };
@@ -629,14 +715,24 @@
   E.shiftReport = (pr) => E.SHIFTS.map((sh) => {
     const r = (pr.shifts || {})[sh.id] || {}, l = r.last;
     return { shift: sh.title, plays: r.plays || 0, bestPercent: Math.round((r.best || 0) * 100), history: (r.history || []).map((h) => Object.assign({}, h, { at: new Date(h.at).toISOString() })),
-      lastReport: l ? { at: new Date(l.at).toISOString(), endedAtHospitalTime: l.endedAt, endedEarly: l.early, score: `${l.score} of ${l.total}`, grade: l.grade, caught: l.items.filter((x) => x.done).map((x) => `${x.phase}: ${x.text}`), missed: l.items.filter((x) => !x.done).map((x) => `${x.phase}: ${x.text}${x.reached ? '' : ' (not reached)'}`), patients: l.patients.map((p) => `${p.name}: ${p.how}`), harmEvents: l.harm, nearMisses: l.near, unsafeOrders: l.unsafe } : null };
+      lastReport: l ? { at: new Date(l.at).toISOString(), endedAtHospitalTime: l.endedAt, endedEarly: l.early, score: `${l.score} of ${l.total}`, grade: l.grade, caught: l.items.filter((x) => x.done).map((x) => `${x.phase}: ${x.text}`), missed: l.items.filter((x) => !x.done && !x.unreachable).map((x) => `${x.phase}: ${x.text}${x.reached ? '' : ' (not reached)'}${x.early ? ' (handoff written before the deterioration)' : ''}`), notReachable: l.items.filter((x) => x.unreachable).map((x) => `${x.phase}: ${x.text}`), patients: l.patients.map((p) => `${p.name}: ${p.how}`), harmEvents: l.harm, nearMisses: l.near, unsafeOrders: l.unsafe } : null };
   });
+  /** What became of a harm event, in words for the report. A case decides its patient's course itself. */
+  const outcomeText = (e) => (e.source === 'case' || e.outcome === 'case' ? 'handled in the case' : e.outcome === 'rescued' ? 'rescued' : e.outcome === 'icu' ? 'transferred to intensive care' : 'unresolved');
+  /* The faculty view. Assessed events (in a shift, case or mission) and practice events (anywhere else) are listed
+     apart; both counted toward the debrief and suspension. Rescues sit beside the harms they answered. */
   E.safetyReport = (pr) => {
     const s = pr.safety || { events: [], suspensions: [], debriefs: [], strikes: 0 }, iso = (t) => (t ? new Date(t).toISOString() : null);
-    return { harmEvents: s.events.filter((e) => e.kind === 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order, what: e.title, outcome: e.outcome === 'rescued' ? 'rescued' : e.outcome === 'icu' ? 'transferred to intensive care' : 'unresolved', duringShift: e.shift })),
-      nearMisses: s.events.filter((e) => e.kind !== 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order, what: e.title, stoppedBy: e.by })),
+    const where = (e) => (e.activity || (e.shift ? 'shift' : e.caseId ? 'case' : null));
+    const part = (list) => ({
+      harmEvents: list.filter((e) => e.kind === 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order || (e.source === 'case' ? 'a decision in a case' : ''), what: e.title, outcome: outcomeText(e), during: where(e), duringShift: e.shift || null })),
+      rescues: list.filter((e) => e.kind === 'harm' && e.outcome === 'rescued').map((e) => ({ at: iso(e.ts), rescuedAt: iso(e.resolvedTs), patient: e.patient, order: e.order, what: e.title })),
+      nearMisses: list.filter((e) => e.kind !== 'harm').map((e) => ({ at: iso(e.ts), patient: e.patient, order: e.order, what: e.title, stoppedBy: e.by, during: where(e) })),
+    });
+    const assessed = part(s.events.filter((e) => !isPractice(e))), practice = part(s.events.filter(isPractice));
+    return Object.assign(assessed, { practice, note: 'Assessed: during a shift, case or mission. Practice: anywhere else in the sim. Both count toward the debrief and the suspension.',
       debriefsCompleted: (s.debriefs || []).map((d) => ({ at: iso(d.at), wrongAnswersBeforeFinishing: d.wrong })),
-      suspensions: (s.suspensions || []).map((x) => ({ at: iso(x.at), after: x.after, liftedAt: iso(x.unlockedAt), remediationAttempts: x.attempts })), currentlySuspended: !!s.suspended, debriefOwed: !!s.debriefDue };
+      suspensions: (s.suspensions || []).map((x) => ({ at: iso(x.at), after: x.after, liftedAt: iso(x.unlockedAt), remediationAttempts: x.attempts })), currentlySuspended: !!s.suspended, debriefOwed: !!s.debriefDue });
   };
   function announce(before, text, title) {
     const g = E.game(E.progress()), extra = [], gained = g.xp - before.xp;
@@ -664,20 +760,20 @@
     }).join('');
     return `<h3 class="shelf-h">${icon('patients', 32)}Shifts</h3>
       <p class="muted shelf-p">A shift is a whole day with all of your patients: ${hhmm(c.startHour)} to ${hhmm(c.endHour)} on the hospital clock, about ${c.minutes} minutes on yours, and you can pause it. Pre-rounds, rounds, day work, sign-out, then a report on what you caught and what you missed. Starting a shift resets the ward to its starting state. One shift or mission at a time.</p>
-      ${a && a.type === 'shift' ? `<div class="notice info">${icon('info', 24)}<span>A shift is in progress. End it from the shift panel in the corner before starting a mission or another shift.</span></div>` : ''}
-      <div class="mission-grid">${cards}</div><h3 class="shelf-h">${icon('trophy', 32)}Missions</h3>`;
+      ${a && a.type === 'shift' ? `<div class="notice info">${icon('info', 24)}<span>A shift is in progress. End it from the shift bar under the toolbar before starting a mission or another shift.</span></div>` : ''}
+      <div class="mission-grid">${cards}</div>`;
   };
 
-  /** The shift panel in the bottom-left corner. */
+  /** The shift strip under the toolbar (V.dockStrip, js/missions.js). */
   V.shiftDock = (a) => {
-    const sh = shiftDef(a.id), c = CFG(), h = hosp(a), min = !!E.ui.dockMin, s = E.safety(), n = counts(s, a.start);
+    const sh = shiftDef(a.id), c = CFG(), h = hosp(a), s = E.safety(), n = counts(s, a.start);
     const pct = Math.round(((h - c.startHour) / (c.endHour - c.startHour)) * 100), ph = PHASES.find((x) => x[0] === a.phase) || PHASES[0];
     const order = ['pre', 'rounds', 'day', 'signout'], at = a.phase === 'over' ? 4 : order.indexOf(a.phase);
     const fired = sh.events.filter((e) => a.fired[e.id]).sort((x, y) => a.fired[y.id] - a.fired[x.id]).slice(0, 3);
-    const open = crises().filter((x) => x.state === 'open' && x.who === E.db.user.name);
+    const open = crises().filter((x) => x.state === 'open' && same(x.who, E.db.user.name));
     const left = a.answers.filter((x) => x == null).length;
     // One or two things to do now, each a single short line, instead of a paragraph.
-    const me = E.db.user.name, mine = E.db.audit.filter((x) => x.user === me && x.ts >= a.start);
+    const me = E.db.user.name, mine = E.db.audit.filter((x) => same(x.user, me) && x.ts >= a.start);
     const todo = (done, html) => `<li class="${done ? 'done' : ''}"><i class="tick${done ? '1' : '0'}"></i><span>${html}</span></li>`;
     let now = '';
     if (a.phase === 'pre') {
@@ -685,19 +781,20 @@
       const pids = sh.rounds.map((q) => q.pid), looked = pids.filter((pid) => mine.some((x) => x.patientId === pid && /^Viewed/.test(x.action))).length;
       now = todo(read === sh.preRead.length, `<a href="#/inbox">Read overnight Inbox</a> <b>${read}/${sh.preRead.length}</b>`) + todo(looked === pids.length, `<a href="#/home">Open each chart</a> <b>${looked}/${pids.length}</b>`);
     } else if (a.phase === 'rounds') now = todo(!left, `Answer the attending <b>${a.answers.length - left}/${a.answers.length}</b>`);
-    else if (a.phase === 'day') now = todo(false, 'Answer pages as they arrive');
+    // not "as they arrive": several can land at once, and the order is the learner's call (and is scored)
+    else if (a.phase === 'day') now = todo(false, 'Several pages can land at once. Decide what cannot wait') + todo(false, `Handoff note on your sickest patient, due by ${hhmm(c.endHour)}`);
     else now = todo(false, 'Write a Handoff (I-PASS) note on your sickest patient') + todo(false, 'Then end the shift');
     const next = { pre: ['Rounds', c.rounds], rounds: ['Day work', c.dayWork], day: ['Sign-out', c.signOut], signout: ['Night team', c.endHour] }[a.phase];
-    const body = `<span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span>
+    const sum = `<span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span>
       <p class="dock-next">${next ? `${esc(next[0])} at ${hhmm(next[1])}` : 'The night team is waiting'}</p>
       ${a.paused ? `<p class="shift-paused">${icon('info', 16)}<span>Paused. The ward is holding its breath.</span></p>` : ''}
-      ${open.map((x) => { const p = E.pt(x.pid); return `<p class="shift-now">${icon('alert', 16)}<a href="#/pt/${p.id}/orders">${esc(p.name)} needs you now</a></p>`; }).join('')}
-      ${s.debriefDue ? `<p class="shift-now">${icon('warn', 16)}<button class="linkish" data-act="debriefOpen">Debrief owed before you sign orders</button></p>` : ''}
+      ${open.map((x) => { const p = E.pt(x.pid); return `<p class="shift-now">${icon('alert', 16)}<span><a href="#/pt/${p.id}/orders">${esc(p.name)} needs you now</a> <small><b id="dock-left-${x.id}">${leftText(x)}</b> left</small></span></p>`; }).join('')}
+      ${s.debriefDue ? `<p class="shift-now">${icon('warn', 16)}<span><button class="linkish" data-act="debriefOpen">Debrief owed before you sign orders</button> <small>Orders for a patient in crisis still go through.</small></span></p>` : ''}
       <ul class="dock-list dock-todo">${now}</ul>
-      ${fired.length ? `<h5>New</h5><ul class="dock-list">${fired.map((e) => `<li>${icon(e.type === 'det' ? 'alert' : e.type === 'result' ? 'results' : 'inbox', 16)}<span><a href="#/pt/${e.pid}/${e.type === 'result' ? 'results' : e.vitals ? 'flowsheets' : 'orders'}">${esc(e.subject)}</a><small>${hhmm(e.at)}</small></span></li>`).join('')}</ul>` : ''}
-      ${n.harm || n.near ? `<div class="dock-score">${n.harm ? chip(`${n.harm} harm`, 'red') : ''}${n.near ? chip(`${n.near} near miss${n.near === 1 ? '' : 'es'}`, 'amber') : ''}</div>` : ''}
-      <div class="dock-acts">${a.over ? '' : `<button class="btn xs" data-act="shiftPause">${a.paused ? 'Resume' : 'Pause'}</button>`}${a.phase === 'rounds' && left ? `<button class="btn xs primary" data-act="shiftRounds">Rounds (${left})</button>` : ''}<button class="btn xs${a.over || a.phase === 'signout' ? ' primary' : ''}" data-act="shiftEnd">End shift</button></div>`;
-    return `<aside class="dock${min ? ' min' : ''} dock-shift${a.paused ? ' paused' : ''}" aria-label="Shift: ${esc(sh.title)}"><header class="dock-h">${icon('log', 16)}<b>${esc(ph[1])}</b><span id="shift-clock" class="dock-timer">${hhmm(h)}</span><button class="cap" data-act="dockToggle" title="${min ? 'Show' : 'Minimize'}" aria-label="${min ? 'Show panel' : 'Minimize panel'}">${min ? MAX_SVG : MIN_SVG}</button></header><div class="dock-b">${body}</div></aside>`;
+      ${n.harm || n.near ? `<span class="dock-score">${n.harm ? chip(`${n.harm} harm`, 'red') : ''}${n.near ? chip(`${n.near} near miss${n.near === 1 ? '' : 'es'}`, 'amber') : ''}</span>` : ''}`;
+    const body = `${fired.length ? `<h5>New</h5><ul class="dock-list">${fired.map((e) => `<li>${icon(e.type === 'det' ? 'alert' : e.type === 'result' ? 'results' : 'inbox', 16)}<span><a href="#/pt/${e.pid}/${e.type === 'result' ? 'results' : e.vitals ? 'flowsheets' : 'orders'}">${esc(e.subject)}</a><small>${hhmm(e.at)}</small></span></li>`).join('')}</ul>` : ''}`;
+    const acts = `${a.over ? '' : `<button class="btn xs" data-act="shiftPause">${a.paused ? 'Resume' : 'Pause'}</button>`}${a.phase === 'rounds' && left ? `<button class="btn xs primary" data-act="shiftRounds">Rounds (${left})</button>` : ''}<button class="btn xs${a.over || a.phase === 'signout' ? ' primary' : ''}" data-act="shiftEnd">End shift</button>`;
+    return V.dockStrip({ type: 'shift', cls: `dock-shift${a.paused ? ' paused' : ''}`, label: `Shift: ${sh.title}`, glyph: 'log', title: ph[1], timer: `<span id="shift-clock" class="dock-timer">${hhmm(h)}</span>`, sum, acts, body, more: 'Recent pages' });
   };
 
   /** Notices at the top of a chart: intensive care, a patient who needs the learner now, a debrief owed. */
@@ -705,17 +802,18 @@
     if (!E.db.user) return '';
     const out = [], me = E.db.user.name;
     if (p.icu) out.push(`<div class="notice harm">${icon('alert', 24)}<span><b>Transferred to intensive care at ${E.fmtTime(p.icu.ts)}.</b> ${esc(p.icu.why)}: nobody answered in time, so the nurse called a rapid response. The ICU team writes the orders now. This chart takes no new orders until the sim data is reset.</span></div>`);
-    crises().filter((c) => c.pid === p.id && c.state === 'open' && c.who === me).forEach((c) => {
+    crises().filter((c) => c.pid === p.id && c.state === 'open' && same(c.who, me)).forEach((c) => {
       const r = c.kind === 'harm' ? ruleById(c.rule) : null, d = r ? null : eventDef(c), o = c.orderId && p.orders.find((x) => x.id === c.orderId);
       const stop = r && o && o.status === 'Active';
-      out.push(`<div class="notice harm">${icon('alert', 24)}<span><b>${esc(r ? r.title : d.crisis.title)}.</b> ${r ? `${esc(o ? o.name : 'An order')} has harmed ${esc(mrms(p))}. ` : ''}${he(p)} needs ${stop ? `that order stopped, and ` : ''}${esc(r ? r.needText : d.crisis.needText)}. The nurse’s page is in your Inbox. If nothing is done the nurse will call a rapid response.</span>${p.id && location.hash.indexOf('/orders') < 0 ? `<a class="btn xs" href="#/pt/${p.id}/orders">Go to Orders</a>` : ''}</div>`);
+      // the time left is hospital time, and is updated in place once a second (the clock loop at the end of this file)
+      out.push(`<div class="notice harm">${icon('alert', 24)}<span><b>${esc(r ? r.title : d.crisis.title)}.</b> ${r ? `${esc(o ? o.name : 'An order')} has harmed ${esc(mrms(p))}. ` : ''}${he(p)} needs ${stop ? `that order stopped, and ` : ''}${esc(r ? r.needText : d.crisis.needText)}. The nurse’s page is in your Inbox. If nothing is done the nurse will call a rapid response in <b id="crisis-left-${c.id}">${leftText(c)}</b> of hospital time.</span>${p.id && location.hash.indexOf('/orders') < 0 ? `<a class="btn xs" href="#/pt/${p.id}/orders">Go to Orders</a>` : ''}</div>`);
     });
-    if (E.safety().debriefDue) out.push(`<div class="notice warn">${icon('warn', 24)}<span><b>Debrief owed.</b> Two of your orders have harmed patients. Your attending wants three questions answered before you sign more orders.</span><button class="btn xs" data-act="debriefOpen">Start the debrief</button></div>`);
+    if (E.safety().debriefDue) { const two = E.safety().events.filter((e) => e.kind === 'harm').slice(-2); out.push(`<div class="notice warn">${icon('warn', 24)}<span><b>Debrief owed.</b> Two patients have been harmed ${harmedBy(two)}. Your attending wants three questions answered before you sign more orders. Orders for a patient in crisis still go through.</span><button class="btn xs" data-act="debriefOpen">Start the debrief</button></div>`); }
     return out.join('');
   };
   /** A student cannot discontinue orders, but can always ask for one of their own harmful orders to be stopped. */
   V.orderExtra = (p, o) => {
-    if (o.status !== 'Active' || E.can('order.dc') || o.by !== E.db.user.name) return '';
+    if (o.status !== 'Active' || E.can('order.dc') || !same(o.by, E.db.user.name)) return '';
     const live = o.rushed || crises().some((c) => c.orderId === o.id && ['pending', 'open'].includes(c.state));
     return live ? `<button class="btn xs danger" data-act="harmStop" data-pid="${p.id}" data-id="${o.id}">Stop this order</button> ` : '';
   };
@@ -728,11 +826,12 @@
   V.learnCards = (who, own) => {
     const s = who.safety;
     if (!s || !(s.events.length || s.suspensions.length)) return '';
-    const rows = [...s.events].sort((x, y) => y.ts - x.ts).map((e) => `<tr><td class="nowrap">${E.fmtDT(e.ts)}</td><td>${e.kind === 'harm' ? chip('Harm', 'red') : chip('Near miss', 'amber')}</td><td>${esc(e.patient)}</td><td><b>${esc(e.order)}</b><div class="muted">${esc(e.title)}</div></td><td>${e.kind === 'harm' ? (e.outcome === 'rescued' ? 'Stabilised after the learner responded' : e.outcome === 'icu' ? 'Transferred to intensive care' : 'Not yet resolved') : `Stopped by ${esc(e.by || '')} before it reached the patient`}</td></tr>`).join('');
+    // practice (outside a shift, case or mission) is marked so faculty can tell it from assessed work; both count
+    const rows = [...s.events].sort((x, y) => y.ts - x.ts).map((e) => `<tr><td class="nowrap">${E.fmtDT(e.ts)}</td><td>${e.kind === 'harm' ? chip('Harm', 'red') : chip('Near miss', 'amber')}${isPractice(e) ? ' ' + chip('Practice', 'grey') : ''}</td><td>${esc(e.patient)}</td><td><b>${esc(e.order || (e.source === 'case' ? 'A decision in a case' : ''))}</b><div class="muted">${esc(e.title)}</div></td><td>${e.kind === 'harm' ? (e.source === 'case' || e.outcome === 'case' ? 'Handled in the case' : e.outcome === 'rescued' ? 'Stabilised after the learner responded' : e.outcome === 'icu' ? 'Transferred to intensive care' : 'Not yet resolved') : `Stopped by ${esc(e.by || '')} before it reached the patient`}</td></tr>`).join('');
     return `<section class="card"><header class="card-h"><h3>${icon('warn', 24)}Safety record</h3><span class="muted">${own ? 'Cleared when progress is reset' : esc(who.name)}</span></header><div class="card-b">
       ${s.suspensions.map((x) => `<p class="notice warn">${icon('warn', 24)}<span><b>Privileges suspended ${E.fmtDT(x.at)}</b> after ${esc(x.after)}. ${x.unlockedAt && x.startedOver ? `Lifted ${E.fmtDT(x.unlockedAt)} by starting over, without remediation.` : x.unlockedAt ? `Lifted ${E.fmtDT(x.unlockedAt)} after ${x.attempts} remediation attempt${x.attempts === 1 ? '' : 's'}.` : 'Not yet lifted.'}</span></p>`).join('')}
       ${rows ? `<table class="tbl compact"><thead><tr><th>When</th><th>Kind</th><th>Patient</th><th>Order</th><th>Outcome</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
-      <p class="fine">Harm events and near misses come from the sim’s harm rules (js/shift.js). Patients are fictional; the record is for teaching.</p></div></section>`;
+      <p class="fine">Harm events and near misses come from the sim’s harm rules and from decisions in cases (js/shift.js). Events marked Practice happened outside a shift, case or mission; they count the same way. Patients are fictional; the record is for teaching.</p></div></section>`;
   };
 
   /** The full-screen lockout while privileges are suspended. */
@@ -741,8 +840,8 @@
     let body;
     if (!L) {
       body = `<p class="lock-lead">You have been reassigned to the gift shop.</p>
-        <p>${c.strikes} patients have been harmed by orders you signed, so your ordering privileges are suspended. The gift shop is short of someone to restock the balloons, and nobody there can be given the wrong one.</p>
-        <table class="tbl compact"><thead><tr><th>Patient</th><th>Order</th><th>What happened</th></tr></thead><tbody>${harm.map((e) => `<tr><td>${esc(e.patient)}</td><td>${esc(e.order)}</td><td>${esc(e.title)}${e.outcome === 'icu' ? ' · intensive care' : ''}</td></tr>`).join('')}</tbody></table>
+        <p>${c.strikes} patients have been harmed ${harmedBy(harm).replace('by your orders', 'by orders you signed')}, so your ordering privileges are suspended. The gift shop is short of someone to restock the balloons, and nobody there can be given the wrong one.</p>
+        <table class="tbl compact"><thead><tr><th>Patient</th><th>Order</th><th>What happened</th></tr></thead><tbody>${harm.map((e) => `<tr><td>${esc(e.patient)}</td><td>${esc(e.order || (e.source === 'case' ? 'A decision in a case' : ''))}</td><td>${esc(e.title)}${e.outcome === 'icu' ? ' · intensive care' : ''}</td></tr>`).join('')}</tbody></table>
         <p>To get your badge back, pass the remediation round: ${c.remediationQuestions} questions, ${c.remediationPass} right. It is not timed, and you can take it as often as you need. The suspension stays on your safety record either way.</p>
         ${E.ui.lockOver ? `<p class="notice warn">${icon('warn', 24)}<span><b>Start over with a clean slate?</b> Everything of yours is erased: XP, level, badges, completed tasks and missions, shift reports and this safety record. Every patient goes back to how they were on admission. It cannot be undone.</span></p>
         <div class="lock-acts"><button class="btn" data-act="lockOverNo">Keep my place</button><button class="btn primary lg" data-act="lockOverDo">Start over</button></div>`
@@ -753,7 +852,8 @@
         <div class="lock-acts"><span id="lockErr" class="err"></span><button class="btn primary lg" data-act="remSubmit">Submit answers</button></div>`;
     } else {
       body = `<div class="result-head"><span class="result-score ${L.passed ? 'pass' : 'fail'}">${L.score}<small>of ${L.qs.length}</small></span><div><b>${L.passed ? 'Passed' : 'Not yet'}</b><span>${L.passed ? 'Your badge is at the front desk. The balloons will manage without you.' : `${c.remediationPass} right are needed. The gift shop is glad to keep you a little longer.`}</span></div></div>
-        ${L.qs.map((q, i) => { const a = L.answers[i], ok = a === q.answer; return `<div class="quiz"><p><b>${i + 1}.</b> ${esc(q.q)}</p>${q.options.map((o, j) => `<button class="qopt${j === q.answer && (ok || L.passed) ? ' right' : ''}${j === a && !ok ? ' wrong' : ''}" disabled>${esc(o)}</button>`).join('')}<div class="why ${ok ? 'ok' : 'no'}"><b>${ok ? 'Correct.' : 'Not quite.'}</b> ${ok || L.passed ? esc(q.why) : 'Think again about what protects the patient here.'}</div></div>`; }).join('')}
+        ${L.qs.map((q, i) => { const a = L.answers[i], ok = a === q.answer; return `<div class="quiz"><p><b>${i + 1}.</b> ${esc(q.q)}</p>${q.options.map((o, j) => `<button class="qopt${j === q.answer && (ok || L.passed) ? ' right' : ''}${j === a && !ok ? ' wrong' : ''}" disabled>${esc(o)}</button>`).join('')}<div class="why ${ok ? 'ok' : 'no'}"><b>${ok ? 'Correct.' : 'Not quite.'}</b> ${esc(q.why)}</div></div>`; }).join('')}
+        ${L.passed ? '' : '<p class="muted">Read the reason under each one you missed. The next round is drawn again, in a new order.</p>'}
         <div class="lock-acts">${L.passed ? '<button class="btn primary lg" data-act="remDone">Collect your badge</button>' : '<button class="btn" data-act="logout">Log off</button><button class="btn primary lg" data-act="remStart">Try again</button>'}</div>`;
     }
     return `<div class="lockout"><div class="lock-card"><header class="modal-h">${icon('brand', 16)}<h3>Privileges suspended</h3></header><div class="lock-b"><div class="lock-top">${icon('warn', 96)}<div><span class="boss-kick">Epig · Medical Staff Office</span><h2>Privileges suspended</h2><span class="muted">${esc(E.db.user.name)} · ${esc(E.roleLabel(E.db.user.role))} · since ${E.fmtDT(s.suspended.ts)}</span></div></div>${body}</div></div></div>`;
@@ -778,14 +878,15 @@
       return modal('Debrief with your attending', `
         <div class="advisory high"><div class="adv-h">${icon('alert', 32)}<b>${esc(ev.title || '')}</b> ${chip('Harm event', 'red')}</div><p>${esc(ev.order || '')} · ${esc(ev.patient || '')}</p></div>
         <p>Three questions about what went wrong. Nothing is marked down for a wrong answer here; you keep going until each one is right.</p>
-        ${m.qs.map((q, i) => { const a = m.picked[i], ok = a === q.answer; return `<div class="quiz"><p><b>${i + 1}.</b> ${esc(q.q)}</p>${q.options.map((o, j) => `<button class="qopt${ok && j === a ? ' right' : ''}${!ok && j === a ? ' wrong' : ''}" data-act="debriefPick" data-q="${i}" data-i="${j}"${ok ? ' disabled' : ''}>${esc(o)}</button>`).join('')}${a != null ? `<div class="why ${ok ? 'ok' : 'no'}"><b>${ok ? 'Yes.' : 'Not that one.'}</b> ${ok ? esc(q.why) : 'Try again.'}</div>` : ''}</div>`; }).join('')}`,
+        ${m.qs.map((q, i) => { const a = m.picked[i], ok = a === q.answer; return `<div class="quiz"><p><b>${i + 1}.</b> ${esc(q.q)}</p>${q.options.map((o, j) => `<button class="qopt${ok && j === a ? ' right' : ''}${!ok && j === a ? ' wrong' : ''}" data-act="debriefPick" data-q="${i}" data-i="${j}"${ok ? ' disabled' : ''}>${esc(o)}</button>`).join('')}${a != null ? `<div class="why ${ok ? 'ok' : 'no'}"><b>${ok ? 'Yes.' : 'Not that one.'}</b> ${ok ? esc(q.why) : esc(debriefWhyNot(q, a))}</div>` : ''}</div>`; }).join('')}`,
         `<button class="btn" data-act="closeModal">Later</button><button class="btn primary" data-act="debriefDone"${all ? '' : ' disabled'}>Finish the debrief</button>`, 'lg');
     },
     shiftResult(m, modal) {
       const pr = E.progress(), r = ((pr.shifts || {})[m.id] || {}).last;
       if (!r) return '';
-      const li = (x, ok) => `<li class="${ok ? 'done' : 'bad'}">${icon(ok ? 'check' : 'remove', 16)}<span><i class="ph-tag">${esc(x.phase)}</i> ${esc(x.text)}${ok ? '' : `<small>${x.reached ? '' : 'Not reached: the shift ended first. '}${esc(x.why)}</small>`}</span></li>`;
-      const caught = r.items.filter((x) => x.done), missed = r.items.filter((x) => !x.done);
+      // a triage line keeps its reason even when caught: the tier words are the same as in Triage the Pages
+      const li = (x, ok) => `<li class="${ok ? 'done' : 'bad'}">${icon(ok ? 'check' : 'remove', 16)}<span><i class="ph-tag">${esc(x.phase)}</i> ${esc(x.text)}${ok && !x.triage ? '' : `<small>${ok || x.reached ? '' : 'Not reached: the shift ended first. '}${esc(x.why)}</small>`}</span></li>`;
+      const caught = r.items.filter((x) => x.done), missed = r.items.filter((x) => !x.done && !x.unreachable), gone = r.items.filter((x) => x.unreachable);
       return modal(`Shift report — ${r.title}`, `
         <div class="result-head"><span class="result-score ${r.grade === 'Not yet' ? 'fail' : 'pass'}">${r.pct}<small>percent</small></span><div><b>${esc(r.grade)}</b><span>${r.score} of ${r.total} caught · ended at ${r.endedAt}${r.early ? ' (early)' : ''}</span>${m.xp ? `<span class="xp">+${m.xp} XP</span>` : ''}</div></div>
         <p class="fine">Honors: 90% or more and nobody harmed. Pass: 70% or more. Your best result on each shift counts toward your level; points are never taken away.</p>
@@ -796,6 +897,7 @@
           ${r.harm.length + r.near.length + r.unsafe.length ? '' : `<li class="done">${icon('check', 16)}<span>Nobody was harmed, and nothing you ordered had to be stopped.</span></li>`}</ul>
         <h4>Caught (${caught.length})</h4><ul class="dock-list wide">${caught.map((x) => li(x, true)).join('') || '<li class="hid"><i class="tick0"></i><span>Nothing yet.</span></li>'}</ul>
         <h4>Missed (${missed.length})</h4><ul class="dock-list wide">${missed.map((x) => li(x, false)).join('') || `<li class="done">${icon('check', 16)}<span>Nothing. A clean shift.</span></li>`}</ul>
+        ${gone.length ? `<h4>Not reachable (${gone.length})</h4><ul class="dock-list wide">${gone.map((x) => `<li class="hid"><i class="tick0"></i><span><i class="ph-tag">${esc(x.phase)}</i> ${esc(x.text)}<small>${esc(E.pt(x.pid) ? E.pt(x.pid).name : 'The patient')} was already in intensive care, so this could not be done. It is left out of the score.</small></span></li>`).join('')}</ul>` : ''}
         <div class="debrief shift-debrief">${icon('learning', 48)}<div><p>${esc(r.debrief)}</p></div></div>`,
         `<a class="btn" href="#/missions" data-act="closeModal">All shifts</a><button class="btn primary" data-act="closeModal">Close</button>`, 'lg');
     },
@@ -816,14 +918,14 @@
       const pr = E.progress(), sh = shiftDef(d.id), c = CFG();
       if (pr.active) { E.app.status(`Finish ${pr.active.type === 'shift' ? 'your shift' : pr.active.type === 'exam' ? 'the proficiency check' : pr.active.type === 'case' ? 'your case' : 'your mission'} first.`); return; }
       if (!E.can('order.sign') && !E.can('order.pend')) return E.app.status('Shifts involve entering orders, so they are for the Medical Student and Physician roles.');
-      E.ui.modal = { type: 'confirm', title: `Start shift ${sh.n}: ${sh.title}?`, text: `The ward is reset to its starting state first: every order, note and result entered on this device so far is erased. Your learning progress and safety record are kept. The hospital clock runs from ${hhmm(c.startHour)} to ${hhmm(c.endHour)} in about ${c.minutes} minutes. You can pause it, and it pauses itself if you switch to another tab.`, yes: 'shiftStart', yesLabel: 'Start the shift', id: sh.id };
+      E.ui.modal = { type: 'confirm', title: `Start shift ${sh.n}: ${sh.title}?`, text: `The ward is reset to its starting state first: every order, note and result entered on this device so far is erased. Your learning progress and safety record are kept. The hospital clock runs from ${hhmm(c.startHour)} to ${hhmm(c.endHour)} in about ${c.minutes} minutes. You can pause it, and it pauses itself if you switch to another tab. Any harm or near miss during the shift goes in your report for faculty.`, yes: 'shiftStart', yesLabel: 'Start the shift', id: sh.id };
       E.app.render();
     },
     shiftStart() {
       const id = E.ui.modal && E.ui.modal.id, sh = shiftDef(id), pr = E.progress();
       if (!sh || pr.active) return;
       E.reset(); E.db.openTabs = [];
-      Object.assign(E.ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0, dockMin: false });
+      Object.assign(E.ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0, dockMin: false, dockOpen: false });
       const t0 = Date.now() - 20 * 60000;
       sh.overnight.forEach((x) => {
         if (x.lab) E.pt(x.pid).labs.push({ id: E.uid('l'), ts: t0, name: x.lab[0], values: x.lab[1] });
@@ -872,7 +974,7 @@
       E.app.commit();
     },
     debriefOpen() { if (E.safety().debriefDue) openDebrief(); },
-    debriefPick(d) { const m = E.ui.modal; if (!m || m.type !== 'safetyDebrief') return; const q = m.qs[d.q]; m.picked[d.q] = Number(d.i); if (Number(d.i) !== q.answer) m.wrong++; E.app.render(); },
+    debriefPick(d) { const m = E.ui.modal; if (!m || m.type !== 'safetyDebrief') return; const q = m.qs[d.q]; m.picked[d.q] = Number(d.i); if (Number(d.i) !== q.answer) { m.wrong++; (m.missed[d.q] = m.missed[d.q] || []).push(Number(d.i)); } E.app.render(); },
     debriefDone() {
       const m = E.ui.modal, s = E.safety(); if (!m || m.type !== 'safetyDebrief' || !m.qs.every((q, i) => m.picked[i] === q.answer)) return;
       s.debriefs.push({ at: Date.now(), eventId: m.evId, wrong: m.wrong }); s.debriefDue = null;
@@ -922,9 +1024,15 @@
   /* The shift clock, once a second. The numbers in the panel are updated in place; scripted events and
      consequences are fired by E.shiftTick from the app's own two-second loop. */
   let ticks = 0;
+  /** Rewrite the time left on each open crisis, in the chart banner and the shift panel, without a full render. */
+  const crisisClocks = () => crises().forEach((c) => {
+    if (c.state !== 'open' || !same(c.who, E.db.user.name)) return;
+    ['crisis-left-', 'dock-left-'].forEach((k) => { const el = document.getElementById(k + c.id); if (el) el.textContent = leftText(c); });
+  });
   setInterval(() => {
     if (!E.db || !E.db.user || !E.app) return;
     advance();
+    crisisClocks();   // a crisis can run outside a shift too
     const a = myShift();
     if (!a) return;
     const c = CFG(), h = hosp(a), el = document.getElementById('shift-clock'), bar = document.getElementById('shift-bar');
@@ -932,6 +1040,8 @@
     if (bar) bar.style.width = Math.round(((h - c.startHour) / (c.endHour - c.startHour)) * 100) + '%';
     if (++ticks % 10 === 0) E.save();
   }, 1000);
+  /* For tests/shift-test.js only: the private scoring and clock helpers. Nothing in the app reads this. */
+  E._test = Object.assign(E._test || {}, { shift: { evaluate, ctxOf, ownText, leftText, pausedAnywhere, isPractice, hourMs, X, advance, sync: () => { last = Date.now(); } } });
   /* Switching to another tab pauses the shift; the learner resumes it on purpose when they come back. */
   document.addEventListener('visibilitychange', () => {
     const a = myShift();

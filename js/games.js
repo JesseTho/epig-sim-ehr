@@ -16,8 +16,26 @@
     { id: 'spot', name: 'Spot the Unsafe Order', glyph: 'warn', skill: 'Safe ordering · EPA 4', blurb: 'A patient and six orders. Decide which are safe and which to stop. Every stop shows the allergy, interaction or lab that makes it unsafe.' },
     { id: 'triage', name: 'Triage the Pages', glyph: 'inbox', skill: 'Prioritising · EPA 10', blurb: 'Five pages arrive in the same minute. Put them in the order you would answer them. Each one is checked against a key, with the reason it sits where it does.' },
     { id: 'right', name: 'Right Patient', glyph: 'idcard', skill: 'Patient identification · EPA 13', blurb: 'Two patients on the list have nearly the same name. Each request names a patient by two identifiers. Open the right chart.' },
-    { id: 'note', name: 'Note Doctor', glyph: 'notes', skill: 'Documentation · EPA 5', blurb: 'A progress note with mistakes in it: copied-forward vitals, a wrong allergy, another patient’s lab. Check it against the chart and click every line that is wrong.' },
+    { id: 'note', name: 'Note Doctor', glyph: 'notes', skill: 'Documentation · EPA 5', blurb: 'A progress note with mistakes in it: copied-forward vitals, a wrong allergy, another patient’s lab. Compare each line with the facts from the chart shown beside it, and click every line that is wrong.' },
   ];
+  /** Games are not played while a clock is running elsewhere: a shift or case clock keeps going behind the dialog,
+      the proficiency check's clock does too (and the games show chart facts), and a mission's live event would land
+      unseen. Returns the one-line reason, or '' when a game can start. */
+  E.gameBlock = () => {
+    const a = E.db && E.db.user ? E.progress().active : null;
+    if (!a) return '';
+    return a.type === 'shift' ? 'Mini-games wait until your shift ends: its clock keeps running behind a game.'
+      : a.type === 'case' ? 'Mini-games wait until your case ends: its clock keeps running behind a game.'
+      : a.type === 'exam' ? 'Mini-games wait until the proficiency check is submitted: its clock keeps running behind a game.'
+      : 'Mini-games wait until your mission ends, so nothing that happens to your patient is missed.';
+  };
+  /** Triage score: every pair of pages counts once, right when the more urgent one is answered first. One swap of
+      neighbours costs one pair, not two places. `ranks` is the urgency rank of each page in the order given (0 = most urgent). */
+  E.triageScore = (ranks) => {
+    let right = 0, total = 0;
+    for (let i = 0; i < ranks.length; i++) for (let j = i + 1; j < ranks.length; j++) { total++; if (ranks[i] < ranks[j]) right++; }
+    return { right, total };
+  };
   E.gameXp = (pr) => Object.values(pr.games || {}).reduce((n, g) => n + Math.min((g.perfect || 0) * E.XP.game, E.XP.gameMax), 0);
   const record = (id) => { const pr = E.progress(); pr.games = pr.games || {}; return pr.games[id] || (pr.games[id] = { plays: 0, perfect: 0, best: 0 }); };
 
@@ -111,6 +129,7 @@
       ['p1', 'Medical records: yesterday’s note on Akana, Keoni is waiting for a cosign request.', 'An administrative reminder. Nobody is harmed if it waits an hour.'],
     ]],
   ];
+  E.TRIAGE_TIERS = TIERS.map((t) => t[0]);
   function buildTriage() {
     const used = new Set();
     const pages = TIERS.map(([tier, list], rank) => {
@@ -141,25 +160,33 @@
 
   /* ---------- views ---------- */
   V.gameShelf = () => {
-    const pr = E.progress();
-    return `<h3 class="shelf-h">${icon('star', 32)}Mini-games</h3><div class="game-grid">${E.GAMES.map((g) => { const r = (pr.games || {})[g.id]; return `<article class="game">${icon(g.glyph, 48)}<div class="game-main"><b>${esc(g.name)}</b><span class="game-skill">${esc(g.skill)}</span><p>${esc(g.blurb)}</p></div><div class="game-side">${r && r.plays ? `<span>Best ${r.best}%</span><span>${r.perfect} perfect</span>` : '<span>Not played yet</span>'}<button class="btn primary" data-act="gameOpen" data-id="${g.id}">Play</button></div></article>`; }).join('')}</div>`;
+    const pr = E.progress(), block = E.gameBlock();
+    return `<h3 class="shelf-h">${icon('star', 32)}Mini-games</h3><p class="muted shelf-p">Short rounds that drill one skill each, open to every role. None is timed, and every mistake is explained.</p>
+      ${block ? `<div class="notice info">${icon('info', 24)}<span>${esc(block)}</span></div>` : ''}
+      <div class="game-grid">${E.GAMES.map((g) => { const r = (pr.games || {})[g.id]; return `<article class="game">${icon(g.glyph, 48)}<div class="game-main"><b>${esc(g.name)}</b><span class="game-skill">${esc(g.skill)}</span><p>${esc(g.blurb)}</p></div><div class="game-side">${r && r.plays ? `<span>Best ${r.best}%</span><span>${r.perfect} perfect</span>` : '<span>Not played yet</span>'}<button class="btn primary" data-act="gameOpen" data-id="${g.id}"${block ? ' disabled' : ''}>Play</button></div></article>`; }).join('')}</div>`;
   };
 
   V.modalExt = Object.assign(V.modalExt || {}, {
     game(m, modal, cancel) {
       const g = E.GAMES.find((x) => x.id === m.game), done = m.checked;
       if (m.game === 'triage') {
-        const s = m.s, right = s.pages.filter((x, i) => x.rank === i).length;
+        const s = m.s, sc = E.triageScore(s.pages.map((x) => x.rank));
         const rows = s.pages.map((x, i) => { const p = E.pt(x.pid), ok = done && x.rank === i; return `<li class="tr-page${done ? (ok ? ' right' : ' wrong') : ''}"><span class="tr-n">${i + 1}</span><div class="tr-main"><b>${esc(x.text)}</b><span class="muted">${p ? esc(p.bed) : ''}</span>${done ? `<p class="g-why">${icon(ok ? 'check' : 'alert', 16)}<span><b>${ok ? 'Right place.' : `Belongs at number ${x.rank + 1}.`}</b> ${esc(x.tier)}. ${esc(x.why)}</span></p>` : ''}</div>${done ? '' : `<span class="tr-move"><button class="btn xs" data-act="triageMove" data-i="${i}" data-d="-1" aria-label="Move page ${i + 1} up"${i === 0 ? ' disabled' : ''}>Up</button><button class="btn xs" data-act="triageMove" data-i="${i}" data-d="1" aria-label="Move page ${i + 1} down"${i === s.pages.length - 1 ? ' disabled' : ''}>Down</button></span>`}</li>`; }).join('');
-        return modal(g.name, `<p class="g-ask">${done ? `<b>${right} of ${s.pages.length} in the right place.</b> ${right === s.pages.length ? 'That is the order a senior resident would answer them in.' : 'Read why for the ones that moved.'}` : 'Five pages have arrived in the same minute. Put the one you would answer first at the top. This is not timed.'}</p><ol class="tr-list">${rows}</ol>${done ? '<p class="fine">The rule underneath: airway, breathing and circulation first; then whatever could become unstable soon; then time-sensitive results; then routine work; paperwork last.</p>' : ''}`,
+        return modal(g.name, `<p class="g-ask">${done ? `<b>${sc.right} of ${sc.total} pairs in the right order.</b> ${sc.right === sc.total ? 'That is the order a senior resident would answer them in.' : 'Each pair of pages counts once: right when the more urgent one comes first. Read why for the ones that moved.'}` : 'Five pages have arrived in the same minute. Put the one you would answer first at the top. This is not timed.'}</p><ol class="tr-list">${rows}</ol>${done ? '<p class="fine">The rule underneath: airway, breathing and circulation first; then whatever could become unstable soon; then time-sensitive results; then routine work; paperwork last.</p>' : ''}`,
           done ? `<button class="btn" data-act="gameOpen" data-id="triage">Play again</button><button class="btn" data-act="triageSend">File these as acknowledged pages in the Inbox</button><button class="btn primary" data-act="closeModal">Close</button>` : `${cancel}<button class="btn primary" data-act="gameCheck">Check my order</button>`, 'lg');
       }
       if (m.game === 'right') {
         const s = m.s, n = s.reqs.length, cur = s.reqs[m.step], rightN = s.reqs.filter((r, i) => m.picks[i] === r.pid).length;
-        const table = (pickable) => `<table class="tbl compact${pickable ? ' hover' : ''} rp-list"><thead><tr><th>Patient</th><th>Date of birth</th><th>MRN</th><th>Bed</th></tr></thead><tbody>${s.rows.map((id) => { const p = E.pt(id); return `<tr${pickable ? ` data-act="rightPick" data-id="${id}" tabindex="0"` : ''}><td><b>${esc(p.name)}</b></td><td>${E.fmtDob(p.dob)}</td><td>${p.mrn}</td><td>${esc(p.bed)}</td></tr>`; }).join('')}</tbody></table>`;
-        if (!done) return modal(g.name, `<p class="g-ask">Request ${m.step + 1} of ${n}. Select the chart you would open. This is not timed.</p><div class="rp-req">${icon('inbox', 32)}<p>${esc(cur.text)}</p></div>${table(true)}<p class="fine">Two patients here have nearly the same name. A room number is not an identifier.</p>`, cancel, 'lg');
+        const mine = m.picks[m.step];
+        const table = (pickable) => `<table class="tbl compact${pickable ? ' hover' : ''} rp-list"><thead><tr><th>Patient</th><th>Date of birth</th><th>MRN</th><th>Bed</th></tr></thead><tbody>${s.rows.map((id) => { const p = E.pt(id), on = pickable && mine === id; return `<tr${pickable ? ` data-act="rightPick" data-id="${id}" tabindex="0" aria-selected="${on}"` : ''}><td><b>${esc(p.name)}</b>${on ? ' <span class="chip green">Your pick</span>' : ''}</td><td>${E.fmtDob(p.dob)}</td><td>${p.mrn}</td><td>${esc(p.bed)}</td></tr>`; }).join('')}</tbody></table>`;
+        // Picking moves on to the next request; after the last one comes a review where any pick can be changed. Nothing is scored until "Check my picks".
+        if (!done && m.step < n) return modal(g.name, `<p class="g-ask">Request ${m.step + 1} of ${n}. Select the chart you would open. You can change any pick before it is checked. This is not timed.</p><div class="rp-req">${icon('inbox', 32)}<p>${esc(cur.text)}</p></div>${table(true)}<p class="fine">Two patients here have nearly the same name. A room number is not an identifier.</p>`,
+          `${cancel}${m.step > 0 ? `<button class="btn" data-act="rightGo" data-i="${m.step - 1}">Previous request</button>` : ''}${s.reqs.every((r, i) => m.picks[i]) ? `<button class="btn" data-act="rightGo" data-i="${n}">Review my picks</button>` : ''}`, 'lg');
+        if (!done) return modal(g.name, `<p class="g-ask"><b>Your picks.</b> Check each one against the request before they are scored. Change any that do not match on two identifiers.</p>
+          <ul class="dock-list wide">${s.reqs.map((r, i) => { const got = E.pt(m.picks[i]); return `<li><i class="tick0"></i><span>${esc(r.text)}<small>You picked <b>${got ? esc(got.name) : 'nobody'}</b>${got ? `, born ${E.fmtDob(got.dob)}, MRN ${got.mrn}` : ''}.</small></span><button class="btn xs" data-act="rightGo" data-i="${i}">Change</button></li>`; }).join('')}</ul>`,
+          `${cancel}<button class="btn primary" data-act="gameCheck">Check my picks</button>`, 'lg');
         return modal(g.name, `<p class="g-ask"><b>${rightN} of ${n} right charts.</b> ${rightN === n ? 'Every chart matched on two identifiers.' : 'A wrong chart is how an order reaches the wrong patient.'}</p>
-          <ul class="dock-list wide">${s.reqs.map((r, i) => { const p = E.pt(r.pid), got = E.pt(m.picks[i]), ok = got === p; return `<li class="${ok ? 'done' : 'bad'}">${icon(ok ? 'check' : 'remove', 16)}<span>${esc(r.text)}<small><b>${esc(p.name)}</b>, born ${E.fmtDob(p.dob)}, MRN ${p.mrn}. Matched on ${esc(r.ids)}.${ok ? '' : ` You opened ${esc(got.name)} (born ${E.fmtDob(got.dob)}, MRN ${got.mrn}).`}</small></span></li>`; }).join('')}</ul>${table(false)}`,
+          <ul class="dock-list wide">${s.reqs.map((r, i) => { const p = E.pt(r.pid), got = E.pt(m.picks[i]), ok = got === p; return `<li class="${ok ? 'done' : 'bad'}">${icon(ok ? 'check' : 'remove', 16)}<span>${esc(r.text)}<small><b>${esc(p.name)}</b>, born ${E.fmtDob(p.dob)}, MRN ${p.mrn}. Matched on ${esc(r.ids)}.${ok || !got ? '' : ` You opened ${esc(got.name)} (born ${E.fmtDob(got.dob)}, MRN ${got.mrn}).`}</small></span></li>`; }).join('')}</ul>${table(false)}`,
           `<button class="btn" data-act="gameOpen" data-id="right">Play again</button><button class="btn" data-act="rightSend">Open ${esc(E.pt(s.reqs[n - 1].pid).name)}’s chart</button><button class="btn primary" data-act="closeModal">Close</button>`, 'lg');
       }
       const p = E.pt(m.s.pid);
@@ -179,7 +206,7 @@
           done ? `<button class="btn" data-act="gameOpen" data-id="spot">Play again</button>${keep.length ? `<button class="btn" data-act="spotSend">Add the ${keep.length} order${keep.length > 1 ? 's' : ''} you marked Safe to ${esc(p.name)}’s unsigned orders</button>` : ''}<button class="btn primary" data-act="closeModal">Close</button>`
             : `${cancel}<button class="btn primary" data-act="gameCheck">Check my answers</button>`, 'xl');
       }
-      const s = m.s, n = s.lines.filter((l) => l.err).length;
+      const s = m.s, n = s.lines.filter((l) => l.err).length, flagged = s.lines.filter((l, i) => m.flags[i]).length;
       const found = done ? s.lines.filter((l, i) => l.err && m.flags[i]).length : 0, falses = done ? s.lines.filter((l, i) => !l.err && m.flags[i]).length : 0;
       const lines = s.lines.map((l, i) => {
         const f = !!m.flags[i], cls = !done ? (f ? ' flagged' : '') : l.err ? (f ? ' found' : ' missed') : f ? ' false' : '';
@@ -187,9 +214,11 @@
           : `<button class="g-l" data-act="noteFlag" data-i="${i}" aria-pressed="${f}">${esc(l.t)}</button>`}</li>`;
       }).join('');
       const facts = `<dl class="kv g-facts">${s.facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
-      return modal(g.name, `${ptCard}<p class="g-ask">${done ? `<b>${found} of ${n} mistakes caught${falses ? `, ${falses} correct line${falses > 1 ? 's' : ''} flagged` : ''}.</b>` : `This note has <b>${n} mistakes</b>. Compare it with the chart and click every line that is wrong.`}</p>
+      return modal(g.name, `${ptCard}<p class="g-ask">${done ? `<b>${found} of ${n} mistakes caught${falses ? `, ${falses} correct line${falses > 1 ? 's' : ''} flagged` : ''}.</b>` : `This note has <b>${n} mistakes</b>. Compare each line with the facts from the chart beside it, and click every line that is wrong.`}</p>
         <div class="g-split"><ol class="g-note">${lines}</ol><aside><h4>${icon('summary', 24)}From the chart</h4>${facts}</aside></div>`,
         done ? `<button class="btn" data-act="gameOpen" data-id="note">Play again</button><button class="btn" data-act="noteSend">Open the corrected note in ${esc(p.name)}’s chart to finish and sign</button><button class="btn primary" data-act="closeModal">Close</button>`
+          // fewer lines flagged than there are mistakes: ask before scoring, so a stray Enter cannot end the round
+          : m.askLow ? `<span class="fine">You have flagged ${flagged} line${flagged === 1 ? '' : 's'}, and the note has ${n} mistakes. Check anyway?</span><button class="btn" data-act="noteKeep">Keep looking</button><button class="btn primary" data-act="gameCheck" data-force="1">Check anyway</button>`
           : `${cancel}<button class="btn primary" data-act="gameCheck">Check my answers</button>`, 'xl');
     },
   });
@@ -197,24 +226,36 @@
   /* ---------- actions ---------- */
   E.gameActions = {
     gameOpen(d) {
+      const block = E.gameBlock();
+      if (block) { if (E.ui.modal && E.ui.modal.type === 'game') E.ui.modal = null; E.app.status(block); return E.app.render(); }
       const s = d.id === 'spot' ? buildSpot() : d.id === 'triage' ? buildTriage() : d.id === 'right' ? buildRight() : buildNote();
       if (!s) return E.app.status(d.id === 'right' ? 'This round needs the two sound-alike patients. Reset the sim data to bring them back.' : 'No patient has enough risky orders for a round right now.');
       E.ui.modal = { type: 'game', game: d.id, s, marks: {}, flags: {}, picks: [], step: 0, checked: false };
       E.app.render();
     },
-    spotMark(d) { const m = E.ui.modal; m.marks[d.i] = m.marks[d.i] === d.v ? undefined : d.v; E.app.render(); },
-    noteFlag(d) { const m = E.ui.modal; m.flags[d.i] = !m.flags[d.i]; E.app.render(); },
-    gameCheck() {
-      const m = E.ui.modal, s = m.s, pr = E.progress(), before = E.game(pr);
+    spotMark(d) { const m = E.ui.modal; if (!m || m.type !== 'game' || m.checked) return; m.marks[d.i] = m.marks[d.i] === d.v ? undefined : d.v; E.app.render(); },
+    noteFlag(d) { const m = E.ui.modal; if (!m || m.type !== 'game' || m.checked) return; m.flags[d.i] = !m.flags[d.i]; m.askLow = false; E.app.render(); },
+    noteKeep() { const m = E.ui.modal; if (!m || m.type !== 'game') return; m.askLow = false; E.app.render(); },
+    /** Score a round. Only a round that is open, not yet checked and complete is scored, so a round left midway
+        (closed, replaced by another window, or a stray click after it closed) never writes a record or awards XP. */
+    gameCheck(d) {
+      const m = E.ui.modal;
+      if (!m || m.type !== 'game' || m.checked || !m.s) return;
+      const s = m.s, pr = E.progress(), before = E.game(pr), err = (t) => { const e = document.getElementById('modalErr'); if (e) e.textContent = t; };
+      if (m.game === 'right' && s.reqs.some((r, i) => !m.picks[i])) return err('Pick a chart for every request first.');
+      if (m.game === 'note' && !(d && d.force)) {
+        const n = s.lines.filter((l) => l.err).length, flagged = s.lines.filter((l, i) => m.flags[i]).length;
+        if (flagged < n) { m.askLow = true; return E.app.render(); }
+      }
       let pct, perfect;
       if (m.game === 'triage') {
-        const right = s.pages.filter((x, i) => x.rank === i).length;
-        pct = Math.round((right / s.pages.length) * 100); perfect = right === s.pages.length;
+        const sc = E.triageScore(s.pages.map((x) => x.rank));
+        pct = Math.round((sc.right / sc.total) * 100); perfect = sc.right === sc.total;
       } else if (m.game === 'right') {
         const right = s.reqs.filter((r, i) => m.picks[i] === r.pid).length;
         pct = Math.round((right / s.reqs.length) * 100); perfect = right === s.reqs.length;
       } else if (m.game === 'spot') {
-        if (s.cards.some((c, i) => !m.marks[i])) { const e = document.getElementById('modalErr'); if (e) e.textContent = 'Mark every order Safe or Stop.'; return; }
+        if (s.cards.some((c, i) => !m.marks[i])) return err('Mark every order Safe or Stop.');
         const right = s.cards.filter((c, i) => (m.marks[i] === 'stop') === c.unsafe).length;
         pct = Math.round((right / s.cards.length) * 100); perfect = right === s.cards.length;
       } else {
@@ -241,12 +282,17 @@
       E.app.status(`${key.length} pages filed in your Inbox as acknowledged.`);
       E.app.go('#/inbox');
     },
+    /** A pick moves on to the next request without a pick, or to the review once every request has one. Never scores. */
     rightPick(d) {
-      const m = E.ui.modal; if (m.checked) return;
+      const m = E.ui.modal; if (!m || m.type !== 'game' || m.game !== 'right' || m.checked) return;
+      const n = m.s.reqs.length; if (!(m.step < n)) return;
       m.picks[m.step] = d.id;
-      if (m.step < m.s.reqs.length - 1) { m.step++; return E.app.render(); }
-      E.gameActions.gameCheck();
+      const after = m.s.reqs.findIndex((r, i) => i > m.step && !m.picks[i]), any = m.s.reqs.findIndex((r, i) => !m.picks[i]);
+      m.step = after >= 0 ? after : any >= 0 ? any : n;
+      E.app.render();
     },
+    /** Go to one request to change its pick (0..n-1), or to the review (n). */
+    rightGo(d) { const m = E.ui.modal; if (!m || m.type !== 'game' || m.game !== 'right' || m.checked) return; m.step = Math.max(0, Math.min(m.s.reqs.length, Number(d.i))); E.app.render(); },
     rightSend() { const m = E.ui.modal, p = E.pt(m.s.reqs[m.s.reqs.length - 1].pid); E.audit('Opened the chart named in Right Patient, after checking two identifiers', p.id); E.ui.modal = null; E.save(); E.app.go(`#/pt/${p.id}/summary`); },
     spotSend() {
       const m = E.ui.modal, p = E.pt(m.s.pid);

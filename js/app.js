@@ -99,6 +99,9 @@
       return;
     }
     // the same dialog redrawn after a click inside it: keep its scroll and focus, and do not replay the zoom-in
+    // a cutscene already on screen at this caption line is left alone: drawing it again would start its picture over
+    if (m.type === 'scene' && shownModal === m && m.drawn === m.i && $('.modal.cut', box)) return;
+    if (m.type === 'scene') m.drawn = m.i;
     const again = !!shownModal && (shownModal === m || (shownModal.type === m.type && shownModal.pid === m.pid && shownModal.id === m.id && shownModal.title === m.title));
     const body0 = $('.modal-b', box), top = again && body0 ? body0.scrollTop : 0, ae = document.activeElement, fk = again && ae && box.contains(ae) ? ctlKey(ae) : null;
     box.innerHTML = V.modal(m);
@@ -182,7 +185,7 @@
     // never push one out; only a newer critical balloon can.
     const crit = tone === 'critical' || glyph === 'alert';
     const box = $('#toast'), b = document.createElement('div');
-    b.className = 'balloon';
+    b.className = 'balloon' + (tone === 'big' || /Level up|Badge earned/.test(String(text) + ' ' + String(title || '')) ? ' big' : '');   // milestones get the larger balloon (css .balloon.big)
     if (crit) { b.dataset.critical = '1'; b.setAttribute('role', 'alert'); }
     b.innerHTML = `${E.icon(glyph || 'info', 24)}<div><b>${E.esc(title)}</b><span>${E.esc(text)}</span></div>`;
     box.appendChild(b);
@@ -527,7 +530,7 @@
     notePrev() { nextBlank($('#noteText'), true, true); },
     noteUndo() { noteUndo(false); },
     noteRedo() { noteUndo(true); },
-    notePane() { ui.notePane = !E.noteOpen(curPt()); render(); },
+    notePane() { ui.notePane = !E.noteOpen(curPt()); (E.db.prefs || (E.db.prefs = {})).notePane = ui.notePane; E.save(); render(); },   // the learner's own choice outlives the visit
     notePaneOpen() { ui.notePane = true; ui.npTab = 'mine'; render(); const t = $('#noteText'); if (t) t.focus(); },
     /* Bold and Italic wrap the selection in plain marks; List starts each selected line with "- ". */
     noteFmt(d) {
@@ -572,7 +575,7 @@
       for (const a of m.alerts) {
         const val = $(`#modal [data-alert="${a.id}"]`).value;
         if (!val) return modalErr('Choose an action for every advisory.');
-        if (val === 'remove') { if (!remove.includes(a.orderId)) remove.push(a.orderId); } else (over[a.orderId] = over[a.orderId] || []).push({ title: a.title, reason: val });
+        if (val === 'remove') { if (!remove.includes(a.orderId)) remove.push(a.orderId); } else { const why = (($(`#modal [data-alert-why="${a.id}"]`) || {}).value || '').trim(); (over[a.orderId] = over[a.orderId] || []).push({ title: a.title, reason: why ? `${val}: ${why}` : val }); }   // the typed reason is what the attending weighs (js/sim.js E.overrideCheck)
       }
       m.alerts.forEach((a) => {
         const removed = remove.includes(a.orderId);
@@ -651,7 +654,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     /* Everything that earns XP goes, except the proficiency check: resetting progress must not hand back exam
        attempts, so that record is kept whole (with any pass). The safety record goes (owner's decision: a reset is
        a full start over, harm events included). The work samples stay. */
-    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; ['bonus', 'missions', 'active', 'games', 'shifts', 'cases', 'safety'].forEach((k) => delete pr[k]); if (E.ui) E.ui.lock = null; award = null; ui.modal = null; E.audit('Reset own learning progress'); const g = E.game(pr); status(`Progress reset. You are at Level ${g.level}.`); commit(); },
+    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; ['bonus', 'missions', 'active', 'games', 'shifts', 'cases', 'safety', 'quizRetry', 'quizOrder'].forEach((k) => delete pr[k]); if (E.ui) E.ui.lock = null; award = null; ui.modal = null; E.audit('Reset own learning progress'); const g = E.game(pr); status(`Progress reset. You are at Level ${g.level}.`); commit(); },
     learnPrint() { window.print(); },
     learnExport() { exportReport(viewedLearner()); },
   };

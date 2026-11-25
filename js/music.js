@@ -4,13 +4,14 @@
    a walking bass, brushed drums and a soft square-wave melody, eight bars in F major at 96 beats a minute.
    It is synthesised in the browser with the Web Audio API, so there is no audio file.
 
-   It is on by default and plays only on the login screen. Browsers allow sound only after someone interacts
-   with the page, so it starts on the first click or key press. The mute button in the corner turns it off,
-   and that choice is remembered on this computer. */
+   It is off until the learner turns it on with "Play music" on the login screen (owner's decision), and it plays
+   on the login screen only. It goes through the one sound system (js/audio.js): its context, its music bus and
+   its mute, so the banner's speaker button silences it like everything else. Whether it is wanted is remembered
+   there (E.audio.music()). Browsers allow sound only after someone interacts with the page, so nothing starts
+   before the first click or key press. */
 (function () {
   const E = window.EHR;
   const BPM = 96, STEP = 60 / BPM / 4, BAR = 16;        // 16th-note grid
-  const PREF = 'epig-music';
 
   /* ---------- the score: [bass root, chord voicing] per bar, then melody as [16th step, MIDI note, length] ---------- */
   const BARS = [
@@ -35,19 +36,18 @@
   ];
   const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
-  let ctx = null, out = null, noise = null, timer = null, next = 0, step = 0, on = false, wanted = false;
-  const readPref = () => { try { return localStorage.getItem(PREF) !== '0'; } catch (e) { return true; } };   // on unless muted
-  const writePref = (v) => { try { localStorage.setItem(PREF, v ? '1' : '0'); } catch (e) { /* not remembered */ } };
+  let ctx = null, out = null, noise = null, timer = null, next = 0, step = 0, on = false, touched = false;
+  const wanted = () => !!(E.audio && E.audio.music());
 
-  function graph() {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return false;
-    ctx = new AC();
-    out = ctx.createGain(); out.gain.value = 0;
+  /** The loop's own little mixer, built once on the shared context and fed into the music bus. */
+  function graph(o) {
+    if (ctx === o.ctx && out) return true;
+    ctx = o.ctx;
+    out = ctx.createGain(); out.gain.value = 0.0001;
     const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 7000;
     // a little room: a feedback echo mixed in quietly
     const echo = ctx.createDelay(1); echo.delayTime.value = STEP * 3; const fb = ctx.createGain(); fb.gain.value = 0.28; const wet = ctx.createGain(); wet.gain.value = 0.22;
-    out.connect(tone); tone.connect(ctx.destination); tone.connect(echo); echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(ctx.destination);
+    out.connect(tone); tone.connect(o.out); tone.connect(echo); echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(o.out);
     noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     return true;
@@ -109,8 +109,8 @@
   }
   function start() {
     if (on) return;
-    if (!ctx && !graph()) return;
-    if (ctx.state === 'suspended') ctx.resume();
+    const o = E.audio && E.audio.musicOut();   // null when muted, hidden or without Web Audio
+    if (!o || !graph(o)) return;
     on = true; step = 0; next = ctx.currentTime + 0.08;
     out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(0.0001, ctx.currentTime); out.gain.exponentialRampToValueAtTime(0.9, ctx.currentTime + 1.2);
     timer = setInterval(tick, 25); tick();
@@ -122,16 +122,28 @@
   }
 
   let scene = null;
+  /** Play exactly when it should: wanted, on the login screen, not muted, tab in view, and after a first click. */
+  function sync() {
+    const ok = touched && scene === 'login' && wanted() && E.audio && !E.audio.muted() && !E.audio.hidden;
+    if (ok) start(); else stop();
+  }
   E.music = {
-    /** The choice remembered on this computer. */
-    get wanted() { return wanted; },
+    /** The choice remembered on this computer (off until turned on). */
+    get wanted() { return wanted(); },
     get playing() { return on; },
-    toggle() { wanted = !wanted; writePref(wanted); if (wanted && scene === 'login') start(); else stop(); },
+    /** "Play music" on the login screen. Turning the music on also lifts the mute: a learner who asks for music
+        should hear it. Turning it off leaves the effects alone. */
+    toggle() {
+      if (!E.audio) return;
+      const w = E.audio.setMusic(!wanted());
+      touched = true;
+      if (w && E.audio.muted()) E.audio.setMuted(false); else sync();
+    },
     /** Called on every redraw with the screen showing; music plays on the login screen only. */
-    scene(name) { scene = name; if (name === 'login' && wanted) { if (ctx && ctx.state !== 'suspended') start(); } else stop(); },
+    scene(name) { scene = name; sync(); },
   };
-  wanted = readPref();
-  // A browser allows sound only after the person interacts with the page: start on the first click or key.
-  const kick = () => { if (wanted && scene === 'login') start(); };
+  if (E.audio) E.audio.onChange(sync);   // the mute, the volume and the tab being hidden all come through here
+  // A browser allows sound only after the person interacts with the page: nothing is made before the first click or key.
+  const kick = () => { touched = true; sync(); };
   document.addEventListener('pointerdown', kick); document.addEventListener('keydown', kick);
 })();

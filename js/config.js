@@ -29,16 +29,17 @@
        minutes: real minutes for one shift, 07:00 to 19:00 hospital time. The phase times are hospital clock times.
        harmDelay: seconds between a harmful order taking effect and the patient getting worse.
        rescueHours: hospital hours the learner has to respond before a rapid response and transfer to intensive care.
-         One hospital hour is always (minutes x 60 / 12) real seconds, in or out of a shift.
+         One hospital hour in a shift, and for every harm rescue timer, is minutes x 60 / (endHour - startHour) real
+         seconds (80 by default). PBL cases use their own, slower hour: cases.hourSeconds (240).
        strikes: harm events before privileges are suspended (1 = a page, 2 = a debrief before more orders, 3 = suspension).
        remediationQuestions / remediationPass: the round that lifts a suspension. */
-/* PBL cases (js/cases.js). hourSeconds: real seconds in one hospital hour while a case runs (slower than a shift,
+    shift: { minutes: 16, startHour: 7, endHour: 19, rounds: 8.5, dayWork: 9.5, signOut: 17.5, harmDelay: 30, rescueHours: 3, strikes: 3, remediationQuestions: 5, remediationPass: 4 },
+    /* PBL cases (js/cases.js). hourSeconds: real seconds in one hospital hour while a case runs (slower than a shift,
        so there is time to read). settle: seconds a node waits before a chart action can move the case on. */
     cases: { hourSeconds: 240, settle: 6 },
     /* The banner as a picture of the day, and the cutscene window (js/world.js). Each can be switched off.
        ruler: the hour ruler and its pins along the top of the banner (off: the owner did not like it; the sun carries the time instead). cutscenes: the animated window on arrivals, transfers and endings.
-       sound: synthesised effects in cutscenes (the learner can still mute them). */
+       sound: synthesised effects in cutscenes (they obey the one mute in js/audio.js). */
     world: { banner: true, ruler: false, cutscenes: true, sound: true },
-    shift: { minutes: 16, startHour: 7, endHour: 19, rounds: 8.5, dayWork: 9.5, signOut: 17.5, harmDelay: 30, rescueHours: 3, strikes: 3, remediationQuestions: 5, remediationPass: 4 },
   };
 })();

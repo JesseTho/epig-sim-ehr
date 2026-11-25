@@ -25,7 +25,7 @@
 
   E.MISSIONS = [
     {
-      id: 'akana', pid: 'p1', glyph: 'code', title: 'Diurese him safely',
+      id: 'akana', pid: 'p1', glyph: 'code', title: 'Diurese him safely', rank: 4, level: 'Medium', needs: 'Two screens to read, one order and a note.',
       brief: 'Mr. Akana came in fluid-overloaded and is on IV furosemide. This morning his potassium is 5.1 and his creatinine has crept up to 2.1. Review the trends, order follow-up labs and write today’s progress note.',
       required: [
         { text: 'Review his lab trends in Results', test: H.viewed('Results') },
@@ -45,7 +45,7 @@
       debrief: 'Diuresis is a balance: enough to relieve congestion, not so much that the kidneys or the potassium go wrong. Daily labs and weights are how you see the balance.',
     },
     {
-      id: 'santos', pid: 'p2', glyph: 'mar', title: 'Answer the nurse',
+      id: 'santos', pid: 'p2', glyph: 'mar', title: 'Answer the nurse', rank: 2, level: 'Easy', needs: 'One message to read and two orders. No note.',
       brief: 'Ms. Santos’s nurse has sent you a message about this morning’s labs. Find it, act on it, and make sure your fix is safe for a patient with penicillin anaphylaxis.',
       required: [
         { text: 'Read the nurse’s message in the Inbox', test: H.read(/Santos/) },
@@ -63,7 +63,7 @@
       debrief: 'Potassium is replaced, then rechecked. Nurses raise these by message because they are easy to miss in a busy list; answering promptly closes the loop.',
     },
     {
-      id: 'whitfield', pid: 'p3', glyph: 'orders', title: 'Bleeding or clotting?',
+      id: 'whitfield', pid: 'p3', glyph: 'orders', title: 'Bleeding or clotting?', rank: 5, level: 'Medium', needs: 'Results to read, two orders and a note, with more unsafe orders to avoid.',
       brief: 'Mr. Whitfield is a day out from a hip replacement and is restarting warfarin for atrial fibrillation. His hemoglobin has dropped and his INR is rising. Check what matters before you change anything.',
       required: [
         { text: 'Review his hemoglobin and INR in Results', test: H.viewed('Results') },
@@ -83,7 +83,7 @@
       debrief: 'After surgery, bleeding and clotting pull in opposite directions. Following the INR and hemoglobin, and choosing pain relief that does not affect bleeding, keeps both under control.',
     },
     {
-      id: 'kahale', pid: 'p4', glyph: 'results', title: 'Close the gap',
+      id: 'kahale', pid: 'p4', glyph: 'results', title: 'Close the gap', rank: 3, level: 'Easy', needs: 'One trend to read and two orders. No note.',
       brief: 'Ms. Kahale came in with diabetic ketoacidosis and is on an insulin infusion. Her anion gap is narrowing. Confirm it, keep checking, and plan the safe switch to insulin under the skin.',
       required: [
         { text: 'Trend her anion gap or bicarbonate in Results', test: H.viewed('Results') },
@@ -99,7 +99,7 @@
       debrief: 'The insulin drip stops only after long-acting insulin has had time to work. Stopping it first lets the ketoacidosis come straight back.',
     },
     {
-      id: 'chen', pid: 'p5', glyph: 'vitals', title: 'Watch for a rebleed',
+      id: 'chen', pid: 'p5', glyph: 'vitals', title: 'Watch for a rebleed', rank: 6, level: 'Hardest', needs: 'Six steps, and his condition changes partway through.',
       brief: 'Mr. Chen had a bleeding ulcer treated by endoscopy yesterday. He looks stable for now. Review him, set up the right monitoring, and keep an eye on him.',
       required: [
         { text: 'Confirm his code status and the matching order', test: H.viewed('Orders') },
@@ -126,7 +126,7 @@
       debrief: 'A fast heart rate and a falling blood pressure after a GI bleed mean rebleeding until proven otherwise. DNR/DNI limits CPR and intubation; it does not limit fluids, blood or a call to GI.',
     },
     {
-      id: 'kowalski', pid: 'p6', glyph: 'flowsheets', title: 'Breathe easy',
+      id: 'kowalski', pid: 'p6', glyph: 'flowsheets', title: 'Breathe easy', rank: 1, level: 'Easiest', needs: 'Two screens to read and a note. No orders.',
       brief: 'Ms. Kowalski is in with a COPD flare and gets drowsy when her oxygen runs high. She is on prednisone. Check her gas and her oxygen, and look after the side effects of her treatment.',
       required: [
         { text: 'Review her blood gas in Results', test: H.viewed('Results') },
@@ -147,32 +147,72 @@
   ];
   const mission = (id) => E.MISSIONS.find((m) => m.id === id);
   E.STARS = ['No star yet', 'Bronze', 'Silver', 'Gold'];
+  /** The missions easiest first, the order the page shows and the next-step path follows. `rank` is judged from
+      what each one asks for: the one with no orders first, the one with a live event last. The array itself stays
+      in bed order so the faculty report does not move about. */
+  E.missionsInOrder = () => [...E.MISSIONS].sort((a, b) => (a.rank || 99) - (b.rank || 99));
+  /** A mission patient in intensive care takes no orders until the ward is reset (js/shift.js), so the mission
+      could never be finished. Returns the reason, or '' when the patient can be worked. */
+  const lockedWhy = (m) => { const p = E.pt(m.pid); return !p ? 'This patient is not on the ward.' : p.icu ? `${p.name} was moved to intensive care and takes no new orders until the ward is reset.` : ''; };
+
+  /* Keyword checks on notes read only what the learner wrote. A template's headings and the data it pulls in (vitals,
+     labs, medicines, problems) are removed first, so an untouched template cannot pass a check: one note check looks
+     for "88", and her medicine and vitals lines can contain it. Dot phrases the learner inserts are data pulls too and
+     are removed the same way. A line of a template that carries a {{token}} matches with the token as a wildcard, so
+     yesterday's vitals line still counts as template; a line that is only a token is matched against the data now. */
+  const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const LAB_LINE = /^(?:[A-Za-z0-9]+ [<>]?[\d.]+(?: \([A-Z]+\))?)(?:, [A-Za-z0-9]+ [<>]?[\d.]+(?: \([A-Z]+\))?)*$/;
+  function tplLines() {
+    const fixed = new Set(), shapes = [];
+    Object.values(E.NOTE_TEMPLATES || {}).forEach((t) => String(t).split('\n').forEach((l) => {
+      const s = l.trim(); if (!s) return;
+      if (!/\{\{\w+\}\}/.test(s)) { fixed.add(s.toLowerCase()); return; }
+      const bits = s.split(/\{\{\w+\}\}/);
+      if (bits.join('').trim()) shapes.push(new RegExp('^' + bits.map(reEsc).join('.*') + '$', 'i'));
+    }));
+    return { fixed, shapes };
+  }
+  E.noteOwnText = (text, p) => {
+    const { fixed, shapes } = tplLines(), data = new Set();
+    if (p && E.DOT) Object.keys(E.DOT).forEach((k) => { try { String(E.DOT[k](p)).split('\n').forEach((l) => { if (l.trim()) data.add(l.trim().toLowerCase()); }); } catch (e) { /* a dot phrase that needs a signed-in user */ } });
+    return String(text || '').split('\n').map((l) => l.trim()).filter((s) => s && !fixed.has(s.toLowerCase()) && !data.has(s.toLowerCase()) && !shapes.some((re) => re.test(s)) && !LAB_LINE.test(s)).join('\n');
+  };
 
   /** Score a mission in progress from the chart: which objectives are done, what unsafe orders were placed. */
   function evaluate(m, act) {
-    const me = E.db.user.name, p = E.pt(m.pid);
+    const me = E.db.user.name, p = E.pt(m.pid) || { orders: [], notes: [] };
+    const mine = (p.orders || []).filter((o) => E.sameUser(o.by, me) && o.ts >= act.start);
     const c = {
       from: act.start, seenAtFire: !!act.seenAtFire,
-      audit: E.db.audit.filter((a) => a.user === me && a.patientId === m.pid && a.ts >= act.start),
-      orders: p.orders.filter((o) => o.by === me && o.ts >= act.start && !['Declined', 'Discontinued'].includes(o.status)),
-      notes: p.notes.filter((n) => n.author === me && n.ts >= act.start),
+      audit: E.db.audit.filter((a) => E.sameUser(a.user, me) && a.patientId === m.pid && a.ts >= act.start),
+      orders: mine.filter((o) => !['Declined', 'Discontinued'].includes(o.status)),
+      // keyword checks see only the learner's own words (see noteOwnText above)
+      notes: (p.notes || []).filter((n) => E.sameUser(n.author, me) && n.ts >= act.start).map((n) => Object.assign({}, n, { text: E.noteOwnText(n.text, p) })),
     };
+    // An unsafe order counts once it was signed, even if it was stopped afterwards: a signed order can reach the
+    // patient before anyone stops it. One the attending declined, or that was never signed, did not.
+    const tried = mine.filter((o) => !['Declined', 'Discontinued'].includes(o.status) || (o.status === 'Discontinued' && o.signedTs));
     const run = (x) => {
       if (x.stage === 'event' && !act.firedAt) return { text: x.text, why: x.why, done: false, hidden: true };
       return { text: x.text, why: x.why, done: !!x.test(x.stage === 'event' ? Object.assign({}, c, { from: act.firedAt }) : c), isNew: x.stage === 'event' };
     };
     const required = m.required.map(run), bonus = m.bonus.map(run);
     const hits = [];
-    c.orders.forEach((o) => {
+    tried.forEach((o) => {
       const tags = (E.cat(o.catId) || {}).tags || [];
       const t = m.traps.find((tr) => (tr.ids || []).includes(o.catId) || (tr.tags || []).some((x) => tags.includes(x)));
-      if (t) hits.push({ order: o.name, why: t.why });
+      if (t) hits.push({ order: o.name, why: t.why, stopped: o.status === 'Discontinued' });
     });
     const allReq = required.every((x) => x.done), allBonus = bonus.every((x) => x.done);
     const stars = !allReq ? 0 : hits.length ? 1 : allBonus ? 3 : 2;
     const responded = !!m.event && !!act.firedAt && required.filter((x) => x.isNew).every((x) => x.done);
-    return { required, bonus, hits, stars, responded };
+    // What was missed and why, in plain words, so the result window and the faculty report say the same thing.
+    const missed = required.filter((x) => !x.done).map((x) => ({ kind: 'objective', text: x.text, why: x.hidden ? 'Not reached: the mission ended before his condition changed.' : 'Not done. Every objective is needed for a bronze star.' }))
+      .concat(hits.map((h) => ({ kind: 'unsafe order', text: h.order, why: h.why + (h.stopped ? ' It was signed and then stopped, so it still counts.' : '') })))
+      .concat(bonus.filter((x) => !x.done).map((x) => ({ kind: 'bonus', text: x.text, why: x.hidden ? 'Not reached: the mission ended before his condition changed.' : x.why || 'Not done.' })));
+    return { required, bonus, hits, stars, responded, missed, waiting: !!m.event && !act.firedAt };
   }
+  E.missionEval = (id, act) => { const m = mission(id); return m && act ? evaluate(m, act) : null; };   // for the tests
 
   /* ---------- the live event ---------- */
   /** Called every couple of seconds by the app. Fires a mission's event when its time comes. Returns true if anything changed. */
@@ -257,9 +297,28 @@
     if (passed && !ex.passed) { ex.passed = true; ex.passedAt = Date.now(); ex.passedScore = score; }
     delete pr.active;
     E.audit(`Finished the proficiency check: ${score} of ${a.qs.length}${passed ? ', passed' : ''}${timeUp ? ' (time ran out)' : ''}`);
+    // Time running out scores the attempt at once, but never closes a window the learner is working in or pulls
+    // focus out of a field: the result waits (saved, so it survives a reload) until they are done.
+    const m = E.ui.modal, ours = !m || m.type === 'examResult' || (m.type === 'confirm' && ['examSubmit', 'examStart'].includes(m.yes));
+    const typing = !m && E.app && E.app.busy && E.app.busy();
+    if (timeUp && (!ours || typing)) {
+      ex.unseen = ex.attempts.length - 1; E.save();
+      E.app.status('Time is up. Your answers were submitted. The result opens when you close this window.');
+      if (passed) announce(before, `You passed the proficiency check with ${score} of ${a.qs.length}.`, 'Proficiency check passed');
+      return;
+    }
     E.ui.modal = { type: 'examResult', n: ex.attempts.length - 1 };
     E.save();
     if (passed) announce(before, `You passed the proficiency check with ${score} of ${a.qs.length}.`, 'Proficiency check passed');
+    E.app.render();
+  }
+  /** A result held back by submitExam opens as soon as nothing else is open. */
+  function showHeldResult() {
+    const pr = E.progress(), ex = pr.exam;
+    if (!ex || ex.unseen == null || E.ui.modal || (E.app.busy && E.app.busy())) return;
+    const n = ex.unseen; delete ex.unseen;
+    if (!ex.attempts[n]) return E.save();
+    E.ui.modal = { type: 'examResult', n }; E.save();
     E.app.render();
   }
   /** Points, level-ups and badges after a mission or the check, in one balloon. */
@@ -274,7 +333,9 @@
   }
 
   /* ---------- reports ---------- */
-  E.missionReport = (pr) => E.MISSIONS.map((m) => { const r = (pr.missions || {})[m.id] || {}; return { mission: m.title, patient: E.pt(m.pid).name, bestStars: r.best || 0, medal: E.STARS[r.best || 0], plays: r.plays || 0, respondedToEvent: m.event ? !!r.responded : undefined }; });
+  /* Each mission record keeps `missed` beside `best`: what the last finished play missed, as [{ kind, text, why }]
+     where kind is 'objective', 'bonus' or 'unsafe order'. The report carries it as missedLastPlay. */
+  E.missionReport = (pr) => E.MISSIONS.map((m) => { const r = (pr.missions || {})[m.id] || {}, p = E.pt(m.pid); return { mission: m.title, patient: p ? p.name : m.pid, difficulty: m.level, bestStars: r.best || 0, medal: E.STARS[r.best || 0], plays: r.plays || 0, lastStars: r.plays ? r.last || 0 : undefined, missedLastPlay: Array.isArray(r.missed) ? r.missed.map((x) => ({ kind: x.kind, text: x.text, why: x.why })) : [], respondedToEvent: m.event ? !!r.responded : undefined }; });
   E.examReport = (pr) => { const ex = pr.exam || { attempts: [] }; return { passed: !!ex.passed, passedAt: ex.passedAt ? new Date(ex.passedAt).toISOString() : null, passMark: `${Math.ceil(E.EXAM.pass * E.EXAM.questions)} of ${E.EXAM.questions}`, attempts: ex.attempts.map((t) => ({ at: new Date(t.start).toISOString(), score: `${t.score} of ${t.total}`, passed: t.passed, timeRanOut: t.timeUp })) }; };
 
   /* ---------- views ---------- */
@@ -283,15 +344,71 @@
   const MAX_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" fill="none" stroke="#fff" stroke-width="2"/></svg>';
   const item = (x) => `<li class="${x.done ? 'done' : ''}">${x.done ? icon('check', 16) : '<i class="tick0"></i>'}<span>${esc(x.text)}${x.isNew && !x.done ? ' <b class="chip red">New</b>' : ''}</span></li>`;
 
+  /* ---------- the recommended next step ----------
+     One suggestion at a time, along a path that teaches before it tests: the practice tasks on the Learning page,
+     the missions easiest first until each has a star, one round of each mini-game, the first shift, the case with
+     the gentlest opening, the other shifts and cases, then the proficiency check, then a replay. Nothing is locked;
+     this only points. Returns { title, why, href } or { title, why, act, id } for the action table (plus a button
+     label), or null when there is nothing left to suggest. Every progress field may be missing on an old save. */
+  const GENTLE_CASE = 'belly';   // FACULTY: the case met first. "Pain after the party" opens on a stable patient with two hours to make the diagnosis.
+  E.nextStep = () => {
+    if (!E.db || !E.db.user) return null;
+    const pr = E.progress(), a = pr.active, ev = pr.events || {}, canOrder = E.can('order.sign') || E.can('order.pend');
+    const rec = (k, id) => (pr[k] && pr[k][id]) || {};
+    const byN = (xs) => [...(xs || [])].sort((x, y) => (x.n || 0) - (y.n || 0));
+    if (a) {   // something is running: the only sensible next step is to go back to it
+      if (a.type === 'mission') { const m = mission(a.id); if (m) return { title: `Back to your mission: ${m.title}`, why: 'It is still running. Finish or abandon it from the bar under the toolbar.', href: `#/pt/${m.pid}/summary`, label: 'Resume' }; }
+      if (a.type === 'case') { const cs = (E.CASES || []).find((x) => x.id === a.id); if (cs) return { title: `Back to your case: ${cs.title}`, why: 'It is still running. Finish or leave it from the bar under the toolbar.', href: `#/pt/${cs.pid}/summary`, label: 'Resume' }; }
+      if (a.type === 'shift') return { title: 'Back to your shift', why: 'The ward is waiting. The shift bar under the toolbar says what to do now.', href: '#/home', label: 'Resume' };
+      if (a.type === 'exam') return { title: 'Finish the proficiency check', why: 'The clock is running. The questions are in the bar under the toolbar.', href: '#/home', label: 'Go back' };
+    }
+    const tasks = (E.LEARNING || []).flatMap((lo) => lo.tasks || []), left = tasks.filter((t) => !ev[t.event]);
+    if (left.length) return { title: left.length === tasks.length ? 'Start the practice tasks' : 'Finish the practice tasks', why: `${tasks.length - left.length} of ${tasks.length} done. Next: ${left[0].text}`, href: '#/learning', label: 'Open Learning' };
+    const ms = E.missionsInOrder();
+    if (canOrder) { const m = ms.find((x) => !(rec('missions', x.id).best > 0)); if (m) return { title: `Mission: ${m.title}`, why: `${m.level}. ${m.needs}`, act: 'missionStart', id: m.id, label: rec('missions', m.id).plays ? 'Try again' : 'Start mission' }; }
+    const g = (E.GAMES || []).find((x) => !(rec('games', x.id).plays > 0));
+    if (g) return { title: `Mini-game: ${g.name}`, why: `One short round, not timed. ${g.skill}.`, act: 'gameOpen', id: g.id, label: 'Play' };
+    const shifts = byN(E.SHIFTS), cases = byN(E.CASES), gentle = cases.find((x) => x.id === GENTLE_CASE) || cases[0];
+    if (canOrder) {
+      const sh = shifts.find((x) => !rec('shifts', x.id).plays), cs = cases.find((x) => !rec('cases', x.id).plays);
+      const shiftStep = (x) => ({ title: `Shift ${x.n}: ${x.title}`, why: `${x.level}. A whole day with all your patients, on a clock you can pause.`, act: 'shiftAsk', id: x.id, label: 'Start shift' });
+      const caseStep = (x) => ({ title: `Case ${x.n}: ${x.title}`, why: x === gentle ? 'Your first case: a new patient whose course depends on what you decide. This one gives you time to think.' : `${x.level}. A new patient whose course depends on what you decide.`, act: 'caseAsk', id: x.id, label: 'Start case' });
+      if (shifts[0] && !rec('shifts', shifts[0].id).plays) return shiftStep(shifts[0]);
+      if (gentle && !rec('cases', gentle.id).plays) return caseStep(gentle);
+      if (sh) return shiftStep(sh);
+      if (cs) return caseStep(cs);
+    }
+    const ex = pr.exam || {}, used = (ex.attempts || []).length;
+    if (!ex.passed && used < E.EXAM.attempts) return { title: 'The proficiency check', why: `${E.EXAM.questions} questions in ${E.EXAM.minutes} minutes, answered from the charts. ${Math.ceil(E.EXAM.pass * E.EXAM.questions)} right to pass.`, act: 'examAsk', label: used ? 'Try again' : 'Start the check' };
+    // everything has been met once: suggest the weakest result to replay
+    if (canOrder) {
+      const m = ms.find((x) => (rec('missions', x.id).best || 0) < 3); if (m) return { title: `Replay: ${m.title}`, why: `Your best is ${E.STARS[rec('missions', m.id).best || 0]}. Play it again for a better result.`, act: 'missionStart', id: m.id, label: 'Play again' };
+      const cs = cases.find((x) => (rec('cases', x.id).best || 0) < 3); if (cs) return { title: `Replay case ${cs.n}: ${cs.title}`, why: `Your best is ${rec('cases', cs.id).best || 0} of 3 stars. Try a different road this time.`, act: 'caseAsk', id: cs.id, label: 'Play again' };
+      const sh = shifts.find((x) => (rec('shifts', x.id).best || 0) < 0.9); if (sh) return { title: `Replay shift ${sh.n}: ${sh.title}`, why: `Your best is ${Math.round((rec('shifts', sh.id).best || 0) * 100)}%. Honors needs 90% with nobody harmed.`, act: 'shiftAsk', id: sh.id, label: 'Work it again' };
+    }
+    const g2 = (E.GAMES || []).find((x) => (rec('games', x.id).best || 0) < 100);
+    if (g2) return { title: `Replay: ${g2.name}`, why: `Your best is ${rec('games', g2.id).best || 0}%. Play again for a perfect round.`, act: 'gameOpen', id: g2.id, label: 'Play' };
+    return null;
+  };
+  /** One compact card for the next step: "Next: <title>", the reason, and one button or link. Empty when there is none. */
+  V.nextCard = () => {
+    const s = E.nextStep ? E.nextStep() : null;
+    if (!s) return '';
+    const btn = s.href ? `<a class="btn xs primary" href="${esc(s.href)}">${esc(s.label || 'Go')}</a>`
+      : `<button class="btn xs primary" data-act="${esc(s.act)}"${s.id ? ` data-id="${esc(s.id)}"` : ''}>${esc(s.label || 'Start')}</button>`;
+    return `<div class="notice info next-step">${icon('star', 24)}<span><b>Next: ${esc(s.title)}</b> ${esc(s.why)}</span>${btn}</div>`;
+  };
+
   V.missions = () => {
     const { chip } = V.h, pr = E.progress(), a = pr.active, canOrder = E.can('order.sign') || E.can('order.pend');
     const total = E.MISSIONS.reduce((n, m) => n + (((pr.missions || {})[m.id] || {}).best || 0), 0);
-    const cards = E.MISSIONS.map((m) => {
-      const p = E.pt(m.pid), rec = (pr.missions || {})[m.id] || {}, live = a && a.type === 'mission' && a.id === m.id;
+    const cards = E.missionsInOrder().map((m, i) => {
+      const p = E.pt(m.pid), rec = (pr.missions || {})[m.id] || {}, live = a && a.type === 'mission' && a.id === m.id, lock = live ? '' : lockedWhy(m);
       const btn = live ? `<a class="btn primary" href="#/pt/${m.pid}/summary">Resume</a>`
-        : `<button class="btn${rec.best ? '' : ' primary'}" data-act="missionStart" data-id="${m.id}"${a || !canOrder ? ' disabled' : ''}>${rec.plays ? 'Play again' : 'Start mission'}</button>`;
-      return `<article class="mission${live ? ' live' : ''}${rec.best === 3 ? ' gold' : ''}"><header>${icon(m.glyph, 48)}<div><b>${esc(m.title)}</b><span>${esc(p.name)} · ${esc(p.bed)}</span></div></header>
-        <p>${esc(m.brief)}</p><footer>${stars(rec.best || 0)}${m.event ? chip('Live event', 'red') : ''}<span class="spacer"></span>${live ? chip('In progress', 'amber') + ' ' : ''}${btn}</footer></article>`;
+        : `<button class="btn${rec.best ? '' : ' primary'}" data-act="missionStart" data-id="${m.id}"${a || !canOrder ? ' disabled' : ''}>${lock ? 'Restore and start' : rec.plays ? 'Play again' : 'Start mission'}</button>`;
+      return `<article class="mission${live ? ' live' : ''}${rec.best === 3 ? ' gold' : ''}"><header>${icon(m.glyph, 48)}<div><b>${esc(m.title)}</b><span>Mission ${i + 1} · ${esc(m.level || '')} · ${esc(p ? p.name : '')}</span></div></header>
+        <p>${esc(m.brief)}</p><p class="muted">${esc(m.needs || '')}</p>${lock ? `<div class="notice warn">${icon('warn', 24)}<span>${esc(lock)} Starting this mission offers to restore the ward first. That resets the patients and keeps your progress and your report.</span></div>` : ''}
+        <footer>${stars(rec.best || 0)}${m.event ? chip('Live event', 'red') : ''}<span class="spacer"></span>${live ? chip('In progress', 'amber') + ' ' : ''}${btn}</footer></article>`;
     }).join('');
     const ex = examState(pr), used = ex.attempts.length, best = used ? Math.max(...ex.attempts.map((t) => t.score)) : null, locked = !ex.passed && used >= E.EXAM.attempts, inExam = a && a.type === 'exam';
     const need = Math.ceil(E.EXAM.pass * E.EXAM.questions);
@@ -300,59 +417,78 @@
       : locked ? '' : `<button class="btn primary" data-act="examAsk"${a ? ' disabled' : ''}>${used ? 'Try again' : 'Start the check'}</button>`;
     const boss = `<section class="boss"><div class="boss-art">${icon(ex.passed ? 'trophy' : 'idcard', 96)}</div><div class="boss-main">
         <span class="boss-kick">Final challenge</span><h3>Proficiency check</h3>
-        <p>${E.EXAM.questions} questions in ${E.EXAM.minutes} minutes, answered by finding information in the patients’ charts. The question panel stays open in the corner while you move around the record. ${need} correct to pass; ${E.EXAM.attempts} attempts, after which a faculty member can reset them.</p>
+        <p>${E.EXAM.questions} questions in ${E.EXAM.minutes} minutes, answered by finding information in the patients’ charts. The question bar stays open under the toolbar while you move around the record. ${need} correct to pass; ${E.EXAM.attempts} attempts, after which a faculty member can reset them.</p>
         <dl class="kv"><dt>Status</dt><dd>${ex.passed ? `${chip('Passed', 'green')} ${ex.passedScore} of ${E.EXAM.questions}, ${E.fmtDate(ex.passedAt)}` : inExam ? chip('In progress', 'amber') : locked ? chip('Attempts used', 'red') : 'Not passed yet'}</dd><dt>Attempts</dt><dd>${used} of ${E.EXAM.attempts}${best != null ? ` · best ${best} of ${E.EXAM.questions}` : ''}</dd></dl>
         ${locked ? '<p class="notice warn">Both attempts are used. A faculty member logged in as Physician can reset them from the Learning page.</p>' : ''}
         <div class="boss-act">${action}</div></div></section>`;
+    const next = V.nextCard();
+    // js/shift.js ends its shelf with a "Missions" heading from when missions came straight after it; that heading is dropped here.
+    const shifts = (V.shiftShelf ? V.shiftShelf() : '').replace(/<h3 class="shelf-h">(?:(?!<h3)[\s\S])*?Missions<\/h3>\s*$/, '');
     return `<div class="page missions"><div class="doc-h"><div><h2>${icon('trophy', 56)}Missions</h2>
-        <p class="muted">Each mission is a short case on one of your patients. Finish every objective for a bronze star, order nothing unsafe for silver, and complete every bonus for gold. Your best result on each mission counts toward your level.</p></div>
-        <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} stars</b></div></div>
-      ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions involve entering orders, so they are written for the Medical Student and Physician roles. The proficiency check below is open to every role.</span></div>`}
-      ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress. Finish or abandon it from the mission panel in the corner before starting another.</span></div>` : ''}
-      ${V.caseShelf ? V.caseShelf() : ''}${V.shiftShelf ? V.shiftShelf() : ''}
-      <div class="mission-grid">${cards}</div>${V.gameShelf ? V.gameShelf() : ''}${boss}</div>`;
+        <p class="muted">Practice on the ward, from easiest to hardest. Work down the page: missions, then mini-games, shifts and cases, and the proficiency check last. Nothing is locked, so you can start anywhere.</p></div>
+        <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} mission stars</b></div></div>
+      ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions, shifts and cases involve entering orders, so they are written for the Medical Student and Physician roles. The mini-games and the proficiency check are open to every role.</span></div>`}
+      ${next ? `<h3 class="shelf-h">${icon('help', 32)}Start here</h3>${next}` : ''}
+      <h3 class="shelf-h">${icon('trophy', 32)}Missions</h3>
+      <p class="muted shelf-p">A mission is a short case on one of your patients, easiest first. Finish every objective for a bronze star, order nothing unsafe for silver, and complete every bonus for gold. Your best result on each mission counts toward your level. One mission, shift or case at a time.</p>
+      ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress. Finish or abandon it from the mission bar under the toolbar before starting another.</span></div>` : ''}
+      <div class="mission-grid">${cards}</div>
+      ${V.gameShelf ? V.gameShelf() : ''}${shifts}${V.caseShelf ? V.caseShelf() : ''}${boss}</div>`;
   };
 
-  /** The panel in the bottom-left corner while a mission or the proficiency check is under way. */
+  /** The activity strip under the toolbar, shared by missions, the proficiency check, shifts (js/shift.js) and cases
+      (js/cases.js): what is running and its clock on the left, what to do now in the middle, its buttons on the right.
+      o.body, when there is one, is the detail that drops open below the strip (open from the start for the check, whose
+      question lives there). { type, cls, label, glyph, title, timer, sum, acts, body, more } */
+  V.dockStrip = (o) => {
+    const open = o.body ? (o.type === 'exam' ? !E.ui.dockMin : !!E.ui.dockOpen) : false;
+    const more = o.body ? `<button class="btn xs dock-more" data-act="dockToggle" aria-expanded="${open}">${open ? 'Hide' : esc(o.more || 'Details')}</button>` : '';
+    return `<aside class="dock${open ? ' open' : ''} ${o.cls || ''}" aria-label="${esc(o.label)}"><div class="dock-row"><div class="dock-h">${icon(o.glyph, 16)}<b>${esc(o.title)}</b>${o.timer || ''}</div><div class="dock-sum">${o.sum || ''}</div><div class="dock-acts">${o.acts || ''}${more}</div></div>${open ? `<div class="dock-b">${o.body}</div>` : ''}</aside>`;
+  };
+  /** The strip while a mission or the proficiency check is under way. */
   V.dock = () => {
     if (!E.db.user) return '';
     const pr = E.progress(), a = pr.active;
     if (!a) return '';
     if (a.type === 'shift') return V.shiftDock ? V.shiftDock(a) : '';   // js/shift.js
     if (a.type === 'case') return V.caseDock ? V.caseDock(a) : '';      // js/cases.js
-    const min = !!E.ui.dockMin;
-    let title, body, timer = '', glyph;
+    let title, body, timer = '', glyph, sum, acts, more;
     if (a.type === 'mission') {
-      const m = mission(a.id), p = E.pt(m.pid), r = evaluate(m, a);
+      const m = mission(a.id), p = m && E.pt(m.pid);
+      if (!p) return '';
+      const r = evaluate(m, a);
       const hiddenReq = r.required.some((x) => x.hidden);
       glyph = 'trophy'; title = m.title;
-      body = `<p class="dock-pt">${icon('user', 16)}<a href="#/pt/${p.id}/summary">${esc(p.name)}</a></p><p class="dock-brief">${esc(m.brief)}</p>
+      const shown = r.required.filter((x) => !x.hidden);
+      sum = `<p class="dock-pt">${icon('user', 16)}<a href="#/pt/${p.id}/summary">${esc(p.name)}</a></p><span>Objectives <b>${shown.filter((x) => x.done).length}/${shown.length}</b></span><span class="dock-score">${stars(r.stars, 16)}<span>${E.STARS[r.stars]} so far</span></span>${r.waiting ? `<p class="shift-now">${icon('info', 16)}<span>Something is about to happen with ${p.sex === 'F' ? 'her' : 'him'}. Finish opens once it has.</span></p>` : ''}`;
+      acts = `<button class="btn xs" data-act="missionAbandon">Abandon</button><button class="btn xs primary" data-act="missionFinish"${r.waiting ? ' disabled' : ''}>Finish mission</button>`; more = 'Objectives';
+      body = `<p class="dock-brief">${esc(m.brief)}</p>
         <h5>Objectives</h5><ul class="dock-list">${r.required.filter((x) => !x.hidden).map(item).join('')}${hiddenReq ? '<li class="hid"><i class="tick0"></i><span>Keep an eye on him. Things may change.</span></li>' : ''}
         <li class="${r.hits.length ? 'bad' : 'done'}">${icon(r.hits.length ? 'remove' : 'check', 16)}<span>Order nothing that puts the patient at risk</span></li></ul>
-        <h5>Bonus</h5><ul class="dock-list">${r.bonus.filter((x) => !x.hidden).map(item).join('')}</ul>
-        <div class="dock-score">${stars(r.stars, 16)}<span>${E.STARS[r.stars]} so far</span></div>
-        <div class="dock-acts"><button class="btn xs" data-act="missionAbandon">Abandon</button><button class="btn xs primary" data-act="missionFinish">Finish mission</button></div>`;
+        <h5>Bonus</h5><ul class="dock-list">${r.bonus.filter((x) => !x.hidden).map(item).join('')}</ul>`;
     } else {
-      const q = a.qs[a.idx];
+      const q = a.type === 'exam' && Array.isArray(a.qs) && a.qs[a.idx];
+      if (!q) return '';   // an unknown or damaged activity: the exam clock tidies it up within a second
       glyph = 'idcard'; title = 'Proficiency check';
       timer = `<span id="dock-timer" class="dock-timer">${mmss(examLeft(a))}</span>`;
-      body = `<p class="dock-q"><b>Question ${a.idx + 1} of ${a.qs.length}</b></p><p class="dock-qt">${esc(q.q)}</p>
+      sum = `<span>Question <b>${a.idx + 1}</b> of ${a.qs.length}</span><span>${a.answers.filter((x) => x != null).length} answered</span>`; more = 'Show the question';
+      acts = `<button class="btn xs" data-act="examGo" data-i="${a.idx - 1}"${a.idx === 0 ? ' disabled' : ''}>Previous</button><button class="btn xs" data-act="examGo" data-i="${a.idx + 1}"${a.idx === a.qs.length - 1 ? ' disabled' : ''}>Next</button><button class="btn xs primary" data-act="examSubmitAsk">Submit</button>`;
+      body = `<p class="dock-qt">${esc(q.q)}</p>
         ${q.options.map((o, i) => `<button class="qopt${a.answers[a.idx] === i ? ' picked' : ''}" data-act="examPick" data-i="${i}" aria-pressed="${a.answers[a.idx] === i}">${esc(o)}</button>`).join('')}
-        <div class="dock-dots">${a.qs.map((_, i) => `<button class="${i === a.idx ? 'on' : ''}${a.answers[i] != null ? ' ans' : ''}" data-act="examGo" data-i="${i}" aria-label="Question ${i + 1}${a.answers[i] != null ? ', answered' : ''}">${i + 1}</button>`).join('')}</div>
-        <div class="dock-acts"><button class="btn xs" data-act="examGo" data-i="${a.idx - 1}"${a.idx === 0 ? ' disabled' : ''}>Previous</button><button class="btn xs" data-act="examGo" data-i="${a.idx + 1}"${a.idx === a.qs.length - 1 ? ' disabled' : ''}>Next</button><span class="spacer"></span><button class="btn xs primary" data-act="examSubmitAsk">Submit</button></div>`;
+        <div class="dock-dots">${a.qs.map((_, i) => `<button class="${i === a.idx ? 'on' : ''}${a.answers[i] != null ? ' ans' : ''}" data-act="examGo" data-i="${i}" aria-label="Question ${i + 1}${a.answers[i] != null ? ', answered' : ''}">${i + 1}</button>`).join('')}</div>`;
     }
-    return `<aside class="dock${min ? ' min' : ''} dock-${a.type}" aria-label="${esc(title)}"><header class="dock-h">${icon(glyph, 16)}<b>${esc(title)}</b>${timer}<button class="cap" data-act="dockToggle" title="${min ? 'Show' : 'Minimize'}" aria-label="${min ? 'Show panel' : 'Minimize panel'}">${min ? MAX_SVG : MIN_SVG}</button></header><div class="dock-b">${body}</div></aside>`;
+    return V.dockStrip({ type: a.type, cls: `dock-${a.type}`, label: title, glyph, title, timer, sum, acts, body, more });
   };
 
   V.modalExt = Object.assign(V.modalExt || {}, {
     missionResult(m, modal) {
       const ms = mission(m.id), r = m.r, p = E.pt(ms.pid);
-      const list = (xs) => `<ul class="dock-list wide">${xs.map((x) => `<li class="${x.done ? 'done' : 'bad'}">${icon(x.done ? 'check' : 'remove', 16)}<span>${esc(x.text)}${!x.done && x.why ? `<small>${esc(x.why)}</small>` : ''}</span></li>`).join('')}</ul>`;
+      const list = (xs, dflt) => `<ul class="dock-list wide">${xs.map((x) => `<li class="${x.done ? 'done' : 'bad'}">${icon(x.done ? 'check' : 'remove', 16)}<span>${esc(x.text)}${!x.done && (x.why || dflt) ? `<small>${esc(x.why || dflt)}</small>` : ''}</span></li>`).join('')}</ul>`;
       return modal(`Mission ${r.stars ? 'complete' : 'ended'} — ${ms.title}`, `
-        <div class="result-head">${stars(r.stars, 48)}<div><b>${E.STARS[r.stars]}</b><span>${esc(ms.title)} · ${esc(p.name)}</span>${m.xp ? `<span class="xp">+${m.xp} XP</span>` : ''}</div></div>
-        <p class="fine">Bronze: every objective done. Silver: and nothing unsafe ordered. Gold: and every bonus.</p>
-        <h4>Objectives</h4>${list(r.required.filter((x) => !x.hidden))}${r.required.some((x) => x.hidden) ? '<p class="fine">You finished before his condition changed, so the rest of this mission never started.</p>' : ''}
-        <h4>Safety</h4>${r.hits.length ? `<ul class="dock-list wide">${r.hits.map((h) => `<li class="bad">${icon('alert', 16)}<span><b>${esc(h.order)}</b><small>${esc(h.why)}</small></span></li>`).join('')}</ul>` : `<ul class="dock-list wide"><li class="done">${icon('check', 16)}<span>Nothing you ordered put the patient at risk.</span></li></ul>`}
+        <div class="result-head">${stars(r.stars, 48)}<div><b>${E.STARS[r.stars]}</b><span>${esc(ms.title)} · ${esc(p ? p.name : '')}</span>${m.xp ? `<span class="xp">+${m.xp} XP</span>` : ''}</div></div>
+        <p class="fine">Bronze: every objective done. Silver: and nothing unsafe signed, even if it was stopped later. Gold: and every bonus.</p>
+        <h4>Objectives</h4>${list(r.required.filter((x) => !x.hidden), 'Not done. Every objective is needed for a bronze star.')}${r.required.some((x) => x.hidden) ? '<p class="fine">You finished before his condition changed, so the rest of this mission never started.</p>' : ''}
+        <h4>Safety</h4>${r.hits.length ? `<ul class="dock-list wide">${r.hits.map((h) => `<li class="bad">${icon('alert', 16)}<span><b>${esc(h.order)}</b><small>${esc(h.why)}${h.stopped ? ' It was signed and then stopped, so it still counts.' : ''}</small></span></li>`).join('')}</ul>` : `<ul class="dock-list wide"><li class="done">${icon('check', 16)}<span>Nothing you ordered put the patient at risk.</span></li></ul>`}
         <h4>Bonus</h4>${list(r.bonus.filter((x) => !x.hidden))}
         <div class="debrief">${icon('learning', 48)}<div><p>${esc(ms.debrief)}</p></div></div>`,
         `${r.stars < 3 ? `<button class="btn" data-act="missionStart" data-id="${ms.id}">Try again</button>` : ''}<a class="btn" href="#/missions" data-act="closeModal">All missions</a><button class="btn primary" data-act="closeModal">Close</button>`, 'lg');
@@ -371,18 +507,39 @@
   E.missionActions = {
     missionStart(d) {
       const pr = E.progress(), m = mission(d.id);
+      if (!m) return;
       if (pr.active) { if (pr.active.type === 'mission' && pr.active.id === m.id) return E.app.go(`#/pt/${m.pid}/summary`); E.ui.modal = null; E.app.status(`Finish ${busyWith(pr)} first.`); return E.app.render(); }
+      // A patient in intensive care takes no orders, so the mission could only end with no stars. Offer the reset first.
+      const lock = lockedWhy(m);
+      if (lock) {
+        E.ui.modal = { type: 'confirm', title: 'Restore the ward first?', text: `${lock} This mission cannot be finished until then. Restoring the ward puts every patient back to how they were on admission and erases the orders, notes and results entered on this device. Your progress, XP, badges and learner report are kept. Then the mission starts.`, yes: 'missionRestoreDo', yesLabel: 'Restore the ward and start', id: m.id };
+        return E.app.render();
+      }
       pr.active = { type: 'mission', id: m.id, start: Date.now(), firedAt: null };
       pr.missions = pr.missions || {};
-      E.ui.modal = null; E.ui.dockMin = false;
+      E.ui.modal = null; E.ui.dockMin = false; E.ui.dockOpen = true;
       E.audit(`Started mission: ${m.title}`, m.pid); E.save();
       E.app.go(`#/pt/${m.pid}/summary`);
     },
+    /** The same reset as "Reset sim data" (js/app.js resetDo), then the mission. Learning progress and evidence survive E.reset. */
+    missionRestoreDo() {
+      const id = E.ui.modal && E.ui.modal.id, m = mission(id), pr = E.progress();
+      if (!m || pr.active) { E.ui.modal = null; return E.app.render(); }
+      E.reset(); E.db.openTabs = [];
+      Object.assign(E.ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0 });
+      E.audit(`Reset sim data to start the mission: ${m.title}`); E.save();
+      E.missionActions.missionStart({ id: m.id });
+    },
     missionFinish() {
-      const pr = E.progress(), a = pr.active, m = mission(a.id), r = evaluate(m, a), before = E.game(pr);
+      const pr = E.progress(), a = pr.active;
+      if (!a || a.type !== 'mission') return;
+      const m = mission(a.id), r = evaluate(m, a), before = E.game(pr);
+      // the live event has not happened yet: finishing now could only score zero, so it waits
+      if (r.waiting) return E.app.status('Something is about to happen with this patient. Finish opens once it has.');
       const rec = (pr.missions = pr.missions || {})[m.id] || { best: 0, plays: 0 };
-      rec.plays++; rec.last = r.stars; rec.at = Date.now();
-      if (r.stars > rec.best) rec.best = r.stars;
+      rec.plays = (rec.plays || 0) + 1; rec.last = r.stars; rec.at = Date.now();
+      if (r.stars > (rec.best || 0)) rec.best = r.stars;
+      rec.missed = r.missed;   // what the last play missed, with reasons, for the result and the faculty report
       if (r.responded) rec.responded = true;
       pr.missions[m.id] = rec;
       delete pr.active;
@@ -393,28 +550,32 @@
       E.app.render();
     },
     missionAbandon() { E.ui.modal = { type: 'confirm', title: 'Abandon this mission?', text: 'Your progress on this mission is dropped and no stars are awarded. Anything you ordered or wrote stays in the chart. You can start it again any time.', yes: 'missionAbandonDo', yesLabel: 'Abandon mission', danger: true }; E.app.render(); },
-    missionAbandonDo() { const pr = E.progress(), m = mission(pr.active.id); delete pr.active; E.ui.modal = null; E.audit(`Abandoned mission: ${m.title}`, m.pid); E.app.commit(); },
-    dockToggle() { E.ui.dockMin = !E.ui.dockMin; E.app.render(); },
+    missionAbandonDo() { const pr = E.progress(), a = pr.active, m = a && a.type === 'mission' && mission(a.id); E.ui.modal = null; if (!m) return E.app.render(); delete pr.active; E.audit(`Abandoned mission: ${m.title}`, m.pid); E.app.commit(); },
+    dockToggle() { const a = E.progress().active; if (a && a.type === 'exam') E.ui.dockMin = !E.ui.dockMin; else E.ui.dockOpen = !E.ui.dockOpen; E.app.render(); },
 
     examAsk() {
       const pr = E.progress(), ex = examState(pr), n = ex.attempts.length + 1;
       if (pr.active) { E.ui.modal = null; E.app.status(`Finish ${busyWith(pr)} first.`); return E.app.render(); }
       if (!ex.passed && ex.attempts.length >= E.EXAM.attempts) return E.app.status('Both attempts are used.');
-      E.ui.modal = { type: 'confirm', title: 'Start the proficiency check?', text: `${E.EXAM.questions} questions, ${E.EXAM.minutes} minutes. Each one is answered by finding something in a patient’s chart, so move around the record freely; the question panel stays open in the bottom-left corner and the clock keeps running. ${Math.ceil(E.EXAM.pass * E.EXAM.questions)} correct to pass. This is attempt ${n} of ${E.EXAM.attempts}.`, yes: 'examStart', yesLabel: 'Start the clock' };
+      E.ui.modal = { type: 'confirm', title: 'Start the proficiency check?', text: `${E.EXAM.questions} questions, ${E.EXAM.minutes} minutes. Each one is answered by finding something in a patient’s chart, so move around the record freely; the question bar stays open under the toolbar and the clock keeps running. ${Math.ceil(E.EXAM.pass * E.EXAM.questions)} correct to pass. This is attempt ${n} of ${E.EXAM.attempts}.`, yes: 'examStart', yesLabel: 'Start the clock' };
       E.app.render();
     },
     examStart() {
-      const pr = E.progress();
+      const pr = E.progress(), ex = examState(pr);
+      if (pr.active || (!ex.passed && ex.attempts.length >= E.EXAM.attempts)) { E.ui.modal = null; return E.app.render(); }
+      // Each question's options were shuffled once, when it was built (mc above), and are saved with the attempt, so
+      // the order a learner sees is the same after a reload, and answers are scored by the index into that saved list.
       pr.active = { type: 'exam', start: Date.now(), qs: E.buildExam(), answers: [], idx: 0 };
       pr.active.answers = pr.active.qs.map(() => null);
-      E.ui.modal = null; E.ui.dockMin = false;
+      E.ui.modal = null; E.ui.dockMin = false; E.ui.dockOpen = true;
       E.audit('Started the proficiency check'); E.save();
       E.app.go('#/home');
     },
     examPick(d) { const a = E.progress().active; if (!a || a.type !== 'exam') return; a.answers[a.idx] = Number(d.i); E.app.commit(); },
     examGo(d) { const a = E.progress().active; if (!a || a.type !== 'exam') return; a.idx = Math.max(0, Math.min(a.qs.length - 1, Number(d.i))); E.app.commit(); },
     examSubmitAsk() {
-      const a = E.progress().active, blank = a.answers.filter((x) => x == null).length;
+      const a = E.progress().active; if (!a || a.type !== 'exam') return;
+      const blank = a.answers.filter((x) => x == null).length;
       E.ui.modal = { type: 'confirm', title: 'Submit your answers?', text: blank ? `You have ${blank} unanswered question${blank > 1 ? 's' : ''}. Unanswered questions count as wrong.` : 'You have answered every question. Once you submit, this attempt is scored.', yes: 'examSubmit', yesLabel: 'Submit' };
       E.app.render();
     },
@@ -445,13 +606,21 @@
     },
   };
 
-  /* the exam clock, once a second; time running out submits the attempt */
-  setInterval(() => {
+  /* The exam clock, once a second; time running out submits the attempt. The attempt lives in the saved progress
+     (questions, the order their options were dealt in, answers, start time), so a reload carries on where it was:
+     the time away still counts, but the attempt is only used up when it is submitted or the time runs out. */
+  E.examClock = () => {
     if (!E.db || !E.db.user || !E.app) return;
-    const a = E.progress().active;
+    showHeldResult();
+    const pr = E.progress(), a = pr.active;
     if (!a || a.type !== 'exam') return;
+    // an attempt saved without its questions cannot be scored or finished: drop it without using up an attempt
+    if (!Array.isArray(a.qs) || !a.qs.length) { delete pr.active; E.audit('Proficiency check closed without a score: its questions were missing'); E.save(); E.app.status('The proficiency check could not be resumed, so it was closed. No attempt was used.'); return E.app.render(); }
+    if (!Array.isArray(a.answers) || a.answers.length !== a.qs.length) a.answers = a.qs.map((_, i) => (Array.isArray(a.answers) && a.answers[i] != null ? a.answers[i] : null));
+    if (!(a.idx >= 0 && a.idx < a.qs.length)) a.idx = 0;
     const left = examLeft(a), el = document.getElementById('dock-timer');
     if (el) { el.textContent = mmss(left); el.classList.toggle('low', left < 120e3); }
     if (left <= 0) submitExam(true);
-  }, 1000);
+  };
+  setInterval(() => E.examClock(), 1000);
 })();

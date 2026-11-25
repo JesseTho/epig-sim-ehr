@@ -133,7 +133,8 @@
   E.progress = () => {
     const u = E.db.user;
     const all = E.db.progress || (E.db.progress = {});
-    return all[key(u)] || (all[key(u)] = { name: u.name, role: u.role, events: {}, quiz: {} });
+    // rankHeld 0: a learner who starts under the rank rules below has no old title to keep
+    return all[key(u)] || (all[key(u)] = { name: u.name, role: u.role, events: {}, quiz: {}, rankHeld: 0 });
   };
   /** Record that the current learner did something. Returns the practice task it completed, if any, the first time. */
   E.track = (event) => {
@@ -149,9 +150,46 @@
      Points reward doing the work and getting the knowledge check right first time.
      Nothing is ever deducted, so there is no incentive to avoid trying. */
   E.XP = { task: 50, quizRight: 100, quizTried: 25, pig: 1, pigMax: 10, star: 50, exam: 300, game: 10, gameMax: 50, shift: 200, case: 60 };   // case: per star on a PBL case (best result on each case counts)     // shift: a full score on a shift (best result on each shift counts, in proportion)   // game: per perfect mini-game round, up to gameMax per game   // star: per mission star (best result counts); exam: passing the proficiency check   // pigMax: the most bonus points flying pigs can ever add
-  /** How many flying pigs this learner has caught. Every catch is counted, even past the bonus limit. */
-  E.pigs = (pr) => pr.pigs || pr.bonus || 0;
+  /** How many flying pigs this learner has caught. Every catch is counted, even past the bonus limit.
+      (The old pr.bonus field is moved to pr.pigs when a save is loaded: js/core.js, E.MIGRATIONS[1].) */
+  E.pigs = (pr) => Number(pr.pigs) || 0;
   E.LEVELS = [[0, 'New Arrival'], [400, 'Observer'], [900, 'Clerk'], [1600, 'Sub-Intern'], [2400, 'Acting Intern'], [3100, 'Ready for the Wards']];
+
+  /* ---------- what the records say the learner has shown, read defensively (older saves lack fields) ---------- */
+  const vals = (o) => (o && typeof o === 'object' ? Object.values(o).filter((x) => x && typeof x === 'object') : []);
+  const plays = (r) => (Array.isArray(r.history) ? r.history : []).concat(r.last && typeof r.last === 'object' ? [r.last] : []);
+  /** A shift finished with a pass: graded Pass or Honors (70% or more; js/shift.js). */
+  E.shiftPassed = (pr) => vals(pr.shifts).some((r) => (r.best || 0) >= 0.7 || plays(r).some((h) => h.grade === 'Pass' || h.grade === 'Honors'));
+  E.shiftHonors = (pr) => vals(pr.shifts).some((r) => plays(r).some((h) => h.grade === 'Honors'));
+  /** A case finished with a good ending: the 'well' outcome, which always earns two or three stars (js/cases.js). */
+  const caseGood = (r) => !!r && ((r.best || 0) >= 2 || plays(r).some((h) => h.outcome === 'well'));
+  E.caseGood = (pr) => vals(pr.cases).some(caseGood);
+  E.caseAllGood = (pr) => { const all = E.CASES || []; return all.length > 0 && all.every((cs) => caseGood((pr.cases || {})[cs.id])); };
+  E.examPassed = (pr) => !!(pr.exam && pr.exam.passed);
+  /** A patient harmed by the learner's order, then stabilised because the learner responded in time (js/shift.js). */
+  E.harmRescued = (pr) => !!(pr.safety && Array.isArray(pr.safety.events) && pr.safety.events.some((e) => e && e.kind === 'harm' && e.outcome === 'rescued'));
+
+  /* Ranks that mean something. Tasks, the knowledge check and mission stars alone add up to the top rank's XP, so
+     each upper rank also asks for a demonstration. XP is never deducted and the bar still fills; a learner with the
+     XP but not the demonstration is told exactly what is needed. Keyed by rank title so faculty can re-space
+     E.LEVELS. A rank someone already held under the old XP-only rule is kept, with its requirement listed "to confirm". */
+  E.RANK_NEEDS = {
+    'Sub-Intern': { test: E.shiftPassed, todo: 'Pass one shift', done: 'one shift passed', short: 'Pass one shift' },
+    'Acting Intern': { test: E.caseGood, todo: 'Finish one case with a good ending', done: 'one case with a good ending', short: 'Get a good case ending' },
+    'Ready for the Wards': { test: E.examPassed, todo: 'Pass the proficiency check', done: 'the proficiency check passed', short: 'Pass the proficiency check' },
+  };   // short: the level widget's line, where there is room for a few words only
+  /** XP by source. The parts always add up to the total the level is worked out from. */
+  E.xpParts = (pr) => {
+    const s = E.progressSummary(pr), num = (f) => { const n = f ? Number(f(pr)) : 0; return isFinite(n) ? n : 0; };
+    return {
+      tasks: s.tasksDone * E.XP.task,
+      quiz: s.quizCorrect * E.XP.quizRight + (s.quizAnswered - s.quizCorrect) * E.XP.quizTried,
+      pigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax),   // flying pigs: a small bonus, capped
+      missions: E.missionStars(pr) * E.XP.star,
+      exam: E.examPassed(pr) ? E.XP.exam : 0,
+      games: num(E.gameXp), shifts: num(E.shiftXp), cases: num(E.caseXp),
+    };
+  };
   E.BADGES = [
     { id: 'lo1', name: 'Results Detective', glyph: 'results', how: 'Finish every task and question for EPA 3.' },
     { id: 'lo2', name: 'Safe Orderer', glyph: 'orders', how: 'Finish every task and question for EPA 4.' },
@@ -160,32 +198,62 @@
     { id: 'lo5', name: 'Early Warning', glyph: 'code', how: 'Finish every task and question for EPA 10.' },
     { id: 'lo6', name: 'Safety Net', glyph: 'problems', how: 'Finish every task and question for EPA 13.' },
     { id: 'catch', name: 'Good Catch', glyph: 'warn', how: 'Remove an order after a high-risk advisory instead of overriding it.' },
-    { id: 'scholar', name: 'Honor Roll', glyph: 'trophy', how: 'Answer every knowledge-check question correctly on the first try.' },
+    { id: 'scholar', name: 'Honor Roll', glyph: 'trophy', how: 'Get every knowledge-check question right, on the first try or on a retry.' },
     { id: 'mission', name: 'First Mission', glyph: 'star', how: 'Earn a star on any mission.' },
     { id: 'allstar', name: 'All-Star', glyph: 'medal', how: 'Earn gold on every mission.' },
     { id: 'responder', name: 'Rapid Responder', glyph: 'vitals', how: 'Notice a patient getting worse during a mission, and act.' },
     { id: 'proficient', name: 'Proficient', glyph: 'idcard', how: 'Pass the proficiency check.' },
+    { id: 'shift', name: 'First Shift', glyph: 'log', how: 'Finish a shift with a pass.' },
+    { id: 'honors', name: 'Honors', glyph: 'learning', how: 'Finish a shift with Honors.' },
+    { id: 'case', name: 'Good Outcome', glyph: 'summary', how: 'Finish a case with a good ending.' },
+    { id: 'allcases', name: 'Case Closed', glyph: 'review', how: 'Finish every case with a good ending.' },
+    { id: 'rescue', name: 'Turned It Around', glyph: 'add', how: 'Stabilise a patient harmed by one of your orders, in time.' },
   ];
   /** Stars earned on missions: the best result on each one. */
   E.missionStars = (pr) => Object.values(pr.missions || {}).reduce((n, r) => n + (r.best || 0), 0);
+  /** The knowledge check counts as clean when every question was right first time or on a retry (retries earn no XP). */
+  E.quizClean = (pr) => E.LEARNING.every((lo) => lo.quiz.every((q) => pr.quiz[q.id] === q.answer || E.quizRetryRight(pr, q)));
+  const BADGE_TEST = {
+    catch: (pr) => !!pr.events['alert.removed'],
+    scholar: E.quizClean,
+    mission: (pr) => vals(pr.missions).some((r) => r.best > 0),
+    allstar: (pr) => { const all = E.MISSIONS || []; return all.length > 0 && all.every((m) => ((pr.missions || {})[m.id] || {}).best === 3); },
+    responder: (pr) => vals(pr.missions).some((r) => r.responded),
+    proficient: E.examPassed, shift: E.shiftPassed, honors: E.shiftHonors, case: E.caseGood, allcases: E.caseAllGood, rescue: E.harmRescued,
+  };
+  /** Points, rank and badges. The rank is the highest whose XP is reached and whose demonstration is shown (or was
+      already held). Returns, besides the old fields: need (what stands between the learner and the next rank they
+      have the XP for, or the next rank's demonstration), confirm (ranks kept from the old rule, still to show). */
   E.game = (pr) => {
-    const s = E.progressSummary(pr);
-    const xp = s.tasksDone * E.XP.task + s.quizCorrect * E.XP.quizRight + (s.quizAnswered - s.quizCorrect) * E.XP.quizTried + Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax)   // flying pigs: a small bonus, capped
-      + E.missionStars(pr) * E.XP.star + (pr.exam && pr.exam.passed ? E.XP.exam : 0) + (E.gameXp ? E.gameXp(pr) : 0) + (E.shiftXp ? E.shiftXp(pr) : 0) + (E.caseXp ? E.caseXp(pr) : 0);
-    let level = 0;
-    E.LEVELS.forEach(([min], i) => { if (xp >= min) level = i; });
+    const s = E.progressSummary(pr), parts = E.xpParts(pr);
+    const xp = Object.values(parts).reduce((n, v) => n + v, 0);
+    let byXp = 0;
+    E.LEVELS.forEach(([min], i) => { if (xp >= min) byXp = i; });
+    // The first time this code sees a learner, the rank they hold under the old rule is written down, so no title is
+    // ever taken away. XP only falls when a learner resets their progress: then the old title goes with it.
+    let held = Number(pr.rankHeld);
+    if (!isFinite(held) || held < 0) held = pr.rankHeld = byXp;
+    if (held > byXp) held = pr.rankHeld = byXp;
+    let level = 0, need = null;
+    const confirm = [];
+    for (let i = 1; i < E.LEVELS.length; i++) {
+      const title = E.LEVELS[i][1], rule = E.RANK_NEEDS[title], shown = !rule || rule.test(pr);
+      if (i > byXp) { if (!need && rule && !shown) need = { title, todo: rule.todo, short: rule.short, xp: E.LEVELS[i][0], blocked: false, text: `${E.LEVELS[i][0]} XP and ${rule.done} to become ${title}` }; break; }
+      if (shown) { level = i; continue; }
+      if (i <= held) { level = i; confirm.push({ title, todo: rule.todo, text: `${rule.todo} to confirm ${title}` }); continue; }
+      need = { title, todo: rule.todo, short: rule.short, xp: E.LEVELS[i][0], blocked: true, text: `${rule.todo} to become ${title}` };
+      break;
+    }
     const floor = E.LEVELS[level][0], next = E.LEVELS[level + 1] ? E.LEVELS[level + 1][0] : null;
     const earned = E.BADGES.filter((b) => {
       const lo = s.byLo.find((x) => x.id === b.id);
       if (lo) return lo.tasksDone === lo.tasks && lo.quizAnswered === lo.quiz;
-      const ms = Object.values(pr.missions || {}), all = E.MISSIONS || [];
-      if (b.id === 'mission') return ms.some((r) => r.best > 0);
-      if (b.id === 'allstar') return all.length > 0 && all.every((m) => ((pr.missions || {})[m.id] || {}).best === 3);
-      if (b.id === 'responder') return ms.some((r) => r.responded);
-      if (b.id === 'proficient') return !!(pr.exam && pr.exam.passed);
-      return b.id === 'catch' ? !!pr.events['alert.removed'] : s.quizCorrect === s.quiz;
+      const t = BADGE_TEST[b.id];
+      try { return t ? !!t(pr) : false; } catch (e) { return false; }   // a malformed old record never breaks the page
     }).map((b) => b.id);
-    return { xp, level: level + 1, title: E.LEVELS[level][1], floor, next, pct: next ? Math.round(((xp - floor) / (next - floor)) * 100) : 100, earned, max: E.LEVELS[E.LEVELS.length - 1][0] };
+    // The bar never goes backwards: held at a demonstration, it shows full rather than restarting.
+    const pct = next ? Math.max(0, Math.min(100, Math.round(((xp - floor) / (next - floor)) * 100))) : 100;
+    return { xp, parts, level: level + 1, title: E.LEVELS[level][1], floor, next, pct, earned, max: E.LEVELS[E.LEVELS.length - 1][0], need, confirm };
   };
   E.progressSummary = (pr) => {
     let tasks = 0, tasksDone = 0, q = 0, qDone = 0, qRight = 0;
@@ -198,4 +266,42 @@
     });
     return { tasks, tasksDone, quiz: q, quizAnswered: qDone, quizCorrect: qRight, byLo };
   };
+
+  /* ---------- the order the knowledge-check options are shown in ----------
+     The questions are written with the answer near the top (positions 0, 1, 1, 1 …), which a learner learns to
+     guess. Each learner sees each question's options in their own order, kept in their progress (pr.quizOrder) so
+     it does not change on a reload. The order is seeded from the learner and the question, so a record that never
+     got saved still comes back the same. The buttons always carry the ORIGINAL option index: the answer handler
+     in js/app.js, the report and the stored answers all speak in original indexes. */
+  const seeded = (str) => {   // FNV-1a into a small PRNG (mulberry32): the same string always gives the same sequence
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return () => { h = (h + 0x6D2B79F5) | 0; let t = Math.imul(h ^ (h >>> 15), 1 | h); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  };
+  const isPerm = (a, n) => Array.isArray(a) && a.length === n && a.every((x, i) => Number.isInteger(x) && x >= 0 && x < n && a.indexOf(x) === i);
+  /** Display order for one question: an array of original option indexes, first shown first. */
+  E.quizOrder = (pr, q) => {
+    const n = q.options.length, store = pr.quizOrder && typeof pr.quizOrder === 'object' ? pr.quizOrder : (pr.quizOrder = {});
+    if (isPerm(store[q.id], n)) return store[q.id];
+    const rnd = seeded(`${String(pr.name || '').trim().toLowerCase()}|${pr.role}|${q.id}`), out = [...Array(n).keys()];
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+    return (store[q.id] = out);
+  };
+  /** A second try at a missed question, for the Honor Roll badge only: the first answer and its XP stand. */
+  E.quizRetry = (pr, qid, i) => {
+    const q = E.LEARNING.flatMap((lo) => lo.quiz).find((x) => x.id === qid);
+    if (!q || pr.quiz[qid] == null || pr.quiz[qid] === q.answer) return null;
+    const r = pr.quizRetry && typeof pr.quizRetry === 'object' ? pr.quizRetry : (pr.quizRetry = {});
+    if (retryRight(pr, q)) return true;   // already put right
+    r[qid] = { i: Number(i), first: pr.quiz[qid], at: Date.now() };
+    return r[qid].i === q.answer;
+  };
+  /* A retry belongs to the first answer it followed. Reset my progress clears pr.quiz but (in js/app.js) not this,
+     so a retry counts only for the same first answer and only if it came after the learner's last reset. */
+  const lastReset = (pr) => (Array.isArray(pr.log) ? pr.log : []).reduce((t, l) => (l && l.action === 'Reset own learning progress' && l.ts > t ? l.ts : t), 0);
+  function retryRight(pr, q) {
+    const r = pr.quizRetry && pr.quizRetry[q.id];
+    return !!r && typeof r === 'object' && r.i === q.answer && pr.quiz[q.id] != null && r.first === pr.quiz[q.id] && (r.at || 0) > lastReset(pr);
+  }
+  E.quizRetryRight = retryRight;
 })();

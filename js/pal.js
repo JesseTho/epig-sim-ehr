@@ -29,8 +29,11 @@
   const prefs = () => E.db.prefs || (E.db.prefs = {});
   const $ = (s) => root.querySelector(s);
 
+  // Reactions to something that just happened. For their few seconds they outrank 'wait', the screen's mood while
+  // any test is in process: otherwise a pig reacting to harm or a rescue in a busy ward would never show it.
+  const REACT = new Set(['gasp', 'worry', 'cheer', 'phew', 'sad', 'unsure']);
   function draw() {
-    const pig = $('.pal-pig'), pose = mood || timedPose;   // what the screen calls for outranks a passing gesture
+    const pig = $('.pal-pig'), pose = timedPose && REACT.has(timedPose) && (!mood || mood === 'wait') ? timedPose : mood || timedPose;   // otherwise what the screen calls for outranks a passing gesture
     if (pose) pig.dataset.pose = pose; else delete pig.dataset.pose;
   }
   /** Hold a pose for a moment (a cheer, a wave), then go back to whatever the screen calls for. */
@@ -45,31 +48,49 @@
       will not fit (a screen-filling note editor, say), it tucks into the corner tab until there is room.
       It is placed, never slid: nothing here animates on its own. */
   const TAKEN = '.banner a, .banner button, .toolbar a, .toolbar button, .toolbar input, .wstabs a, .wstabs button, .acts a, .main button, .main input, .main select, .main textarea, .main a[href], .modal';
+  /* Both #pal and #pal-back are fixed to the bottom edge, so the box at a given `bottom` is known without moving
+     it: same left, right and height, top = window height - bottom - height. One measurement, then arithmetic,
+     instead of a layout per 28px step; the step order and the spot chosen are exactly as before. */
   function fits(el, taken) {
-    for (let bottom = 8; bottom < window.innerHeight - 60; bottom += 28) {
-      el.style.bottom = bottom + 'px';
-      const p = el.getBoundingClientRect();
+    const r = el.getBoundingClientRect(), vh = window.innerHeight;
+    for (let bottom = 8; bottom < vh - 60; bottom += 28) {
+      const p = { left: r.left, right: r.right, top: vh - bottom - r.height, bottom: vh - bottom };
       if (p.top < 0) break;
-      if (!taken.some((r) => r.left < p.right && r.right > p.left && r.top < p.bottom && r.bottom > p.top)) return true;
+      if (!taken.some((t) => t.left < p.right && t.right > p.left && t.top < p.bottom && t.bottom > p.top)) { el.style.bottom = bottom + 'px'; return true; }
     }
     el.style.bottom = '';
     return false;
   }
+  // What the last placement was worked out from. When none of it has changed, the pig is already where it belongs.
+  let lastSig = '', colLeft = 0;
   function dodge() {
     queued = false;
     if (!root) return;
     const off = !!prefs().palOff;
-    if (!signedIn) { root.hidden = back.hidden = true; return; }
-    if (off) { root.hidden = true; back.hidden = false; back.style.bottom = ''; return; }
-    if (forced) { tucked = false; root.hidden = false; back.hidden = true; root.style.bottom = '8px'; return; }
-    const taken = [...document.querySelectorAll(TAKEN)].map((e) => e.getBoundingClientRect()).filter((r) => r.width && r.height);
+    if (!signedIn) { lastSig = ''; root.hidden = back.hidden = true; return; }
+    if (off) { lastSig = ''; root.hidden = true; back.hidden = false; back.style.bottom = ''; return; }
+    if (forced) { lastSig = ''; tucked = false; root.hidden = false; back.hidden = true; root.style.bottom = '8px'; return; }
+    const vw = window.innerWidth, bubbleOpen = !$('.pal-bubble').hidden;
+    // Only controls in the right-hand column the pig and its balloon can occupy matter; the rest can scroll freely.
+    const taken = [...document.querySelectorAll(TAKEN)].map((e) => e.getBoundingClientRect()).filter((r) => r.width && r.height && r.right > colLeft);
+    const sigOf = () => [vw, window.innerHeight, !$('.pal-bubble').hidden, unprompted, tucked, root.hidden ? 0 : Math.round(root.getBoundingClientRect().height)].concat(taken.map((r) => `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`)).join('|');
+    if (sigOf() === lastSig) return;
     root.hidden = false; back.hidden = true;
     let ok = fits(root, taken);
-    if (!ok && unprompted && !$('.pal-bubble').hidden) { $('.pal-bubble').hidden = true; clearTimeout(bubbleTimer); ok = fits(root, taken); }
+    if (!ok && unprompted && bubbleOpen) { $('.pal-bubble').hidden = true; clearTimeout(bubbleTimer); ok = fits(root, taken); }
     tucked = !ok;
     if (tucked) { $('.pal-bubble').hidden = true; root.hidden = true; back.hidden = false; if (!fits(back, taken)) back.style.bottom = ''; }
+    else colLeft = Math.min(root.getBoundingClientRect().left, vw - 360);   // the column: the pig with its widest balloon, measured where it stands
+    lastSig = sigOf();
   }
+  /** At most once per animation frame, however many scroll and resize events arrive. */
   const dodgeSoon = () => { if (!queued) { queued = true; requestAnimationFrame(dodge); } };
+  /** A scroll only matters if what scrolled reaches into the pig's column: a scrolled table on the left cannot move a control under it. */
+  function onScroll(e) {
+    const t = e.target;
+    if (t && t.nodeType === 1 && t !== document.documentElement && t !== document.body && t.getBoundingClientRect && t.getBoundingClientRect().right <= colLeft) return;
+    dodgeSoon();
+  }
   function hush() { if (root) { $('.pal-bubble').hidden = true; clearTimeout(bubbleTimer); forced = false; dodge(); } }
   /** Speak. One short message, a way to dismiss it, and a way to put the assistant away. */
   function say(text, opts) {
@@ -154,7 +175,7 @@
       if (prefs().palOff) return E.pal.show();
       forced = true; dodge(); flutter(); tip();   // it had only stepped aside: come out for this one tip
     });
-    document.addEventListener('scroll', dodgeSoon, true);
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
     window.addEventListener('resize', dodgeSoon);
   }
   mount();
