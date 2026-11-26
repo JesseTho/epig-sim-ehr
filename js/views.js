@@ -356,7 +356,7 @@
         <div class="np-foot"><button class="btn primary" data-act="noteSign">${icon('check', 16)}${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button><button class="btn" data-act="noteCancel">Cancel note</button><span class="fine">SmartLinks: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> then a space</span></div>`
       : `<div class="np-empty"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button><p>Signed notes are in the Notes activity.</p></div>`;
     // Reading and writing share the pane (owner's request): one tab for the chart's notes, one for the learner's own.
-    const notes = [...p.notes].sort((a, b) => b.ts - a.ts), sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
+    const notes = [...p.notes].sort((a, b) => b.ts - a.ts), sel = notes.find((n) => n.id === E.ui.noteSel) || firstNote(notes);
     const tab = E.ui.npTab === 'read' ? 'read' : 'mine';
     const read = notes.length ? `<div class="np-list">${notes.map((n) => `<button class="list-row${sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('')}</div><div class="np-doc">${V.noteDoc(p, sel)}</div>`
       : empty('No notes yet');
@@ -367,7 +367,7 @@
   V.act.notes = (p) => {
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), d = p.noteDraft;
     // An index only: a note opens in the note pane on the right, where it is read and written.
-    const sel = E.ui.npTab === 'read' && noteOpen(p) ? (notes.find((n) => n.id === E.ui.noteSel) || notes[0]) : null;
+    const sel = E.ui.npTab === 'read' && noteOpen(p) ? (notes.find((n) => n.id === E.ui.noteSel) || firstNote(notes)) : null;
     return `<div class="pane list"><div class="toolbar"><b>Notes (${notes.length})</b><span class="muted">Open one to read it in the note pane on the right.</span><span class="spacer"></span><button class="btn xs" data-act="noteNew"${d ? ' disabled' : ''}>${icon('add', 16)}New note</button></div>
         ${d ? `<button class="list-row draft" data-act="notePaneOpen"><b>Draft: ${esc(d.type)}</b><span class="muted">Unsigned · autosaved · open in the note pane on the right</span></button>` : ''}
         ${notes.map((n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('') || empty('No notes yet')}</div>`;
@@ -532,6 +532,9 @@
       </tbody></table></div>`;
 
   /* ================= Learning ================= */
+  /** The note shown before the reader picks one: the newest provider note (H&P, progress note, consult), not a nursing
+      note that happens to be more recent. The list itself stays newest first. */
+  function firstNote(notes) { return notes.find((n) => !/^nursing/i.test(n.type || "")) || notes[0]; }
   /** One knowledge-check question. Options are shown in the learner's own stored order (E.quizOrder) but every
       button carries the ORIGINAL option index, which is what quizAnswer in js/app.js expects. A question missed on
       the first try can be answered again for the Honor Roll badge only; the first answer and its points stand. */
