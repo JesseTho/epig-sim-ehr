@@ -353,10 +353,10 @@
     return h;
   }
   /** What is on the road: patients on foot, the ambulance, a car going home. Nothing here is clickable. */
-  function roadHtml() {
+  function roadHtml(onFoot) {
     if (reduce()) return '';
     const t = performance.now();
-    return actors.filter((a) => ROAD[a.kind] && t < ends(a)).map((a) => {
+    return actors.filter((a) => ROAD[a.kind] && t < ends(a) && (!onFoot || a.kind === 'walk' || a.kind === 'leave')).map((a) => {
       const at = `animation-duration:${a.dur.toFixed(2)}s;animation-delay:-${((t - a.t0) / 1000).toFixed(2)}s`;
       if (a.kind === 'walk' || a.kind === 'leave') return `<i class="wl-act wl-person ${a.kind}" style="${at}"><i style="background-image:var(--wl-p${a.v}a)"></i><i style="background-image:var(--wl-p${a.v}b)"></i></i>`;
       return `<i class="wl-act wl-van ${a.kind}" style="${at}">${a.kind === 'amb' ? `<i class="wl-siren" style="${loop(0.4)}"></i>` : ''}</i>`;
@@ -372,6 +372,13 @@
     measure();
     road.style.width = `${doorX}px`;
     road.innerHTML = visible && doorX ? roadHtml() : '';
+    // Whoever is on foot is drawn a second time on the stage, over the hospital, so they walk up to the door in front of
+    // the building. The stage starts to the right of the lettering and clips, so they still pass behind the lockup.
+    let front = el.querySelector('.wl-road.front');
+    if (!front) { front = document.createElement('i'); front.className = 'wl-road front'; el.appendChild(front); }
+    const off = el.getBoundingClientRect && bn.getBoundingClientRect ? el.getBoundingClientRect().left - bn.getBoundingClientRect().left : 0;
+    front.style.left = `${-Math.round(off)}px`; front.style.width = `${doorX}px`;
+    front.innerHTML = visible && doorX ? roadHtml(true) : '';
   }
   /** Pins wait for whatever is carrying their news: a result's flag goes up when the pig lands, an admission's when the ambulance does. */
   const shown = (t) => pins.filter((p) => p.show <= t);

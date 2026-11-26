@@ -363,7 +363,7 @@
       if (a.type === 'exam') return { title: 'Finish the proficiency check', why: 'The clock is running.', href: '#/home', label: 'Go back' };
     }
     const tasks = (E.LEARNING || []).flatMap((lo) => lo.tasks || []), left = tasks.filter((t) => !ev[t.event]);
-    if (left.length) return { title: left.length === tasks.length ? 'Start the practice tasks' : 'Finish the practice tasks', why: `${tasks.length - left.length} of ${tasks.length} done. Next: ${left[0].text}`, href: '#/learning', label: 'Open Learning' };
+    if (left.length) return { title: left.length === tasks.length ? 'Start the practice tasks' : 'Finish the practice tasks', why: `${tasks.length - left.length} of ${tasks.length} done · ${left[0].text}`, href: '#/learning', label: 'Open Learning' };
     const ms = E.missionsInOrder();
     if (canOrder) { const m = ms.find((x) => !(rec('missions', x.id).best > 0)); if (m) return { title: `Mission: ${m.title}`, why: `${m.level}. ${m.needs}`, act: 'missionStart', id: m.id, label: rec('missions', m.id).plays ? 'Try again' : 'Start mission' }; }
     const g = (E.GAMES || []).find((x) => !(rec('games', x.id).plays > 0));
@@ -394,9 +394,9 @@
   V.nextCard = () => {
     const s = E.nextStep ? E.nextStep() : null;
     if (!s) return '';
-    const btn = s.href ? `<a class="btn xs primary" href="${esc(s.href)}">${esc(s.label || 'Go')}</a>`
-      : `<button class="btn xs primary" data-act="${esc(s.act)}"${s.id ? ` data-id="${esc(s.id)}"` : ''}>${esc(s.label || 'Start')}</button>`;
-    return `<div class="notice info next-step">${icon('star', 24)}<span><b>Next: ${esc(s.title)}</b> ${esc(s.why)}</span>${btn}</div>`;
+    const btn = s.href ? `<a class="btn primary" href="${esc(s.href)}">${esc(s.label || 'Go')}</a>`
+      : `<button class="btn primary" data-act="${esc(s.act)}"${s.id ? ` data-id="${esc(s.id)}"` : ''}>${esc(s.label || 'Start')}</button>`;
+    return `<div class="next-step"><span class="next-k">Next</span><span class="next-t"><b>${esc(s.title)}</b><small>${esc(s.why)}</small></span>${btn}</div>`;
   };
 
   V.missions = () => {
@@ -424,10 +424,9 @@
     const next = V.nextCard();
     // js/shift.js ends its shelf with a "Missions" heading from when missions came straight after it; that heading is dropped here.
     const shifts = (V.shiftShelf ? V.shiftShelf() : '').replace(/<h3 class="shelf-h">(?:(?!<h3)[\s\S])*?Missions<\/h3>\s*$/, '');
-    return `<div class="page missions"><div class="doc-h"><div><h2>${icon('trophy', 56)}Missions</h2></div>
-        <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} mission stars</b></div></div>
+    return `<div class="page missions"><section class="m-hero"><div class="doc-h"><h2>${icon('trophy', 48)}Missions</h2>
+        <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} mission stars</b></div></div>${next || ''}</section>
       ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions, shifts and cases need the Medical Student or Physician role.</span></div>`}
-      ${next || ''}
       ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>
       ${V.gameShelf ? V.gameShelf() : ''}${shifts}${V.caseShelf ? V.caseShelf() : ''}${boss}</div>`;

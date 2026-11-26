@@ -466,7 +466,16 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .dock-list { list-style: none; margin: 0; padding: 0; } .dock-list li { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; line-height: 1.35; } .dock-list .gl { margin-top: 1px; }
 .dock-list li.done > span { color: var(--muted); } .dock-list li.bad > span { color: var(--red); } .dock-list li.hid > span { font-style: italic; color: var(--muted); }
 .dock-list small { display: block; color: var(--muted); margin-top: 1px; } .dock-list.wide li { padding: 3px 0; } .dock-list.wide li.bad > span { color: var(--ink); } .dock-list.wide li > .btn.xs { margin-left: auto; align-self: center; }
-.next-step .btn { margin-left: auto; }
+.next-step .btn { margin-left: auto; flex: none; }
+/* the next step: one row with a tag, the step and why, and one button. On Missions it sits inside the page's header panel. */
+.next-step { display: flex; align-items: center; gap: 12px; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--line); border-left: 4px solid var(--hot); background: #fff; }
+.next-k { flex: none; padding: 2px 9px; border-radius: 10px; background: var(--olive-5); color: #fff; font: 700 11px var(--title); letter-spacing: .05em; text-transform: uppercase; }
+.next-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; } .next-t b { font: 700 15px/1.25 var(--book); color: var(--olive-6); } .next-t small { font-size: 12px; color: var(--muted); }
+.m-hero { border: 1px solid #B4BF95; border-radius: 4px; background: #fff; margin-bottom: 16px; overflow: hidden; box-shadow: 0 1px 0 #E4E2D4; }
+.m-hero .doc-h { margin: 0; padding: 8px 16px 8px 12px; background: linear-gradient(var(--olive-0), var(--olive-1)); }
+.m-hero h2 { margin: 0; display: flex; align-items: center; gap: 10px; }
+.m-hero .mission-total { flex-direction: row; align-items: center; gap: 10px; }
+.m-hero .next-step { margin: 0; border: 0; border-top: 1px solid #B4BF95; border-left: 4px solid var(--hot); padding: 10px 16px 10px 12px; }
 .tick0 { flex: none; width: 14px; height: 14px; margin: 1px 1px 0; border: 1px solid #7F9D5E; background: #fff; box-shadow: inset 1px 1px 0 #DCDACA; }
 .dock-score { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; padding-top: 6px; border-top: 1px solid var(--line-2); font-weight: 700; color: var(--olive-6); }
 .dock-acts { display: flex; gap: 5px; margin-top: 8px; } .dock-acts .btn { flex: 1; padding-left: 4px; padding-right: 4px; }
@@ -813,9 +822,9 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
    results of what it is working on. Hovering lifts one a pixel; a delivery landing squashes it. */
 .wl-hosp, .wl-lab { transform-origin: 50% 100%; transition: transform .12s cubic-bezier(.2, .8, .3, 1.4); }
 .wl [data-go] { cursor: pointer; }   /* the stage is aria-hidden, so its "links" are spans that cannot take focus (js/world.js follows the click) */
-.wl-hosp[data-go]:hover, .wl-lab[data-go]:hover { transform: translateY(-2px); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 1px 0 rgba(18, 35, 63, .35)); }
+.wl-hosp[data-go]:hover, .wl-lab[data-go]:hover { transform: scale(1.04, 1.06); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 1px 0 rgba(18, 35, 63, .35)); }
 .wl-hosp.got, .wl-lab.got { animation: wl-got .45s cubic-bezier(.3, 0, .4, 1) both; }
-@keyframes wl-got { 0% { transform: scale(1); } 30% { transform: scale(1.14, .82); } 62% { transform: translateY(-3px) scale(.94, 1.08); } 100% { transform: scale(1); } }
+@keyframes wl-got { 0% { transform: scale(1); } 30% { transform: scale(1.14, .82); } 62% { transform: scale(.96, 1.06); } 100% { transform: scale(1); } }   /* a squash on its base: the foot of a building never leaves the ground */
 .wl-hosp { left: 62px; bottom: 6px; width: 36px; height: 32px; background: var(--wl-hosp) 0 0 / 36px 32px no-repeat; pointer-events: auto; }
 /* the census rides the hospital's top right corner like a notification badge, clear of the kerb where the ambulance parks */
 .wl-hosp b { position: absolute; left: 29px; top: 6px; min-width: 14px; padding: 1px 3px; text-align: center; font: 700 9px/1 var(--ui); color: #12233F; background: #fff; border: 1px solid #12233F; border-radius: 7px; image-rendering: auto; font-variant-numeric: tabular-nums; }
@@ -827,7 +836,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .wl-lab b { position: absolute; left: -6px; top: 2px; min-width: 12px; padding: 1px 2px; text-align: center; font: 700 9px/1 var(--ui); color: #12233F; background: #FFE98A; border: 1px solid #1F5560; border-radius: 6px; image-rendering: auto; }
 /* the lab is busy: it squashes and hops from its base for as long as a test is in it */
 .wl-lab.on:not(.got) { animation: wl-busy .62s cubic-bezier(.3, 0, .4, 1) infinite; }
-@keyframes wl-busy { 0%, 100% { transform: translateY(0) scale(1); } 18% { transform: translateY(0) scale(1.12, .84); } 48% { transform: translateY(-5px) scale(.93, 1.1); } 74% { transform: translateY(0) scale(1.07, .92); } 88% { transform: translateY(-1px) scale(.98, 1.03); } }
+@keyframes wl-busy { 0%, 100% { transform: translateY(0) scale(1); } 18% { transform: translateY(0) scale(1.12, .84); } 48% { transform: scale(.95, 1.07); } 74% { transform: scale(1.05, .94); } 88% { transform: scale(.99, 1.02); } }
 @media (prefers-reduced-motion: reduce) { .wl-lab.on, .wl-hosp.got, .wl-lab.got, .wl-hosp b.pop, .wl-flag.new, .wl-beacon, .wl-load.sheet.crit { animation: none !important; } .wl-hosp, .wl-lab { transition: none; } }   /* the beacon stays lit, steady */
 .wl-act { animation-timing-function: linear; animation-fill-mode: both; }
 .wl .wl-act[data-go] { pointer-events: auto; cursor: pointer; }
@@ -871,7 +880,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .cut-van { bottom: 12px; z-index: 2; width: 60px; height: 32px; background: 0 0 / 60px 32px no-repeat; }   /* vehicles drive in front of the nearest hill, never behind it */
 .cut-van.amb { width: 64px; background-size: 64px 32px; background-image: var(--wl-amb2); animation: cut-amb 3.4s cubic-bezier(.2, .7, .3, 1) both; } @keyframes cut-amb { from { left: 100%; } to { left: 214px; } }
 .cut-van.car { background-image: var(--wl-car2); left: 214px; animation: cut-car 4.2s cubic-bezier(.6, 0, .9, .6) 1s both; } @keyframes cut-car { from { left: 214px; } to { left: 105%; } }
-.cut-win { left: 154px; top: 110px; width: 6px; height: 9px; background: #FFE98A; animation: wl-blink .8s steps(1, end) infinite; }
+.cut-win { left: 166px; top: 109px; width: 13px; height: 9px; background: #FFE98A; animation: wl-blink .8s steps(1, end) infinite; }
 .cut-pager { right: 150px; top: 46px; transform-origin: 50% 100%; animation: cut-ring .42s steps(2, end) infinite; image-rendering: auto; } @keyframes cut-ring { 0% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
 .cut-beacon { left: 124px; top: 36px; width: 9px; height: 9px; border-radius: 50%; background: #FF2A1A; box-shadow: 0 0 0 3px rgba(255, 42, 26, .4); animation: wl-blink .6s steps(1, end) infinite; }
 .cut-flash { inset: 0; background: rgba(255, 40, 20, .16); animation: wl-blink .6s steps(1, end) infinite; }
