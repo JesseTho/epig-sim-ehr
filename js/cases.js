@@ -319,7 +319,7 @@
         <p>${esc(cs.brief)}</p><footer>${stars(rec.best || 0)}${rec.last ? `<button class="btn xs" data-act="caseLast" data-id="${cs.id}">Last debrief</button>` : ''}<span class="spacer"></span>${on ? chip('In progress', 'amber') + ' ' : ''}${btn}</footer></article>`;
     }).join('');
     return `<h3 class="shelf-h">${icon('learning', 32)}Cases</h3>
-      <p class="muted shelf-p">A case is a new patient whose course depends on what you decide. Tests show something only if you order them, the attending asks what you want to do, and time matters. Each case can end three ways. Afterwards you see the path you took, with questions to take back to your group. Once you reach a good ending, the whole tree opens too. One case, shift or mission at a time.</p>
+      <p class="muted shelf-p">A new patient whose course depends on what you decide.</p>
       ${a && a.type === 'case' ? `<div class="notice info">${icon('info', 24)}<span>A case is in progress. Finish or leave it from the case bar under the toolbar before starting anything else.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>`;
   };
@@ -336,7 +336,7 @@
     const body = `<h5>Now · ${esc(n.title)}</h5><p class="dock-brief case-now">${esc(n.story)}</p>
       ${n.paths && !a.done ? `<p class="dock-brief">${esc(waitLine(n, p))}</p>` : ''}
       ${a.path.length ? `<h5>So far</h5><ul class="dock-list">${a.path.map((s) => `<li class="done"><i class="tick1"></i><span>${esc(s.label)}<small>${s.at}</small></span></li>`).join('')}</ul>` : ''}`;
-    const acts = `${a.done ? '<button class="btn xs primary" data-act="caseDebrief">See the debrief</button>' : `${n.paths && !a.paused && timesOf(n).length ? '<button class="btn xs" data-act="caseWait" title="Moves the case clock on to the next point where something happens, as if you had waited">I have done what I can for now</button>' : ''}<button class="btn xs" data-act="casePause">${a.paused ? 'Resume' : 'Pause'}</button><button class="btn xs" data-act="caseLeave">Leave case</button>`}`;
+    const acts = `${a.done ? '<button class="btn xs primary" data-act="caseDebrief">See the debrief</button>' : `${n.paths && !a.paused && timesOf(n).length ? '<button class="btn xs" data-act="caseWait" title="Moves the case clock on to the next point where something happens, as if you had waited">I have done what I can for now</button>' : ''}${V.pauseBtn('casePause', a.paused, 'case')}<button class="btn xs" data-act="caseLeave">Leave case</button>`}`;
     return V.dockStrip({ type: 'case', cls: `dock-shift dock-case${a.paused ? ' paused' : ''}`, label: `Case: ${cs.title}`, glyph: 'learning', title: cs.title, timer: `<span id="case-clock" class="dock-timer">${hhmm(hosp(a))}</span>`, sum, acts, body, more: 'The story so far' });
   };
 
@@ -359,7 +359,7 @@
         <div class="g-pt">${icon('user', 32)}<div><b>${esc(p.name)}</b> · ${E.age(p.dob)} ${p.sex} · ${esc(p.bed)}<span>${esc(n.story)}</span></div></div>
         <p class="dock-qt rounds-q">“${esc(n.ask.q)}”</p>
         ${optOrder(a, n).map((i) => `<button class="qopt" data-act="casePick" data-i="${i}">${esc(n.ask.options[i].text)}</button>`).join('')}
-        <p class="fine">The hospital clock waits while you are being asked. If you want to look at the chart first, step out and come back from the case panel; the clock runs while you look. An answer is final.</p>`,
+        <p class="fine">The clock is paused while you answer. An answer is final.</p>`,
         '<button class="btn" data-act="closeModal">Step out to check the chart</button>', 'lg');
     },
     caseResult(m, modal) {
@@ -372,12 +372,11 @@
       return modal(`Case debrief — ${cs.title}`, `
         <div class="result-head">${stars(r.stars, 48)}<div><b>${esc(OUT[r.outcome][0])}</b><span>${esc(r.patient)} · ${esc(r.ending)} · ${r.endedAt}</span><span>${r.score} of ${r.total} points${m.xp ? ` <span class="xp">+${m.xp} XP</span>` : ''}</span></div></div>
         <p class="case-end">${esc(r.endText)}</p>
-        <p class="fine">Three stars: a good outcome with 85% or more of the points and no harm. Two: a good outcome. One: a rocky course. Your best result on each case counts toward your level; points are never taken away.</p>
         <h4>Your path</h4><ol class="case-path">${r.steps.map((s) => `<li><span class="nowrap">${s.at}</span><div><b>${esc(s.label)}</b> ${chip(GRADE[s.grade][0], GRADE[s.grade][1])}<small>${esc(s.why)}</small></div></li>`).join('') || '<li><span></span><div>No decisions were made.</div></li>'}</ol>
         ${r.credits.length ? `<h4>Loose ends</h4><ul class="dock-list wide">${r.credits.map((x) => `<li class="${x.done ? 'done' : 'bad'}">${icon(x.done ? 'check' : 'remove', 16)}<span>${esc(x.text)}${x.done && !x.always ? '' : `<small>${esc(x.why)}</small>`}</span></li>`).join('')}</ul>` : ''}
         ${open ? `<h4>The whole tree</h4><p class="fine">Every road this case could have taken. Yours is marked.</p><div class="tree"><ul><li class="on">${tree(cs, cs.start, took, new Set())}</li></ul></div>` : ''}
         <h4>Learning issues for your group</h4><ol class="case-issues">${cs.issues.map((q) => `<li>${esc(q)}</li>`).join('')}</ol>
-        ${open ? `<div class="debrief shift-debrief">${icon('learning', 48)}<div><p>${esc(cs.debrief)}</p></div></div>` : `<p class="fine case-map-locked">The full map of this case, with every road and its grade, opens after you reach a good ending.</p>`}`,
+        ${open ? `<div class="debrief shift-debrief">${icon('learning', 48)}<div><p>${esc(cs.debrief)}</p></div></div>` : `<p class="fine case-map-locked">The full map of this case opens after a good ending.</p>`}`,
         `${r.stars < 3 ? `<button class="btn" data-act="caseAsk" data-id="${cs.id}">Play again</button>` : ''}<a class="btn" href="#/missions" data-act="closeModal">All cases</a><button class="btn primary" data-act="closeModal">Close</button>`, 'xl');
     },
   });

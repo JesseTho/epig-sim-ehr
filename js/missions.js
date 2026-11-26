@@ -425,12 +425,12 @@
     // js/shift.js ends its shelf with a "Missions" heading from when missions came straight after it; that heading is dropped here.
     const shifts = (V.shiftShelf ? V.shiftShelf() : '').replace(/<h3 class="shelf-h">(?:(?!<h3)[\s\S])*?Missions<\/h3>\s*$/, '');
     return `<div class="page missions"><div class="doc-h"><div><h2>${icon('trophy', 56)}Missions</h2>
-        <p class="muted">Practice on the ward, from easiest to hardest. Work down the page: missions, then mini-games, shifts and cases, and the proficiency check last. Nothing is locked, so you can start anywhere.</p></div>
+        <p class="muted">Practice on the ward, easiest first.</p></div>
         <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} mission stars</b></div></div>
       ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions, shifts and cases involve entering orders, so they are written for the Medical Student and Physician roles. The mini-games and the proficiency check are open to every role.</span></div>`}
       ${next ? `<h3 class="shelf-h">${icon('help', 32)}Start here</h3>${next}` : ''}
       <h3 class="shelf-h">${icon('trophy', 32)}Missions</h3>
-      <p class="muted shelf-p">A mission is a short case on one of your patients, easiest first. Finish every objective for a bronze star, order nothing unsafe for silver, and complete every bonus for gold. Your best result on each mission counts toward your level. One mission, shift or case at a time.</p>
+      <p class="muted shelf-p">Short cases on one of your patients, easiest first.</p>
       ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress. Finish or abandon it from the mission bar under the toolbar before starting another.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>
       ${V.gameShelf ? V.gameShelf() : ''}${shifts}${V.caseShelf ? V.caseShelf() : ''}${boss}</div>`;
@@ -440,6 +440,12 @@
       (js/cases.js): what is running and its clock on the left, what to do now in the middle, its buttons on the right.
       o.body, when there is one, is the detail that drops open below the strip (open from the start for the check, whose
       question lives there). { type, cls, label, glyph, title, timer, sum, acts, body, more } */
+  /** Pause and Resume as one icon button on the activity strip. The name is carried by aria-label and the tooltip. */
+  V.pauseBtn = (act, paused, what) => {
+    const name = `${paused ? 'Resume' : 'Pause'} the ${what}`;
+    const svg = paused ? '<path d="M4.5 2.8v10.4L13 8z"/>' : '<path d="M4 3h3v10H4zM9 3h3v10H9z"/>';
+    return `<button class="btn xs dock-ico${paused ? ' primary' : ''}" data-act="${act}" aria-label="${name}" title="${name}"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="currentColor">${svg}</svg></button>`;
+  };
   V.dockStrip = (o) => {
     const open = o.body ? (o.type === 'exam' ? !E.ui.dockMin : !!E.ui.dockOpen) : false;
     const more = o.body ? `<button class="btn xs dock-more" data-act="dockToggle" aria-expanded="${open}">${open ? 'Hide' : esc(o.more || 'Details')}</button>` : '';
@@ -486,7 +492,6 @@
       const list = (xs, dflt) => `<ul class="dock-list wide">${xs.map((x) => `<li class="${x.done ? 'done' : 'bad'}">${icon(x.done ? 'check' : 'remove', 16)}<span>${esc(x.text)}${!x.done && (x.why || dflt) ? `<small>${esc(x.why || dflt)}</small>` : ''}</span></li>`).join('')}</ul>`;
       return modal(`Mission ${r.stars ? 'complete' : 'ended'} — ${ms.title}`, `
         <div class="result-head">${stars(r.stars, 48)}<div><b>${E.STARS[r.stars]}</b><span>${esc(ms.title)} · ${esc(p ? p.name : '')}</span>${m.xp ? `<span class="xp">+${m.xp} XP</span>` : ''}</div></div>
-        <p class="fine">Bronze: every objective done. Silver: and nothing unsafe signed, even if it was stopped later. Gold: and every bonus.</p>
         <h4>Objectives</h4>${list(r.required.filter((x) => !x.hidden), 'Not done. Every objective is needed for a bronze star.')}${r.required.some((x) => x.hidden) ? '<p class="fine">You finished before his condition changed, so the rest of this mission never started.</p>' : ''}
         <h4>Safety</h4>${r.hits.length ? `<ul class="dock-list wide">${r.hits.map((h) => `<li class="bad">${icon('alert', 16)}<span><b>${esc(h.order)}</b><small>${esc(h.why)}${h.stopped ? ' It was signed and then stopped, so it still counts.' : ''}</small></span></li>`).join('')}</ul>` : `<ul class="dock-list wide"><li class="done">${icon('check', 16)}<span>Nothing you ordered put the patient at risk.</span></li></ul>`}
         <h4>Bonus</h4>${list(r.bonus.filter((x) => !x.hidden))}

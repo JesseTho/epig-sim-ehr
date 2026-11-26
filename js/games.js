@@ -161,7 +161,7 @@
   /* ---------- views ---------- */
   V.gameShelf = () => {
     const pr = E.progress(), block = E.gameBlock();
-    return `<h3 class="shelf-h">${icon('star', 32)}Mini-games</h3><p class="muted shelf-p">Short rounds that drill one skill each, open to every role. None is timed, and every mistake is explained.</p>
+    return `<h3 class="shelf-h">${icon('star', 32)}Mini-games</h3><p class="muted shelf-p">Short rounds that drill one skill each.</p>
       ${block ? `<div class="notice info">${icon('info', 24)}<span>${esc(block)}</span></div>` : ''}
       <div class="game-grid">${E.GAMES.map((g) => { const r = (pr.games || {})[g.id]; return `<article class="game">${icon(g.glyph, 48)}<div class="game-main"><b>${esc(g.name)}</b><span class="game-skill">${esc(g.skill)}</span><p>${esc(g.blurb)}</p></div><div class="game-side">${r && r.plays ? `<span>Best ${r.best}%</span><span>${r.perfect} perfect</span>` : '<span>Not played yet</span>'}<button class="btn primary" data-act="gameOpen" data-id="${g.id}"${block ? ' disabled' : ''}>Play</button></div></article>`; }).join('')}</div>`;
   };
@@ -180,7 +180,7 @@
         const mine = m.picks[m.step];
         const table = (pickable) => `<table class="tbl compact${pickable ? ' hover' : ''} rp-list"><thead><tr><th>Patient</th><th>Date of birth</th><th>MRN</th><th>Bed</th></tr></thead><tbody>${s.rows.map((id) => { const p = E.pt(id), on = pickable && mine === id; return `<tr${pickable ? ` data-act="rightPick" data-id="${id}" tabindex="0" aria-selected="${on}"` : ''}><td><b>${esc(p.name)}</b>${on ? ' <span class="chip green">Your pick</span>' : ''}</td><td>${E.fmtDob(p.dob)}</td><td>${p.mrn}</td><td>${esc(p.bed)}</td></tr>`; }).join('')}</tbody></table>`;
         // Picking moves on to the next request; after the last one comes a review where any pick can be changed. Nothing is scored until "Check my picks".
-        if (!done && m.step < n) return modal(g.name, `<p class="g-ask">Request ${m.step + 1} of ${n}. Select the chart you would open. You can change any pick before it is checked. This is not timed.</p><div class="rp-req">${icon('inbox', 32)}<p>${esc(cur.text)}</p></div>${table(true)}<p class="fine">Two patients here have nearly the same name. A room number is not an identifier.</p>`,
+        if (!done && m.step < n) return modal(g.name, `<p class="g-ask">Request ${m.step + 1} of ${n}. Select the chart you would open.</p><div class="rp-req">${icon('inbox', 32)}<p>${esc(cur.text)}</p></div>${table(true)}<p class="fine">Two patients here have nearly the same name. A room number is not an identifier.</p>`,
           `${cancel}${m.step > 0 ? `<button class="btn" data-act="rightGo" data-i="${m.step - 1}">Previous request</button>` : ''}${s.reqs.every((r, i) => m.picks[i]) ? `<button class="btn" data-act="rightGo" data-i="${n}">Review my picks</button>` : ''}`, 'lg');
         if (!done) return modal(g.name, `<p class="g-ask"><b>Your picks.</b> Check each one against the request before they are scored. Change any that do not match on two identifiers.</p>
           <ul class="dock-list wide">${s.reqs.map((r, i) => { const got = E.pt(m.picks[i]); return `<li><i class="tick0"></i><span>${esc(r.text)}<small>You picked <b>${got ? esc(got.name) : 'nobody'}</b>${got ? `, born ${E.fmtDob(got.dob)}, MRN ${got.mrn}` : ''}.</small></span><button class="btn xs" data-act="rightGo" data-i="${i}">Change</button></li>`; }).join('')}</ul>`,

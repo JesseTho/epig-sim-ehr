@@ -759,7 +759,7 @@
         <p>${esc(sh.brief)}</p><footer>${rec.plays ? `<span class="shift-best"><b>${Math.round((rec.best || 0) * 100)}%</b> best</span>${rec.last ? `<button class="btn xs" data-act="shiftLast" data-id="${sh.id}">Last report</button>` : ''}` : '<span class="muted">Not worked yet</span>'}<span class="spacer"></span>${live ? chip('In progress', 'amber') + ' ' : ''}${btn}</footer></article>`;
     }).join('');
     return `<h3 class="shelf-h">${icon('patients', 32)}Shifts</h3>
-      <p class="muted shelf-p">A shift is a whole day with all of your patients: ${hhmm(c.startHour)} to ${hhmm(c.endHour)} on the hospital clock, about ${c.minutes} minutes on yours, and you can pause it. Pre-rounds, rounds, day work, sign-out, then a report on what you caught and what you missed. Starting a shift resets the ward to its starting state. One shift or mission at a time.</p>
+      <p class="muted shelf-p">A whole day with all of your patients, about ${c.minutes} minutes. You can pause.</p>
       ${a && a.type === 'shift' ? `<div class="notice info">${icon('info', 24)}<span>A shift is in progress. End it from the shift bar under the toolbar before starting a mission or another shift.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>`;
   };
@@ -793,7 +793,7 @@
       <ul class="dock-list dock-todo">${now}</ul>
       ${n.harm || n.near ? `<span class="dock-score">${n.harm ? chip(`${n.harm} harm`, 'red') : ''}${n.near ? chip(`${n.near} near miss${n.near === 1 ? '' : 'es'}`, 'amber') : ''}</span>` : ''}`;
     const body = `${fired.length ? `<h5>New</h5><ul class="dock-list">${fired.map((e) => `<li>${icon(e.type === 'det' ? 'alert' : e.type === 'result' ? 'results' : 'inbox', 16)}<span><a href="#/pt/${e.pid}/${e.type === 'result' ? 'results' : e.vitals ? 'flowsheets' : 'orders'}">${esc(e.subject)}</a><small>${hhmm(e.at)}</small></span></li>`).join('')}</ul>` : ''}`;
-    const acts = `${a.over ? '' : `<button class="btn xs" data-act="shiftPause">${a.paused ? 'Resume' : 'Pause'}</button>`}${a.phase === 'rounds' && left ? `<button class="btn xs primary" data-act="shiftRounds">Rounds (${left})</button>` : ''}<button class="btn xs${a.over || a.phase === 'signout' ? ' primary' : ''}" data-act="shiftEnd">End shift</button>`;
+    const acts = `${a.over ? '' : V.pauseBtn('shiftPause', a.paused, 'shift')}${a.phase === 'rounds' && left ? `<button class="btn xs primary" data-act="shiftRounds">Rounds (${left})</button>` : ''}<button class="btn xs${a.over || a.phase === 'signout' ? ' primary' : ''}" data-act="shiftEnd">End shift</button>`;
     return V.dockStrip({ type: 'shift', cls: `dock-shift${a.paused ? ' paused' : ''}`, label: `Shift: ${sh.title}`, glyph: 'log', title: ph[1], timer: `<span id="shift-clock" class="dock-timer">${hhmm(h)}</span>`, sum, acts, body, more: 'Recent pages' });
   };
 
@@ -831,7 +831,7 @@
     return `<section class="card"><header class="card-h"><h3>${icon('warn', 24)}Safety record</h3><span class="muted">${own ? 'Cleared when progress is reset' : esc(who.name)}</span></header><div class="card-b">
       ${s.suspensions.map((x) => `<p class="notice warn">${icon('warn', 24)}<span><b>Privileges suspended ${E.fmtDT(x.at)}</b> after ${esc(x.after)}. ${x.unlockedAt && x.startedOver ? `Lifted ${E.fmtDT(x.unlockedAt)} by starting over, without remediation.` : x.unlockedAt ? `Lifted ${E.fmtDT(x.unlockedAt)} after ${x.attempts} remediation attempt${x.attempts === 1 ? '' : 's'}.` : 'Not yet lifted.'}</span></p>`).join('')}
       ${rows ? `<table class="tbl compact"><thead><tr><th>When</th><th>Kind</th><th>Patient</th><th>Order</th><th>Outcome</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
-      <p class="fine">Harm events and near misses come from the sim’s harm rules and from decisions in cases (js/shift.js). Events marked Practice happened outside a shift, case or mission; they count the same way. Patients are fictional; the record is for teaching.</p></div></section>`;
+      <p class="fine">Events marked Practice happened outside a shift, case or mission. Patients are fictional; the record is for teaching.</p></div></section>`;
   };
 
   /** The full-screen lockout while privileges are suspended. */
@@ -853,7 +853,7 @@
     } else {
       body = `<div class="result-head"><span class="result-score ${L.passed ? 'pass' : 'fail'}">${L.score}<small>of ${L.qs.length}</small></span><div><b>${L.passed ? 'Passed' : 'Not yet'}</b><span>${L.passed ? 'Your badge is at the front desk. The balloons will manage without you.' : `${c.remediationPass} right are needed. The gift shop is glad to keep you a little longer.`}</span></div></div>
         ${L.qs.map((q, i) => { const a = L.answers[i], ok = a === q.answer; return `<div class="quiz"><p><b>${i + 1}.</b> ${esc(q.q)}</p>${q.options.map((o, j) => `<button class="qopt${j === q.answer && (ok || L.passed) ? ' right' : ''}${j === a && !ok ? ' wrong' : ''}" disabled>${esc(o)}</button>`).join('')}<div class="why ${ok ? 'ok' : 'no'}"><b>${ok ? 'Correct.' : 'Not quite.'}</b> ${esc(q.why)}</div></div>`; }).join('')}
-        ${L.passed ? '' : '<p class="muted">Read the reason under each one you missed. The next round is drawn again, in a new order.</p>'}
+        ${L.passed ? '' : '<p class="muted">Read the reason under each one you missed.</p>'}
         <div class="lock-acts">${L.passed ? '<button class="btn primary lg" data-act="remDone">Collect your badge</button>' : '<button class="btn" data-act="logout">Log off</button><button class="btn primary lg" data-act="remStart">Try again</button>'}</div>`;
     }
     return `<div class="lockout"><div class="lock-card"><header class="modal-h">${icon('brand', 16)}<h3>Privileges suspended</h3></header><div class="lock-b"><div class="lock-top">${icon('warn', 96)}<div><span class="boss-kick">Epig · Medical Staff Office</span><h2>Privileges suspended</h2><span class="muted">${esc(E.db.user.name)} · ${esc(E.roleLabel(E.db.user.role))} · since ${E.fmtDT(s.suspended.ts)}</span></div></div>${body}</div></div></div>`;
@@ -869,7 +869,7 @@
         <div class="g-pt">${icon('user', 32)}<div><b>${esc(p.name)}</b> · ${E.age(p.dob)} ${p.sex} · ${esc(p.bed)}<span>${esc(p.dx)}</span></div></div>
         <p class="dock-qt rounds-q">“${esc(q.q)}”</p>
         ${q.options.map((o, j) => `<button class="qopt${done && j === q.answer ? ' right' : ''}${done && j === picked && picked !== q.answer ? ' wrong' : ''}" data-act="roundsPick" data-i="${j}"${done ? ' disabled' : ''}>${esc(o)}</button>`).join('')}
-        ${done ? `<div class="why ${picked === q.answer ? 'ok' : 'no'}"><b>${picked === q.answer ? 'Right.' : 'No.'}</b> ${picked === q.answer ? 'On to the next bed.' : esc(q.where)}</div>` : '<p class="fine">The hospital clock waits while you are being asked. If you do not know, step out, look in the chart, and come back from the shift panel; the clock runs while you look.</p>'}
+        ${done ? `<div class="why ${picked === q.answer ? 'ok' : 'no'}"><b>${picked === q.answer ? 'Right.' : 'No.'}</b> ${picked === q.answer ? 'On to the next bed.' : esc(q.where)}</div>` : '<p class="fine">The clock is paused while you answer.</p>'}
         <div class="dock-dots rounds-dots">${a.qs.map((x, j) => `<button class="${j === i ? 'on' : ''}${a.answers[j] != null ? ' ans' : ''}" data-act="roundsGo" data-i="${j}" aria-label="Patient ${j + 1}${a.answers[j] != null ? ', answered' : ''}">${j + 1}</button>`).join('')}</div>`,
         `<span class="muted">${a.qs.length - left} of ${a.qs.length} answered</span><button class="btn" data-act="closeModal">${left ? 'Step out to check a chart' : 'Close'}</button>${left && (done || nx !== i) ? `<button class="btn primary" data-act="roundsGo" data-i="${nx}">Next patient</button>` : !left ? '<button class="btn primary" data-act="closeModal">Rounds done</button>' : ''}`, 'lg');
     },
@@ -889,7 +889,6 @@
       const caught = r.items.filter((x) => x.done), missed = r.items.filter((x) => !x.done && !x.unreachable), gone = r.items.filter((x) => x.unreachable);
       return modal(`Shift report — ${r.title}`, `
         <div class="result-head"><span class="result-score ${r.grade === 'Not yet' ? 'fail' : 'pass'}">${r.pct}<small>percent</small></span><div><b>${esc(r.grade)}</b><span>${r.score} of ${r.total} caught · ended at ${r.endedAt}${r.early ? ' (early)' : ''}</span>${m.xp ? `<span class="xp">+${m.xp} XP</span>` : ''}</div></div>
-        <p class="fine">Honors: 90% or more and nobody harmed. Pass: 70% or more. Your best result on each shift counts toward your level; points are never taken away.</p>
         <h4>How each patient did</h4><table class="tbl compact"><tbody>${r.patients.map((p) => `<tr><td class="nowrap"><b>${esc(p.name)}</b></td><td>${chip(p.tone === 'green' ? 'Well' : p.tone === 'amber' ? 'Mixed' : 'Badly', p.tone)}</td><td>${esc(p.how)}</td></tr>`).join('')}</tbody></table>
         <h4>Safety</h4><ul class="dock-list wide">${r.harm.map((e) => `<li class="bad">${icon('alert', 16)}<span><b>Harm: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.title)}. ${e.outcome === 'rescued' ? 'You responded and the patient stabilised.' : e.outcome === 'icu' ? 'Nobody responded in time: transferred to intensive care.' : 'Still unresolved when the shift ended.'}</small></span></li>`).join('')}
           ${r.near.map((e) => `<li>${icon('warn', 16)}<span><b>Near miss: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.title)}. Stopped by ${esc(e.by || 'someone else')} before it reached the patient.</small></span></li>`).join('')}
