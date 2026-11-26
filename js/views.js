@@ -229,7 +229,7 @@
     const cos = p.notes.filter((n) => n.status === 'Cosign needed'), od = E.overdue(p);
     const todo = [pend.length && `${pend.length} order(s) pended, awaiting cosign`, cos.length && `${cos.length} note(s) awaiting cosign`, od.length && `${od.length} medication dose(s) overdue`, proc.length && `${proc.length} test(s) in process`].filter(Boolean);
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts).slice(0, 4), reps = [...p.reports].sort((a, b) => b.ts - a.ts).slice(0, 4);
-    return `<div class="sum-head"><div><h2>${esc(p.dx)}</h2><div class="muted">Chief complaint: ${esc(p.cc)} · Hospital day ${Math.max(1, Math.ceil((Date.now() - p.admitTs) / (24 * H)))}</div></div><button class="btn call" data-act="callOpen">${icon('call', 32)}Call patient</button></div>
+    return `<div class="sum-head"><div><h2>${esc(p.dx)}</h2><div class="muted">Chief complaint: ${esc(p.cc)} · Hospital day ${Math.max(1, Math.ceil((Date.now() - p.admitTs) / (24 * H)))}</div></div></div>
       ${todo.length ? `<div class="notice info"><b>Needs attention:</b> ${todo.map(esc).join(' · ')}</div>` : ''}
       <div class="grid3">
         ${card('Latest vitals', v ? `<div class="vit-grid">${[['temp', 'Temp', v.temp + ' °C'], ['hr', 'HR', v.hr], ['rr', 'RR', v.rr], ['sbp', 'BP', v.sbp + '/' + v.dbp], ['spo2', 'SpO2', v.spo2 + '%'], ['pain', 'Pain', v.pain + '/10']].map(([k, l, val]) => { const f = vflagOf(k, v); return `<div class="${f ? 'abn' : ''}"><span>${l}</span><b>${val}</b>${vmark(f)}</div>`; }).join('')}</div><div class="muted">${esc(v.o2)} · ${E.fmtDT(v.ts)} · ${esc(v.by)}</div>` : empty('No vitals recorded'), `<a href="#/pt/${p.id}/flowsheets">Flowsheets</a>`)}

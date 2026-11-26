@@ -785,7 +785,7 @@
     else if (a.phase === 'day') now = todo(false, 'Several pages can land at once. Decide what cannot wait') + todo(false, `Handoff note on your sickest patient, due by ${hhmm(c.endHour)}`);
     else now = todo(false, 'Write a Handoff (I-PASS) note on your sickest patient') + todo(false, 'Then end the shift');
     const next = { pre: ['Rounds', c.rounds], rounds: ['Day work', c.dayWork], day: ['Sign-out', c.signOut], signout: ['Night team', c.endHour] }[a.phase];
-    const sum = `<span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span>
+    const sum = `<span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span><span class="dock-xport">${a.over ? '' : V.pauseBtn('shiftPause', a.paused, 'shift')}${V.endBtn('shiftEnd', 'End shift', a.over || a.phase === 'signout')}</span>
       <p class="dock-next">${next ? `${esc(next[0])} at ${hhmm(next[1])}` : 'The night team is waiting'}</p>
       ${a.paused ? `<p class="shift-paused">${icon('info', 16)}<span>Paused. The ward is holding its breath.</span></p>` : ''}
       ${open.map((x) => { const p = E.pt(x.pid); return `<p class="shift-now">${icon('alert', 16)}<span><a href="#/pt/${p.id}/orders">${esc(p.name)} needs you now</a> <small><b id="dock-left-${x.id}">${leftText(x)}</b> left</small></span></p>`; }).join('')}
@@ -793,7 +793,7 @@
       <ul class="dock-list dock-todo">${now}</ul>
       ${n.harm || n.near ? `<span class="dock-score">${n.harm ? chip(`${n.harm} harm`, 'red') : ''}${n.near ? chip(`${n.near} near miss${n.near === 1 ? '' : 'es'}`, 'amber') : ''}</span>` : ''}`;
     const body = `${fired.length ? `<h5>New</h5><ul class="dock-list">${fired.map((e) => `<li>${icon(e.type === 'det' ? 'alert' : e.type === 'result' ? 'results' : 'inbox', 16)}<span><a href="#/pt/${e.pid}/${e.type === 'result' ? 'results' : e.vitals ? 'flowsheets' : 'orders'}">${esc(e.subject)}</a><small>${hhmm(e.at)}</small></span></li>`).join('')}</ul>` : ''}`;
-    const acts = `${a.over ? '' : V.pauseBtn('shiftPause', a.paused, 'shift')}${a.phase === 'rounds' && left ? `<button class="btn xs primary" data-act="shiftRounds">Rounds (${left})</button>` : ''}<button class="btn xs${a.over || a.phase === 'signout' ? ' primary' : ''}" data-act="shiftEnd">End shift</button>`;
+    const acts = a.phase === 'rounds' && left ? `<button class="btn xs primary" data-act="shiftRounds">Rounds (${left})</button>` : '';
     return V.dockStrip({ type: 'shift', cls: `dock-shift${a.paused ? ' paused' : ''}`, label: `Shift: ${sh.title}`, glyph: 'log', title: ph[1], timer: `<span id="shift-clock" class="dock-timer">${hhmm(h)}</span>`, sum, acts, body, more: 'Recent pages' });
   };
 

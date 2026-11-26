@@ -602,6 +602,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
    The letters come from a CSS counter so the option markup stays the bare text the tests read. */
 .quiz:has(.quiz-h) { border: 1px solid var(--line); border-left: 4px solid var(--olive-4); background: #fff; padding: 0 0 10px; margin-top: 12px; max-width: 78ch; }
 .quiz.is-right:has(.quiz-h) { border-left-color: var(--green); } .quiz.is-wrong:has(.quiz-h) { border-left-color: var(--red); }
+.dock-xport { display: inline-flex; gap: 4px; flex: none; margin-left: -6px; }
 .dock-ico { display: inline-grid; place-items: center; min-width: 26px; padding-left: 0; padding-right: 0; } .dock-ico svg { display: block; }
 .quiz-g { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--line-2); font: 700 12px var(--title); letter-spacing: .04em; text-transform: uppercase; color: var(--olive-6); } .quiz-g + .quiz:has(.quiz-h) { margin-top: 8px; }
 .quiz-h { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--olive-0); border-bottom: 1px solid var(--line-2); font: 700 11px var(--title); letter-spacing: .04em; text-transform: uppercase; color: var(--olive-6); }
@@ -672,7 +673,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .im-opt span { flex: 1; } .im-opt.asked { color: var(--muted); }
 @media (max-width: 700px) { .im-buddy { display: none; } .im-log { height: 220px; } }
 /* The conversation popped out over a chart (markup: V.chatFloat): a floating window, draggable by its title bar */
-.im-float { position: fixed; z-index: 40; width: 470px; max-width: calc(100vw - 24px); left: max(12px, calc(50vw - 360px)); bottom: 16px; }
+.im-float { position: fixed; z-index: 40; width: 470px; max-width: calc(100vw - 24px); left: max(12px, calc(50vw - 360px)); top: max(96px, calc(45vh - 215px)); }   /* opens at the visual centre, a little above the middle; dragging sets its own left and top */
 .im-float .im { margin: 0; max-width: none; box-shadow: 4px 6px 18px rgba(0, 0, 0, .35); }
 .im-float .im-bar { cursor: move; user-select: none; touch-action: none; }
 .im-float .im-buddy { display: none; } .im-float .im-log { height: 190px; } .im-float .im-opt { padding: 3px 6px; }
