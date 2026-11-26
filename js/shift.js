@@ -574,18 +574,22 @@
   /** Move sim time on by however long has passed since the last call. Time does not pass while nobody is logged
       in, while anything says the learner has paused (a shift, a case), the tab is hidden, a dialog above is open,
       or privileges are suspended. The rescue timers on crises obey the same rule, in or out of a shift. */
+  const SPEEDS = [1, 2, 10];
   function advance() {
     const now = Date.now(), dt = Math.max(0, Math.min(now - last, 5000));
     last = now;
     if (!dt || !E.db || !E.db.user) return;
     const a = myShift();
     if (holding() || pausedAnywhere()) return;
-    if (a && !a.over) a.elapsed += dt;
-    crises().forEach((c) => { if (!same(c.who, E.db.user.name)) return; if (c.state === 'pending') c.wait -= dt; else if (c.state === 'open') c.left -= dt; });
+    // the learner can run the hospital clock at 2x or 10x during a shift; the rescue timers keep hospital time with it
+    const k = a && !a.over && SPEEDS.includes(a.speed) ? a.speed : 1;
+    if (a && !a.over) a.elapsed += dt * k;
+    crises().forEach((c) => { if (!same(c.who, E.db.user.name)) return; if (c.state === 'pending') c.wait -= dt * k; else if (c.state === 'open') c.left -= dt * k; });
   }
   function fire(a, sh, ev) {
     const p = E.pt(ev.pid);
     a.fired[ev.id] = Date.now(); (a.firedH = a.firedH || {})[ev.id] = hosp(a);
+    a.speed = 1;   // something has happened: back to normal speed so it is not missed
     a.seen[ev.id] = location.hash.indexOf(`#/pt/${ev.pid}/`) === 0;
     // already with the ICU team: the ward nurse has nothing to page about, and nothing this event expects can be done
     if (p.icu) { (a.unreach = a.unreach || {})[ev.id] = true; return; }
@@ -785,7 +789,7 @@
     else if (a.phase === 'day') now = todo(false, 'Several pages can land at once. Decide what cannot wait') + todo(false, `Handoff note on your sickest patient, due by ${hhmm(c.endHour)}`);
     else now = todo(false, 'Write a Handoff (I-PASS) note on your sickest patient') + todo(false, 'Then end the shift');
     const next = { pre: ['Rounds', c.rounds], rounds: ['Day work', c.dayWork], day: ['Sign-out', c.signOut], signout: ['Night team', c.endHour] }[a.phase];
-    const sum = `<span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span><span class="dock-xport">${a.over ? '' : V.pauseBtn('shiftPause', a.paused, 'shift')}${V.endBtn('shiftEnd', 'End shift', a.over || a.phase === 'signout')}</span>
+    const sum = `<span class="xpbar shift-bar" role="img" aria-label="${pct}% of the shift gone"><i id="shift-bar" style="width:${pct}%"></i></span><span class="dock-xport">${a.over ? '' : V.pauseBtn('shiftPause', a.paused, 'shift')}${a.over ? '' : `<span class="sim-speed" role="group" aria-label="Clock speed">${SPEEDS.map((x) => `<button class="${(a.speed || 1) === x ? 'on' : ''}" data-act="shiftSpeed" data-x="${x}" aria-pressed="${(a.speed || 1) === x}" title="${x === 1 ? 'Normal speed' : x + ' times as fast'}">${x}×</button>`).join('')}</span>`}${V.endBtn('shiftEnd', 'End shift', a.over || a.phase === 'signout')}</span>
       <p class="dock-next">${next ? `${esc(next[0])} at ${hhmm(next[1])}` : 'The night team is waiting'}</p>
       ${a.paused ? `<p class="shift-paused">${icon('info', 16)}<span>Paused. The ward is holding its breath.</span></p>` : ''}
       ${open.map((x) => { const p = E.pt(x.pid); return `<p class="shift-now">${icon('alert', 16)}<span><a href="#/pt/${p.id}/orders">${esc(p.name)} needs you now</a> <small><b id="dock-left-${x.id}">${leftText(x)}</b> left</small></span></p>`; }).join('')}
@@ -884,21 +888,34 @@
     shiftResult(m, modal) {
       const pr = E.progress(), r = ((pr.shifts || {})[m.id] || {}).last;
       if (!r) return '';
-      // a triage line keeps its reason even when caught: the tier words are the same as in Triage the Pages
-      const li = (x, ok) => `<li class="${ok ? 'done' : 'bad'}">${icon(ok ? 'check' : 'remove', 16)}<span><i class="ph-tag">${esc(x.phase)}</i> ${esc(x.text)}${ok && !x.triage ? '' : `<small>${ok || x.reached ? '' : 'Not reached: the shift ended first. '}${esc(x.why)}</small>`}</span></li>`;
-      const caught = r.items.filter((x) => x.done), missed = r.items.filter((x) => !x.done && !x.unreachable), gone = r.items.filter((x) => x.unreachable);
+      // Laid out as the day ran: one block per phase, what was caught and what was missed together, with the reason under a
+      // miss. Things the shift never got to are folded away, so an early finish is not a wall of the same sentence.
+      // A triage line keeps its reason even when caught: the tier words are the same as in Triage the Pages.
+      const scored = r.items.filter((x) => !x.unreachable), gone = r.items.filter((x) => x.unreachable);
+      const unreached = (x) => !x.done && !x.reached && (r.early || 'reached' in x);
+      const caught = scored.filter((x) => x.done), never = scored.filter(unreached), missed = scored.filter((x) => !x.done && !unreached(x));
+      const li = (x) => `<li class="${x.done ? 'done' : unreached(x) ? 'hid' : 'bad'}">${unreached(x) ? '<i class="tick0"></i>' : icon(x.done ? 'check' : 'remove', 16)}<span>${esc(x.text)}${x.done && !x.triage ? '' : `<small>${esc(x.why)}</small>`}</span></li>`;
+      const phases = ['Pre-rounds', 'Rounds', 'Day work', 'Sign-out'].map((ph) => {
+        const all = scored.filter((x) => x.phase === ph); if (!all.length) return '';
+        const got = all.filter((x) => x.done).length, seen = all.filter((x) => !unreached(x)), late = all.filter(unreached);
+        return `<section class="sr-phase"><header><b>${esc(ph)}</b><span class="xpbar" aria-hidden="true"><i style="width:${Math.round((got / all.length) * 100)}%"></i></span><span>${got} of ${all.length}</span></header>
+          ${seen.length ? `<ul class="dock-list wide">${seen.map(li).join('')}</ul>` : ''}
+          ${late.length ? `<details class="sr-late"><summary>${late.length} not reached before the shift ended</summary><ul class="dock-list wide">${late.map(li).join('')}</ul></details>` : ''}</section>`;
+      }).join('');
+      const tile = (n, label, tone) => `<span class="sr-tile ${n ? tone : ''}"><b>${n}</b>${label}</span>`;
       return modal(`Shift report — ${r.title}`, `
-        <div class="result-head"><span class="result-score ${r.grade === 'Not yet' ? 'fail' : 'pass'}">${r.pct}<small>percent</small></span><div><b>${esc(r.grade)}</b><span>${r.score} of ${r.total} caught · ended at ${r.endedAt}${r.early ? ' (early)' : ''}</span>${m.xp ? `<span class="xp">+${m.xp} XP</span>` : ''}</div></div>
-        <h4>How each patient did</h4><table class="tbl compact"><tbody>${r.patients.map((p) => `<tr><td class="nowrap"><b>${esc(p.name)}</b></td><td>${chip(p.tone === 'green' ? 'Well' : p.tone === 'amber' ? 'Mixed' : 'Badly', p.tone)}</td><td>${esc(p.how)}</td></tr>`).join('')}</tbody></table>
-        <h4>Safety</h4><ul class="dock-list wide">${r.harm.map((e) => `<li class="bad">${icon('alert', 16)}<span><b>Harm: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.title)}. ${e.outcome === 'rescued' ? 'You responded and the patient stabilised.' : e.outcome === 'icu' ? 'Nobody responded in time: transferred to intensive care.' : 'Still unresolved when the shift ended.'}</small></span></li>`).join('')}
-          ${r.near.map((e) => `<li>${icon('warn', 16)}<span><b>Near miss: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.title)}. Stopped by ${esc(e.by || 'someone else')} before it reached the patient.</small></span></li>`).join('')}
-          ${r.unsafe.map((e) => `<li class="bad">${icon('warn', 16)}<span><b>Unsafe order: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.why)}</small></span></li>`).join('')}
-          ${r.harm.length + r.near.length + r.unsafe.length ? '' : `<li class="done">${icon('check', 16)}<span>Nobody was harmed, and nothing you ordered had to be stopped.</span></li>`}</ul>
-        <h4>Caught (${caught.length})</h4><ul class="dock-list wide">${caught.map((x) => li(x, true)).join('') || '<li class="hid"><i class="tick0"></i><span>Nothing yet.</span></li>'}</ul>
-        <h4>Missed (${missed.length})</h4><ul class="dock-list wide">${missed.map((x) => li(x, false)).join('') || `<li class="done">${icon('check', 16)}<span>Nothing. A clean shift.</span></li>`}</ul>
-        ${gone.length ? `<h4>Not reachable (${gone.length})</h4><ul class="dock-list wide">${gone.map((x) => `<li class="hid"><i class="tick0"></i><span><i class="ph-tag">${esc(x.phase)}</i> ${esc(x.text)}<small>${esc(E.pt(x.pid) ? E.pt(x.pid).name : 'The patient')} was already in intensive care, so this could not be done. It is left out of the score.</small></span></li>`).join('')}</ul>` : ''}
-        <div class="debrief shift-debrief">${icon('learning', 48)}<div><p>${esc(r.debrief)}</p></div></div>`,
-        `<a class="btn" href="#/missions" data-act="closeModal">All shifts</a><button class="btn primary" data-act="closeModal">Close</button>`, 'lg');
+        <div class="result-head sr-head"><span class="result-score ${r.grade === 'Not yet' ? 'fail' : 'pass'}">${r.pct}<small>percent</small></span><div><b>${esc(r.grade)}</b><span>Ended at ${r.endedAt}${r.early ? ', early' : ''}</span>${m.xp ? `<span class="xp">+${m.xp} XP</span>` : ''}</div>
+          <div class="sr-tiles">${tile(caught.length, 'Caught', 'green')}${tile(missed.length, 'Missed', 'red')}${never.length ? tile(never.length, 'Not reached', 'grey') : ''}${tile(r.harm.length, 'Harm', 'red')}${tile(r.near.length, r.near.length === 1 ? 'Near miss' : 'Near misses', 'amber')}</div></div>
+        <div class="sr-grid"><div>
+          <h4>Your patients</h4><table class="tbl compact sr-pts"><tbody>${r.patients.map((p) => `<tr><td class="nowrap"><b>${esc(p.name)}</b></td><td>${chip(p.tone === 'green' ? 'Well' : p.tone === 'amber' ? 'Mixed' : 'Badly', p.tone)}</td><td>${esc(p.how)}</td></tr>`).join('')}</tbody></table>
+          <h4>Safety</h4><ul class="dock-list wide">${r.harm.map((e) => `<li class="bad">${icon('alert', 16)}<span><b>Harm: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.title)}. ${e.outcome === 'rescued' ? 'You responded and the patient stabilised.' : e.outcome === 'icu' ? 'Nobody responded in time: transferred to intensive care.' : 'Still unresolved when the shift ended.'}</small></span></li>`).join('')}
+            ${r.near.map((e) => `<li>${icon('warn', 16)}<span><b>Near miss: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.title)}. Stopped by ${esc(e.by || 'someone else')} before it reached the patient.</small></span></li>`).join('')}
+            ${r.unsafe.map((e) => `<li class="bad">${icon('warn', 16)}<span><b>Unsafe order: ${esc(e.patient)}</b> — ${esc(e.order)}<small>${esc(e.why)}</small></span></li>`).join('')}
+            ${r.harm.length + r.near.length + r.unsafe.length ? '' : `<li class="done">${icon('check', 16)}<span>Nobody was harmed, and nothing you ordered had to be stopped.</span></li>`}</ul>
+          ${gone.length ? `<h4>Left out of the score</h4><ul class="dock-list wide">${gone.map((x) => `<li class="hid"><i class="tick0"></i><span>${esc(x.text)}<small>${esc(E.pt(x.pid) ? E.pt(x.pid).name : 'The patient')} was already in intensive care.</small></span></li>`).join('')}</ul>` : ''}
+          <div class="debrief shift-debrief">${icon('learning', 48)}<div><p>${esc(r.debrief)}</p></div></div>
+        </div><div><h4>The day</h4>${phases}</div></div>`,
+`<a class="btn" href="#/missions" data-act="closeModal">All shifts</a><button class="btn primary" data-act="closeModal">Close</button>`, 'xl');
     },
   });
 
@@ -938,6 +955,7 @@
       say(PHASES[0][2], `${hhmm(CFG().startHour)} · Pre-rounds`, 'info');
       E.app.go('#/inbox');
     },
+    shiftSpeed(d) { const a = myShift(), x = Number(d.x); if (!a || a.over || !SPEEDS.includes(x)) return; a.speed = x; if (a.paused) { a.paused = false; a.autoPaused = false; } last = Date.now(); E.app.commit(); },
     shiftPause() { const a = myShift(); if (!a) return; a.paused = !a.paused; last = Date.now(); E.audit(a.paused ? 'Paused the shift' : 'Resumed the shift'); E.app.commit(); },
     shiftRounds() { const a = myShift(); if (!a || a.phase !== 'rounds') return; E.ui.modal = { type: 'rounds', i: Math.max(0, a.answers.indexOf(null)) }; E.app.render(); },
     roundsPick(d) { const a = myShift(), m = E.ui.modal; if (!a || !m || a.answers[m.i] != null) return; a.answers[m.i] = Number(d.i); E.audit(`Answered on rounds: ${E.pt(a.qs[m.i].pid).name}`, a.qs[m.i].pid); E.app.commit(); },
