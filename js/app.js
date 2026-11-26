@@ -403,7 +403,7 @@
       A.closeTabDo(d);
     },
     closeTabDo(d) { d = d && d.id ? d : { id: ui.closing }; ui.closing = null; ui.modal = null; E.db.openTabs = E.db.openTabs.filter((id) => id !== d.id); E.save(); if (route().pid === d.id) go('#/home'); else render(); },
-    resetAsk() { ui.modal = { type: 'confirm', title: 'Reset sim data?', text: 'All patients return to their starting state and the timeline is regenerated from the current time. Orders, notes and documentation entered by anyone on this device are erased. Learning progress is kept.', yes: 'resetDo', yesLabel: 'Reset', danger: true }; render(); },
+    resetAsk() { ui.modal = { type: 'confirm', title: 'Reset sim data?', text: 'All patients return to their starting state. Orders, notes and documentation entered by anyone on this device are erased. Learning progress is kept.', yes: 'resetDo', yesLabel: 'Reset', danger: true }; render(); },
     resetDo() { const act = E.progress().active; if (act && (act.type === 'mission' || act.type === 'shift' || act.type === 'case')) delete E.progress().active; E.reset(); E.db.openTabs = []; Object.assign(ui, { modal: null, selLab: null, selVital: null, selReport: null, noteSel: null, crSel: null, inboxSel: null, marDay: 0 }); E.audit('Reset sim data'); E.save(); toast('Sim data reset'); go('#/home'); },
 
     /* video visit */
@@ -516,7 +516,7 @@
       const p = curPt(), d = p.noteDraft, u = E.db.user, text = d.text.trim();
       if (!text) return toast('The note is empty.');
       const left = (text.match(/\*\*\*/g) || []).length;
-      if (left) { nextBlank($('#noteText')); return toast(`${left} blank${left > 1 ? 's' : ''} still to fill. Each *** is a placeholder the template left for you: type over it (the next one is selected for you), or delete it if it does not apply.`, 'Not signed yet'); }
+      if (left) { nextBlank($('#noteText')); return toast(`${left} blank${left > 1 ? 's' : ''} still to fill. Type over each ***, or delete it.`, 'Not signed yet'); }
       const student = u.role === 'student';
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
       if (d.source) n.source = d.source;   // started in a mini-game

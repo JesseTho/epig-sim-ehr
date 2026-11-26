@@ -13,10 +13,10 @@
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
   E.GAMES = [
-    { id: 'spot', name: 'Spot the Unsafe Order', glyph: 'warn', skill: 'Safe ordering · EPA 4', blurb: 'A patient and six orders. Decide which are safe and which to stop. Every stop shows the allergy, interaction or lab that makes it unsafe.' },
-    { id: 'triage', name: 'Triage the Pages', glyph: 'inbox', skill: 'Prioritising · EPA 10', blurb: 'Five pages arrive in the same minute. Put them in the order you would answer them. Each one is checked against a key, with the reason it sits where it does.' },
+    { id: 'spot', name: 'Spot the Unsafe Order', glyph: 'warn', skill: 'Safe ordering · EPA 4', blurb: 'A patient and six orders. Decide which are safe and which to stop.' },
+    { id: 'triage', name: 'Triage the Pages', glyph: 'inbox', skill: 'Prioritising · EPA 10', blurb: 'Five pages arrive in the same minute. Put them in the order you would answer them.' },
     { id: 'right', name: 'Right Patient', glyph: 'idcard', skill: 'Patient identification · EPA 13', blurb: 'Two patients on the list have nearly the same name. Each request names a patient by two identifiers. Open the right chart.' },
-    { id: 'note', name: 'Note Doctor', glyph: 'notes', skill: 'Documentation · EPA 5', blurb: 'A progress note with mistakes in it: copied-forward vitals, a wrong allergy, another patient’s lab. Compare each line with the facts from the chart shown beside it, and click every line that is wrong.' },
+    { id: 'note', name: 'Note Doctor', glyph: 'notes', skill: 'Documentation · EPA 5', blurb: 'A progress note with mistakes in it: copied-forward vitals, a wrong allergy, another patient’s lab. Click every line that is wrong.' },
   ];
   /** Games are not played while a clock is running elsewhere: a shift or case clock keeps going behind the dialog,
       the proficiency check's clock does too (and the games show chart facts), and a mission's live event would land
@@ -24,10 +24,10 @@
   E.gameBlock = () => {
     const a = E.db && E.db.user ? E.progress().active : null;
     if (!a) return '';
-    return a.type === 'shift' ? 'Mini-games wait until your shift ends: its clock keeps running behind a game.'
-      : a.type === 'case' ? 'Mini-games wait until your case ends: its clock keeps running behind a game.'
-      : a.type === 'exam' ? 'Mini-games wait until the proficiency check is submitted: its clock keeps running behind a game.'
-      : 'Mini-games wait until your mission ends, so nothing that happens to your patient is missed.';
+    return a.type === 'shift' ? 'Mini-games wait until your shift ends.'
+      : a.type === 'case' ? 'Mini-games wait until your case ends.'
+      : a.type === 'exam' ? 'Mini-games wait until the proficiency check is submitted.'
+      : 'Mini-games wait until your mission ends.';
   };
   /** Triage score: every pair of pages counts once, right when the more urgent one is answered first. One swap of
       neighbours costs one pair, not two places. `ranks` is the urgency rank of each page in the order given (0 = most urgent). */
@@ -161,7 +161,7 @@
   /* ---------- views ---------- */
   V.gameShelf = () => {
     const pr = E.progress(), block = E.gameBlock();
-    return `<h3 class="shelf-h">${icon('star', 32)}Mini-games</h3><p class="muted shelf-p">Short rounds that drill one skill each.</p>
+    return `<h3 class="shelf-h">${icon('star', 32)}Mini-games</h3>
       ${block ? `<div class="notice info">${icon('info', 24)}<span>${esc(block)}</span></div>` : ''}
       <div class="game-grid">${E.GAMES.map((g) => { const r = (pr.games || {})[g.id]; return `<article class="game">${icon(g.glyph, 48)}<div class="game-main"><b>${esc(g.name)}</b><span class="game-skill">${esc(g.skill)}</span><p>${esc(g.blurb)}</p></div><div class="game-side">${r && r.plays ? `<span>Best ${r.best}%</span><span>${r.perfect} perfect</span>` : '<span>Not played yet</span>'}<button class="btn primary" data-act="gameOpen" data-id="${g.id}"${block ? ' disabled' : ''}>Play</button></div></article>`; }).join('')}</div>`;
   };
@@ -202,7 +202,7 @@
         }).join('');
         const keep = s.cards.filter((c, i) => m.marks[i] === 'safe');
         const score = done ? s.cards.filter((c, i) => (m.marks[i] === 'stop') === c.unsafe).length : 0;
-        return modal(g.name, `${ptCard}${facts}<p class="g-ask">${done ? `<b>${score} of ${s.cards.length} right.</b> ${score === s.cards.length ? 'Every unsafe order stopped, every safe one let through.' : 'Read why for the ones you missed.'}` : 'For each order: is it safe to give this patient? Take your time; this is not timed.'}</p><div class="g-cards">${cards}</div>`,
+        return modal(g.name, `${ptCard}${facts}<p class="g-ask">${done ? `<b>${score} of ${s.cards.length} right.</b> ${score === s.cards.length ? 'Every unsafe order stopped, every safe one let through.' : 'Read why for the ones you missed.'}` : 'For each order: is it safe to give this patient?'}</p><div class="g-cards">${cards}</div>`,
           done ? `<button class="btn" data-act="gameOpen" data-id="spot">Play again</button>${keep.length ? `<button class="btn" data-act="spotSend">Add the ${keep.length} order${keep.length > 1 ? 's' : ''} you marked Safe to ${esc(p.name)}’s unsigned orders</button>` : ''}<button class="btn primary" data-act="closeModal">Close</button>`
             : `${cancel}<button class="btn primary" data-act="gameCheck">Check my answers</button>`, 'xl');
       }

@@ -594,6 +594,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .quiz:has(.quiz-h) { border: 1px solid var(--line); border-left: 4px solid var(--olive-4); background: #fff; padding: 0 0 10px; margin-top: 12px; max-width: 78ch; }
 .quiz.is-right:has(.quiz-h) { border-left-color: var(--green); } .quiz.is-wrong:has(.quiz-h) { border-left-color: var(--red); }
 .dock-ico { display: inline-grid; place-items: center; min-width: 26px; padding-left: 0; padding-right: 0; } .dock-ico svg { display: block; }
+.quiz-g { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--line-2); font: 700 12px var(--title); letter-spacing: .04em; text-transform: uppercase; color: var(--olive-6); } .quiz-g + .quiz:has(.quiz-h) { margin-top: 8px; }
 .quiz-h { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--olive-0); border-bottom: 1px solid var(--line-2); font: 700 11px var(--title); letter-spacing: .04em; text-transform: uppercase; color: var(--olive-6); }
 .quiz-h .quiz-n { font-weight: 400; color: var(--muted); letter-spacing: 0; text-transform: none; } .quiz-h .chip { margin-left: auto; text-transform: none; letter-spacing: 0; }
 .quiz-q { font: 15px/1.5 var(--book); color: var(--ink); margin: 10px 12px 10px; }

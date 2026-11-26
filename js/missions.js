@@ -357,10 +357,10 @@
     const rec = (k, id) => (pr[k] && pr[k][id]) || {};
     const byN = (xs) => [...(xs || [])].sort((x, y) => (x.n || 0) - (y.n || 0));
     if (a) {   // something is running: the only sensible next step is to go back to it
-      if (a.type === 'mission') { const m = mission(a.id); if (m) return { title: `Back to your mission: ${m.title}`, why: 'It is still running. Finish or abandon it from the bar under the toolbar.', href: `#/pt/${m.pid}/summary`, label: 'Resume' }; }
-      if (a.type === 'case') { const cs = (E.CASES || []).find((x) => x.id === a.id); if (cs) return { title: `Back to your case: ${cs.title}`, why: 'It is still running. Finish or leave it from the bar under the toolbar.', href: `#/pt/${cs.pid}/summary`, label: 'Resume' }; }
-      if (a.type === 'shift') return { title: 'Back to your shift', why: 'The ward is waiting. The shift bar under the toolbar says what to do now.', href: '#/home', label: 'Resume' };
-      if (a.type === 'exam') return { title: 'Finish the proficiency check', why: 'The clock is running. The questions are in the bar under the toolbar.', href: '#/home', label: 'Go back' };
+      if (a.type === 'mission') { const m = mission(a.id); if (m) return { title: `Back to your mission: ${m.title}`, why: 'It is still running.', href: `#/pt/${m.pid}/summary`, label: 'Resume' }; }
+      if (a.type === 'case') { const cs = (E.CASES || []).find((x) => x.id === a.id); if (cs) return { title: `Back to your case: ${cs.title}`, why: 'It is still running.', href: `#/pt/${cs.pid}/summary`, label: 'Resume' }; }
+      if (a.type === 'shift') return { title: 'Back to your shift', why: 'The ward is waiting.', href: '#/home', label: 'Resume' };
+      if (a.type === 'exam') return { title: 'Finish the proficiency check', why: 'The clock is running.', href: '#/home', label: 'Go back' };
     }
     const tasks = (E.LEARNING || []).flatMap((lo) => lo.tasks || []), left = tasks.filter((t) => !ev[t.event]);
     if (left.length) return { title: left.length === tasks.length ? 'Start the practice tasks' : 'Finish the practice tasks', why: `${tasks.length - left.length} of ${tasks.length} done. Next: ${left[0].text}`, href: '#/learning', label: 'Open Learning' };
@@ -417,21 +417,18 @@
       : locked ? '' : `<button class="btn primary" data-act="examAsk"${a ? ' disabled' : ''}>${used ? 'Try again' : 'Start the check'}</button>`;
     const boss = `<section class="boss"><div class="boss-art">${icon(ex.passed ? 'trophy' : 'idcard', 96)}</div><div class="boss-main">
         <span class="boss-kick">Final challenge</span><h3>Proficiency check</h3>
-        <p>${E.EXAM.questions} questions in ${E.EXAM.minutes} minutes, answered by finding information in the patients’ charts. The question bar stays open under the toolbar while you move around the record. ${need} correct to pass; ${E.EXAM.attempts} attempts, after which a faculty member can reset them.</p>
+        <p>${E.EXAM.questions} questions in ${E.EXAM.minutes} minutes, answered from the patients’ charts. ${need} correct to pass.</p>
         <dl class="kv"><dt>Status</dt><dd>${ex.passed ? `${chip('Passed', 'green')} ${ex.passedScore} of ${E.EXAM.questions}, ${E.fmtDate(ex.passedAt)}` : inExam ? chip('In progress', 'amber') : locked ? chip('Attempts used', 'red') : 'Not passed yet'}</dd><dt>Attempts</dt><dd>${used} of ${E.EXAM.attempts}${best != null ? ` · best ${best} of ${E.EXAM.questions}` : ''}</dd></dl>
         ${locked ? '<p class="notice warn">Both attempts are used. A faculty member logged in as Physician can reset them from the Learning page.</p>' : ''}
         <div class="boss-act">${action}</div></div></section>`;
     const next = V.nextCard();
     // js/shift.js ends its shelf with a "Missions" heading from when missions came straight after it; that heading is dropped here.
     const shifts = (V.shiftShelf ? V.shiftShelf() : '').replace(/<h3 class="shelf-h">(?:(?!<h3)[\s\S])*?Missions<\/h3>\s*$/, '');
-    return `<div class="page missions"><div class="doc-h"><div><h2>${icon('trophy', 56)}Missions</h2>
-        <p class="muted">Practice on the ward, easiest first.</p></div>
+    return `<div class="page missions"><div class="doc-h"><div><h2>${icon('trophy', 56)}Missions</h2></div>
         <div class="mission-total">${stars(Math.round((total / (E.MISSIONS.length * 3)) * 3), 32)}<b>${total} of ${E.MISSIONS.length * 3} mission stars</b></div></div>
-      ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions, shifts and cases involve entering orders, so they are written for the Medical Student and Physician roles. The mini-games and the proficiency check are open to every role.</span></div>`}
-      ${next ? `<h3 class="shelf-h">${icon('help', 32)}Start here</h3>${next}` : ''}
-      <h3 class="shelf-h">${icon('trophy', 32)}Missions</h3>
-      <p class="muted shelf-p">Short cases on one of your patients, easiest first.</p>
-      ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress. Finish or abandon it from the mission bar under the toolbar before starting another.</span></div>` : ''}
+      ${canOrder ? '' : `<div class="notice info">${icon('info', 24)}<span>Missions, shifts and cases need the Medical Student or Physician role.</span></div>`}
+      ${next || ''}
+      ${a && a.type === 'mission' ? `<div class="notice info">${icon('info', 24)}<span>A mission is in progress.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>
       ${V.gameShelf ? V.gameShelf() : ''}${shifts}${V.caseShelf ? V.caseShelf() : ''}${boss}</div>`;
   };
@@ -554,7 +551,7 @@
       announce(before, `${E.STARS[r.stars]} on “${m.title}”.`, 'Mission');
       E.app.render();
     },
-    missionAbandon() { E.ui.modal = { type: 'confirm', title: 'Abandon this mission?', text: 'Your progress on this mission is dropped and no stars are awarded. Anything you ordered or wrote stays in the chart. You can start it again any time.', yes: 'missionAbandonDo', yesLabel: 'Abandon mission', danger: true }; E.app.render(); },
+    missionAbandon() { E.ui.modal = { type: 'confirm', title: 'Abandon this mission?', text: 'No stars are awarded. Anything you ordered or wrote stays in the chart.', yes: 'missionAbandonDo', yesLabel: 'Abandon mission', danger: true }; E.app.render(); },
     missionAbandonDo() { const pr = E.progress(), a = pr.active, m = a && a.type === 'mission' && mission(a.id); E.ui.modal = null; if (!m) return E.app.render(); delete pr.active; E.audit(`Abandoned mission: ${m.title}`, m.pid); E.app.commit(); },
     dockToggle() { const a = E.progress().active; if (a && a.type === 'exam') E.ui.dockMin = !E.ui.dockMin; else E.ui.dockOpen = !E.ui.dockOpen; E.app.render(); },
 
@@ -562,7 +559,7 @@
       const pr = E.progress(), ex = examState(pr), n = ex.attempts.length + 1;
       if (pr.active) { E.ui.modal = null; E.app.status(`Finish ${busyWith(pr)} first.`); return E.app.render(); }
       if (!ex.passed && ex.attempts.length >= E.EXAM.attempts) return E.app.status('Both attempts are used.');
-      E.ui.modal = { type: 'confirm', title: 'Start the proficiency check?', text: `${E.EXAM.questions} questions, ${E.EXAM.minutes} minutes. Each one is answered by finding something in a patient’s chart, so move around the record freely; the question bar stays open under the toolbar and the clock keeps running. ${Math.ceil(E.EXAM.pass * E.EXAM.questions)} correct to pass. This is attempt ${n} of ${E.EXAM.attempts}.`, yes: 'examStart', yesLabel: 'Start the clock' };
+      E.ui.modal = { type: 'confirm', title: 'Start the proficiency check?', text: `${E.EXAM.questions} questions, ${E.EXAM.minutes} minutes, answered from the charts. ${Math.ceil(E.EXAM.pass * E.EXAM.questions)} correct to pass. This is attempt ${n} of ${E.EXAM.attempts}.`, yes: 'examStart', yesLabel: 'Start the clock' };
       E.app.render();
     },
     examStart() {

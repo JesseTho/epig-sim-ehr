@@ -319,8 +319,7 @@
         <p>${esc(cs.brief)}</p><footer>${stars(rec.best || 0)}${rec.last ? `<button class="btn xs" data-act="caseLast" data-id="${cs.id}">Last debrief</button>` : ''}<span class="spacer"></span>${on ? chip('In progress', 'amber') + ' ' : ''}${btn}</footer></article>`;
     }).join('');
     return `<h3 class="shelf-h">${icon('learning', 32)}Cases</h3>
-      <p class="muted shelf-p">A new patient whose course depends on what you decide.</p>
-      ${a && a.type === 'case' ? `<div class="notice info">${icon('info', 24)}<span>A case is in progress. Finish or leave it from the case bar under the toolbar before starting anything else.</span></div>` : ''}
+      ${a && a.type === 'case' ? `<div class="notice info">${icon('info', 24)}<span>A case is in progress.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>`;
   };
 
@@ -389,7 +388,7 @@
       const pr = E.progress(), cs = def(d.id);
       if (pr.active) { E.ui.modal = null; E.app.status(`Finish ${pr.active.type === 'shift' ? 'your shift' : pr.active.type === 'exam' ? 'the proficiency check' : pr.active.type === 'case' ? 'your case' : 'your mission'} first.`); return E.app.render(); }
       if (!E.can('order.sign') && !E.can('order.pend')) return E.app.status('Cases involve entering orders, so they are for the Medical Student and Physician roles.');
-      E.ui.modal = { type: 'confirm', title: `Start case ${cs.n}: ${cs.title}?`, text: `${cs.brief} The patient joins your list when the case starts. The hospital clock starts at ${hhmm(cs.startHour)}; one hospital hour is about ${Math.round(CFG().hourSeconds / 60)} minutes of yours. You can pause it, and it waits whenever you are asked a question.`, yes: 'caseStart', yesLabel: 'Start the case', id: cs.id };
+      E.ui.modal = { type: 'confirm', title: `Start case ${cs.n}: ${cs.title}?`, text: `${cs.brief}`, yes: 'caseStart', yesLabel: 'Start the case', id: cs.id };
       E.app.render();
     },
     caseStart() {
@@ -432,7 +431,7 @@
     },
     casePause() { const a = myCase(); if (!a) return; a.paused = !a.paused; last = Date.now(); E.audit(a.paused ? 'Paused the case' : 'Resumed the case'); E.app.commit(); },
     caseDebrief() { if (myCase() && myCase().done) finish(); },
-    caseLeave() { E.ui.modal = { type: 'confirm', title: 'Leave this case?', text: 'The case stops where it is and no stars are awarded. The patient stays on your list, and anything you ordered or wrote stays in the chart. You can start the case again at any time; it begins from the beginning with a fresh chart.', yes: 'caseLeaveDo', yesLabel: 'Leave the case', danger: true }; E.app.render(); },
+    caseLeave() { E.ui.modal = { type: 'confirm', title: 'Leave this case?', text: 'No stars are awarded. The patient stays on your list, and anything you ordered or wrote stays in the chart.', yes: 'caseLeaveDo', yesLabel: 'Leave the case', danger: true }; E.app.render(); },
     caseLeaveDo() { const pr = E.progress(), a = myCase(); if (!a) return; const cs = def(a.id), p = E.pt(cs.pid); if (p) delete p.isNew; delete pr.active; E.ui.modal = null; E.audit(`Left case: ${cs.title}`, cs.pid); E.app.commit(); },
     caseLast(d) { E.ui.modal = { type: 'caseResult', id: d.id }; E.app.render(); },
   };

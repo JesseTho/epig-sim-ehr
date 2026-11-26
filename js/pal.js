@@ -147,7 +147,7 @@
       signedIn = true; place();
       if (prefs().palOff) return;
       pose('wave', 3200);
-      say(`Hi ${E.db.user.name.split(' ')[0]}, I'm ${NAME}. I'll point out things worth trying as you go. Click me any time for a tip.`, { more: false, ms: 11000, auto: true });
+      say(`Hi ${E.db.user.name.split(' ')[0]}, I'm ${NAME}. Click me any time for a tip.`, { more: false, ms: 11000, auto: true });
     },
     show() { prefs().palOff = false; E.save(); place(); pose('wave', 2600); say(`I'm back. Click me any time for a tip.`, { more: false, ms: 8000 }); },
     hide() { prefs().palOff = true; E.save(); place(); },

@@ -759,8 +759,8 @@
         <p>${esc(sh.brief)}</p><footer>${rec.plays ? `<span class="shift-best"><b>${Math.round((rec.best || 0) * 100)}%</b> best</span>${rec.last ? `<button class="btn xs" data-act="shiftLast" data-id="${sh.id}">Last report</button>` : ''}` : '<span class="muted">Not worked yet</span>'}<span class="spacer"></span>${live ? chip('In progress', 'amber') + ' ' : ''}${btn}</footer></article>`;
     }).join('');
     return `<h3 class="shelf-h">${icon('patients', 32)}Shifts</h3>
-      <p class="muted shelf-p">A whole day with all of your patients, about ${c.minutes} minutes. You can pause.</p>
-      ${a && a.type === 'shift' ? `<div class="notice info">${icon('info', 24)}<span>A shift is in progress. End it from the shift bar under the toolbar before starting a mission or another shift.</span></div>` : ''}
+      <p class="muted shelf-p">A whole day with all of your patients, about ${c.minutes} minutes.</p>
+      ${a && a.type === 'shift' ? `<div class="notice info">${icon('info', 24)}<span>A shift is in progress.</span></div>` : ''}
       <div class="mission-grid">${cards}</div>`;
   };
 
@@ -877,7 +877,7 @@
       const ev = E.safety().events.find((e) => e.id === m.evId) || {}, all = m.qs.every((q, i) => m.picked[i] === q.answer);
       return modal('Debrief with your attending', `
         <div class="advisory high"><div class="adv-h">${icon('alert', 32)}<b>${esc(ev.title || '')}</b> ${chip('Harm event', 'red')}</div><p>${esc(ev.order || '')} · ${esc(ev.patient || '')}</p></div>
-        <p>Three questions about what went wrong. Nothing is marked down for a wrong answer here; you keep going until each one is right.</p>
+        <p>Three questions about what went wrong.</p>
         ${m.qs.map((q, i) => { const a = m.picked[i], ok = a === q.answer; return `<div class="quiz"><p><b>${i + 1}.</b> ${esc(q.q)}</p>${q.options.map((o, j) => `<button class="qopt${ok && j === a ? ' right' : ''}${!ok && j === a ? ' wrong' : ''}" data-act="debriefPick" data-q="${i}" data-i="${j}"${ok ? ' disabled' : ''}>${esc(o)}</button>`).join('')}${a != null ? `<div class="why ${ok ? 'ok' : 'no'}"><b>${ok ? 'Yes.' : 'Not that one.'}</b> ${ok ? esc(q.why) : esc(debriefWhyNot(q, a))}</div>` : ''}</div>`; }).join('')}`,
         `<button class="btn" data-act="closeModal">Later</button><button class="btn primary" data-act="debriefDone"${all ? '' : ' disabled'}>Finish the debrief</button>`, 'lg');
     },
@@ -917,7 +917,7 @@
       const pr = E.progress(), sh = shiftDef(d.id), c = CFG();
       if (pr.active) { E.app.status(`Finish ${pr.active.type === 'shift' ? 'your shift' : pr.active.type === 'exam' ? 'the proficiency check' : pr.active.type === 'case' ? 'your case' : 'your mission'} first.`); return; }
       if (!E.can('order.sign') && !E.can('order.pend')) return E.app.status('Shifts involve entering orders, so they are for the Medical Student and Physician roles.');
-      E.ui.modal = { type: 'confirm', title: `Start shift ${sh.n}: ${sh.title}?`, text: `The ward is reset to its starting state first: every order, note and result entered on this device so far is erased. Your learning progress and safety record are kept. The hospital clock runs from ${hhmm(c.startHour)} to ${hhmm(c.endHour)} in about ${c.minutes} minutes. You can pause it, and it pauses itself if you switch to another tab. Any harm or near miss during the shift goes in your report for faculty.`, yes: 'shiftStart', yesLabel: 'Start the shift', id: sh.id };
+      E.ui.modal = { type: 'confirm', title: `Start shift ${sh.n}: ${sh.title}?`, text: `The ward is reset first: every order, note and result entered on this device is erased. Your learning progress and safety record are kept. About ${c.minutes} minutes. Any harm or near miss during the shift goes in your report for faculty.`, yes: 'shiftStart', yesLabel: 'Start the shift', id: sh.id };
       E.app.render();
     },
     shiftStart() {
@@ -1014,7 +1014,7 @@
       s.suspended = null; s.strikes = 0; s.debriefDue = null; E.ui.lock = null; last = Date.now();
       E.audit('Ordering privileges restored after remediation');
       E.save();
-      say('Welcome back. The suspension stays on your safety record; the count toward the next one starts again from zero.', 'Privileges restored', 'check');
+      say('Welcome back. The suspension stays on your safety record.', 'Privileges restored', 'check');
       pose('phew', 4000);
       E.app.go('#/home');
     },
