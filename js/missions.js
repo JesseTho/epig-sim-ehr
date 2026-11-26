@@ -440,10 +440,10 @@
   V.pauseBtn = (act, paused, what) => {
     const name = `${paused ? 'Resume' : 'Pause'} the ${what}`;
     const svg = paused ? '<path d="M4.5 2.8v10.4L13 8z"/>' : '<path d="M4 3h3v10H4zM9 3h3v10H9z"/>';
-    return `<button class="btn xs dock-ico${paused ? ' primary' : ''}" data-act="${act}" aria-label="${name}" title="${name}"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="currentColor">${svg}</svg></button>`;
+    return `<button class="sim-btn ${paused ? 'play' : 'pause'}" data-act="${act}" aria-label="${name}" title="${name}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">${svg}</svg></button>`;
   };
   /** End the day: the skip-to-end icon, beside Pause. */
-  V.endBtn = (act, name, primary) => `<button class="btn xs dock-ico${primary ? ' primary' : ''}" data-act="${act}" aria-label="${name}" title="${name}"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="currentColor"><path d="M3 2.8v10.4L10.5 8zM11 3h2.2v10H11z"/></svg></button>`;
+  V.endBtn = (act, name, primary) => `<button class="sim-btn end${primary ? ' go' : ''}" data-act="${act}" aria-label="${name}" title="${name}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M3 2.8v10.4L10.5 8zM11 3h2.2v10H11z"/></svg></button>`;
   V.dockStrip = (o) => {
     const open = o.body ? (o.type === 'exam' ? !E.ui.dockMin : !!E.ui.dockOpen) : false;
     const more = o.body ? `<button class="btn xs dock-more" data-act="dockToggle" aria-expanded="${open}">${open ? 'Hide' : esc(o.more || 'Details')}</button>` : '';

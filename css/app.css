@@ -602,7 +602,15 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
    The letters come from a CSS counter so the option markup stays the bare text the tests read. */
 .quiz:has(.quiz-h) { border: 1px solid var(--line); border-left: 4px solid var(--olive-4); background: #fff; padding: 0 0 10px; margin-top: 12px; max-width: 78ch; }
 .quiz.is-right:has(.quiz-h) { border-left-color: var(--green); } .quiz.is-wrong:has(.quiz-h) { border-left-color: var(--red); }
-.dock-xport { display: inline-flex; gap: 4px; flex: none; margin-left: -6px; }
+.dock-xport { display: inline-flex; gap: 5px; flex: none; margin: 0 0 0 -4px; }
+/* the clock's own controls, in the manner of a sim game: round and coloured by what they do. No drop shadow: the
+   highlight is the Windows XP one, a ring inside the edge (green when it is the thing to press, orange under the pointer). */
+.sim-btn { width: 26px; height: 26px; flex: none; display: inline-grid; place-items: center; padding: 0; border: 1px solid #12233F; border-radius: 50%; color: #fff; cursor: pointer; background: #6B7A8F; }
+.sim-btn svg { display: block; }
+.sim-btn.play { background: linear-gradient(#63C96C, #2F9A3B); } .sim-btn.pause { background: linear-gradient(#FFC466, #E0902A); } .sim-btn.end { background: linear-gradient(#63AEE3, #2B78B5); }
+.sim-btn.play, .sim-btn.end.go { box-shadow: inset 0 0 0 2px #D5EFA0; }
+.sim-btn:hover { box-shadow: inset 0 0 0 2px var(--hot-2), inset 0 -2px 0 2px var(--hot); } .sim-btn:focus-visible { outline: 2px solid var(--hot); outline-offset: 1px; }
+.sim-btn:active { box-shadow: inset 1px 2px 3px rgba(0, 0, 0, .4); }
 .dock-ico { display: inline-grid; place-items: center; min-width: 26px; padding-left: 0; padding-right: 0; } .dock-ico svg { display: block; }
 .quiz-g { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--line-2); font: 700 12px var(--title); letter-spacing: .04em; text-transform: uppercase; color: var(--olive-6); } .quiz-g + .quiz:has(.quiz-h) { margin-top: 8px; }
 .quiz-h { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--olive-0); border-bottom: 1px solid var(--line-2); font: 700 11px var(--title); letter-spacing: .04em; text-transform: uppercase; color: var(--olive-6); }
