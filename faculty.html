@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIM+EHR Class View</title>
+<link rel="icon" type="image/png" href="assets/logo/epig-48.png">
+<style>
+/* Palette and type from css/app.css (flat fallbacks of the dithered ramps). */
+:root {
+  --face: #ECE9D8; --face-hi: #F8F7F0; --work: #FFFFFF; --page: #FBFBF6;
+  --ink: #16170F; --muted: #575B46; --line: #ACA899; --line-2: #D8D5C4;
+  --olive-0: #EEF2DD; --olive-1: #DCE5C3; --olive-2: #BDCB9B; --olive-3: #9DAF78; --olive-4: #7C9055; --olive-5: #55672D; --olive-6: #36441A;
+  --hot: #E5972A; --hot-2: #FFC83C; --sel: #DCE5BF; --link: #0B4DA8; --note: #FFFFE1;
+  --red: #A8201A; --red-bg: #FDE8E6; --amber: #7A4F00; --amber-bg: #FFF1CC;
+  --green: #17693F; --green-bg: #DFF3E7;
+  --ui: Tahoma, "Segoe UI", Verdana, Geneva, sans-serif;
+  --title: "Trebuchet MS", Tahoma, Verdana, sans-serif;
+  --book: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 12px/1.45 var(--ui); color: var(--ink); background: var(--face); overflow-x: hidden; }
+::selection { background: var(--olive-4); color: #fff; }
+:focus-visible { outline: 1px dotted var(--ink); outline-offset: 1px; }
+.mast { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--olive-6); color: #fff; }
+.mast img { width: 40px; height: 40px; image-rendering: pixelated; }
+.mast h1 { margin: 0; font: 700 18px var(--title); }
+main { padding: 12px; max-width: 100%; }
+h2 { font: 400 22px var(--book); margin: 0 0 6px; color: var(--olive-6); }
+h3 { font: 700 13px var(--ui); color: var(--olive-6); margin: 12px 0 4px; }
+.muted { color: var(--muted); }
+.drop { background: var(--work); border: 2px dashed var(--olive-3); border-radius: 4px; padding: 14px; text-align: center; }
+.drop.over { border-color: var(--hot); background: var(--note); }
+.drop p { margin: 4px 0; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 23px; padding: 2px 12px; border: 1px solid var(--olive-5); border-radius: 3px; cursor: pointer; white-space: nowrap;
+  font: 12px var(--ui); color: var(--ink); background: #E4E2D2; }
+.btn:hover { box-shadow: inset 0 0 0 2px var(--hot-2), inset 0 -2px 0 2px var(--hot); }
+.btn:active { background: #F2F1E8; box-shadow: inset 1px 1px 2px rgba(0, 0, 0, .25); }
+.btn.primary { font-weight: 700; box-shadow: inset 0 0 0 2px #B4CB7C; }
+.btn.primary:hover { box-shadow: inset 0 0 0 2px var(--hot-2), inset 0 -2px 0 2px var(--hot); }
+.btn:disabled { color: #9A9786; border-color: #C9C7BA; background: #F3F2EA; box-shadow: none; cursor: default; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 10px 0 6px; }
+.tools .spacer { flex: 1; }
+.msgs { list-style: none; margin: 0 0 8px; padding: 0; }
+.msgs li { padding: 3px 8px; margin-bottom: 2px; background: var(--amber-bg); color: var(--amber); border-left: 3px solid var(--amber); }
+.msgs li.info { background: var(--olive-0); color: var(--olive-6); border-left-color: var(--olive-4); }
+.wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--line); background: var(--work); }
+.tbl { width: 100%; border-collapse: collapse; background: var(--work); font-variant-numeric: tabular-nums; }
+.tbl th, .tbl td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #ECEADD; vertical-align: top; }
+.tbl thead th { position: sticky; top: 0; z-index: 2; white-space: nowrap; font-weight: 400; background: #E9E7D7; border-right: 1px solid var(--line-2); border-bottom: 1px solid #CBC7B8; box-shadow: inset 0 -2px 0 #E0DDCD; padding: 0; }
+.tbl thead th button { all: unset; display: block; padding: 4px 8px; cursor: pointer; }
+.tbl thead th button:focus-visible { outline: 1px dotted var(--ink); outline-offset: -2px; }
+.tbl thead th small { display: block; color: var(--muted); font-size: 11px; }
+.tbl thead th[aria-sort="ascending"] button::after { content: " \25B2"; font-size: 9px; }
+.tbl thead th[aria-sort="descending"] button::after { content: " \25BC"; font-size: 9px; }
+.tbl tbody tr:nth-child(even) { background: #F7FAF0; }
+.tbl.rows tbody tr { cursor: pointer; }
+.tbl.rows tbody tr:hover { background: #F4F7E8; }
+.tbl.rows tbody tr.sel { background: var(--sel); }
+.tbl.class td { white-space: nowrap; }
+.tbl.class .stick { position: sticky; left: 0; z-index: 1; background: inherit; }
+.tbl.class thead th.stick { z-index: 3; }
+.tbl.class tbody tr { background: var(--work); }
+.tbl.class tbody tr:nth-child(even) { background: #F7FAF0; }
+.tbl.class tbody tr:hover { background: #F4F7E8; }
+.tbl.class tbody tr.sel { background: var(--sel); }
+.tbl.compact th, .tbl.compact td { padding: 3px 7px; }
+.tbl.compact thead th { padding: 3px 7px; }
+.num { text-align: right; }
+.sub { display: block; color: var(--muted); font-size: 11px; }
+.flag { display: inline-block; padding: 0 5px; border-radius: 2px; font-size: 11px; line-height: 16px; white-space: nowrap; }
+.flag.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #E2C06A; }
+.flag.red { background: var(--red-bg); color: var(--red); border: 1px solid #E7A7A0; }
+.flag.green { background: var(--green-bg); color: var(--green); border: 1px solid #9CCFAF; }
+.bad { color: var(--red); font-weight: 700; }
+.good { color: var(--green); }
+#detail { margin-top: 14px; }
+.pane { background: var(--work); border: 1px solid var(--line); border-radius: 4px 4px 0 0; padding: 10px 12px; }
+.pane > p { margin: 2px 0; }
+details.sec { border: 1px solid var(--line-2); border-radius: 3px; margin-top: 8px; background: var(--work); }
+details.sec > summary { cursor: pointer; padding: 5px 9px; background: var(--olive-0); color: var(--olive-6); font-weight: 700; }
+details.sec > .sec-b { padding: 8px 10px; overflow-x: auto; }
+details.item { border-top: 1px dotted var(--line); padding: 4px 0; }
+details.item > summary { cursor: pointer; }
+.note { border: 1px solid var(--line-2); border-radius: 3px; padding: 6px 8px; margin: 6px 0; }
+.note.flagged { border-color: #E7A7A0; }
+.note pre, .pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.45 var(--ui); margin: 4px 0; background: var(--face-hi); padding: 6px; }
+.fb { background: var(--note); border: 1px solid #E4DFA6; padding: 5px 7px; margin: 4px 0; white-space: pre-wrap; }
+.acc { background: var(--red-bg); color: var(--red); border: 1px solid #E7A7A0; padding: 5px 7px; margin: 4px 0; }
+.acc ul { margin: 2px 0 0 18px; padding: 0; }
+ul.plain { margin: 2px 0 6px 18px; padding: 0; }
+dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 4px 0; }
+dl.kv dt { color: var(--muted); } dl.kv dd { margin: 0; overflow-wrap: anywhere; }
+footer { padding: 10px 12px 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line-2); margin-top: 16px; }
+@media (max-width: 560px) {
+  .mast h1 { font-size: 16px; }
+  dl.kv { grid-template-columns: 1fr; } dl.kv dd { margin-bottom: 4px; }
+}
+@media print {
+  .drop, .tools, .msgs { display: none; }
+  .wrap { max-height: none; overflow: visible; }
+}
+</style>
+</head>
+<body>
+<header class="mast"><img src="assets/logo/epig-48.png" alt="" width="40" height="40"><h1>SIM+EHR Class View</h1></header>
+<main>
+  <section class="drop" id="drop">
+    <p><b>Drop learner report files here</b></p>
+    <p><button type="button" class="btn primary" id="pickBtn">Choose files</button>
+      <input type="file" id="pick" class="vh" multiple accept=".json,application/json" tabindex="-1" aria-hidden="true"></p>
+    <p class="muted">Files are read in this browser and are not uploaded.</p>
+  </section>
+  <div class="tools">
+    <span id="count" class="muted" aria-live="polite">No reports loaded.</span>
+    <span class="spacer"></span>
+    <button type="button" class="btn" id="csvBtn" disabled>Export CSV</button>
+    <button type="button" class="btn" id="clearBtn" disabled>Clear</button>
+  </div>
+  <ul class="msgs" id="msgs" aria-live="polite"></ul>
+  <div class="wrap" id="wrap" hidden><table class="tbl rows class" id="tbl"></table></div>
+  <section id="detail" aria-live="polite"></section>
+</main>
+<footer>Training simulation with fictional patients. Not for clinical use. Not affiliated with or endorsed by Epic Systems Corporation.</footer>
+
+<script id="faculty-core">
+/* Pure functions: no DOM. tests/faculty-test.js extracts and runs this block in Node. */
+var FV = (function () {
+  'use strict';
+  var EPAS = ['EPA 3', 'EPA 4', 'EPA 5', 'EPA 8', 'EPA 10', 'EPA 13'];
+  var arr = function (x) { return Array.isArray(x) ? x : []; };
+  var isObj = function (x) { return x !== null && typeof x === 'object' && !Array.isArray(x); };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+
+  /* Report checksum. MUST MATCH the checksum in js/app.js exactly: delete `checksum`, JSON.stringify with no
+     spacing, FNV-1a 32-bit over UTF-16 code units, 8 lowercase hex digits. */
+  function fnv1a(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  }
+  function checksum(report) {
+    var o = Object.assign({}, report);
+    delete o.checksum;
+    return fnv1a(JSON.stringify(o));
+  }
+
+  /** null when the object looks like a learner report, otherwise a short reason. */
+  function whyNotReport(r) {
+    if (!isObj(r)) return 'not a learner report (no top-level object)';
+    if (r.format != null && !/^sim-ehr-report\//.test(String(r.format))) return 'unknown report format "' + String(r.format).slice(0, 40) + '"';
+    if (!isObj(r.learner) || typeof r.learner.name !== 'string' || !r.learner.name.trim()) return 'not a learner report (no learner name)';
+    if (!Array.isArray(r.objectives) && !/SIM\+EHR/.test(String(r.title || ''))) return 'not a SIM+EHR learner report';
+    return null;
+  }
+
+  /** "7 of 10" -> [7, 10] */
+  function parseScore(s) {
+    var m = /^\s*(\d+)\s*of\s*(\d+)/.exec(String(s == null ? '' : s));
+    return m ? [Number(m[1]), Number(m[2])] : null;
+  }
+  var time = function (iso) { var t = Date.parse(iso); return isNaN(t) ? 0 : t; };
+
+  function summarize(r) {
+    var learner = r.learner || {};
+    var epa = {};
+    EPAS.forEach(function (k) { epa[k] = null; });
+    arr(r.objectives).forEach(function (o) {
+      if (!isObj(o) || !(o.epa in epa)) return;
+      var e = epa[o.epa] || (epa[o.epa] = { tasksDone: 0, tasks: 0, quizCorrect: 0, quiz: 0 });
+      arr(o.tasks).forEach(function (t) { e.tasks++; if (t && t.completedAt) e.tasksDone++; });
+      arr(o.knowledgeCheck).forEach(function (q) { e.quiz++; if (q && q.correct === true) e.quizCorrect++; });
+    });
+
+    var exam = null, pc = r.proficiencyCheck;
+    if (isObj(pc)) {
+      var atts = arr(pc.attempts), best = null, last = null;
+      atts.forEach(function (a) {
+        var sc = a && parseScore(a.score);
+        if (sc && (!best || sc[0] / (sc[1] || 1) > best[0] / (best[1] || 1))) best = sc;
+        if (a && a.at && (!last || time(a.at) > time(last))) last = a.at;
+      });
+      exam = { passed: !!pc.passed, best: best ? best[0] + ' of ' + best[1] : null, bestRatio: best ? best[0] / (best[1] || 1) : -1,
+        attempts: atts.length, date: pc.passedAt || last || null };
+    }
+
+    var shifts = arr(r.shifts), shiftsPassed = shifts.filter(function (s) {
+      if (!isObj(s)) return false;
+      var g = arr(s.history).map(function (h) { return h && h.grade; });
+      if (s.lastReport) g.push(s.lastReport.grade);
+      return g.some(function (x) { return x === 'Pass' || x === 'Honors'; });
+    }).length;
+
+    var cases = arr(r.cases), casesGood = cases.filter(function (c) {
+      if (!isObj(c)) return false;
+      return arr(c.history).some(function (h) { return h && h.outcome === 'well'; }) || !!(c.lastPlay && c.lastPlay.outcome === 'Did well');
+    }).length;
+
+    var sr = isObj(r.safetyRecord) ? r.safetyRecord : null, pr = sr && isObj(sr.practice) ? sr.practice : {};
+    var both = function (k) { return sr ? arr(sr[k]).length + arr(pr[k]).length : 0; };
+    var safety = sr || Array.isArray(r.safetyReports) ? { harm: both('harmEvents'), rescued: both('rescues'), near: both('nearMisses'), reports: Array.isArray(r.safetyReports) ? r.safetyReports.length : null } : null;
+
+    var ready = null;
+    if (isObj(r.survey)) ready = r.survey.readyForEpic == null ? null : Number(r.survey.readyForEpic);
+    else if (r.survey === 'skipped') ready = 'skipped';
+
+    var integrity = !('checksum' in r) ? null : checksum(r) === r.checksum ? 'ok' : 'edited';
+
+    return {
+      key: String(learner.name || '').trim().toLowerCase() + '|' + String(learner.role || '').trim().toLowerCase(),
+      name: String(learner.name || ''), role: String(learner.role || ''), exportedAt: r.exportedAt || null,
+      epa: epa, exam: exam, shiftsPassed: shiftsPassed, shiftsTotal: shifts.length, casesGood: casesGood, casesTotal: cases.length,
+      safety: safety, ready: ready, integrity: integrity, format: r.format || null, appVersion: r.appVersion || null,
+    };
+  }
+
+  /** Adds an entry {report, summary, file} to rows. Same learner name and role keeps the newer export. */
+  function merge(rows, entry) {
+    var i = -1;
+    rows.forEach(function (x, j) { if (x.summary.key === entry.summary.key) i = j; });
+    if (i < 0) return { rows: rows.concat([entry]), note: null };
+    var old = rows[i];
+    if (time(entry.summary.exportedAt) < time(old.summary.exportedAt)) return { rows: rows, note: entry.file + ': an older export of ' + entry.summary.name + ' than the one loaded; kept the newer one.' };
+    var next = rows.slice(); next[i] = entry;
+    return { rows: next, note: entry.file + ': replaced the earlier export of ' + entry.summary.name + '.' };
+  }
+
+  var frac = function (a, b) { return b ? a / b : -1; };
+  var COLS = [
+    { id: 'name', label: 'Learner', sort: function (s) { return s.name.toLowerCase(); } },
+    { id: 'role', label: 'Role', sort: function (s) { return s.role.toLowerCase(); } },
+    { id: 'date', label: 'Report date', sort: function (s) { return time(s.exportedAt); } },
+  ].concat(EPAS.map(function (k) {
+    return { id: k, label: k, sub: 'tasks · quiz', sort: function (s) { var e = s.epa[k]; return e ? frac(e.tasksDone, e.tasks) * 1000 + frac(e.quizCorrect, e.quiz) : -2000; } };
+  })).concat([
+    { id: 'exam', label: 'Proficiency', sort: function (s) { return s.exam ? (s.exam.passed ? 10 : 0) + s.exam.bestRatio : -10; } },
+    { id: 'shifts', label: 'Shifts', sub: 'passed', sort: function (s) { return s.shiftsPassed; } },
+    { id: 'cases', label: 'Cases', sub: 'good ending', sort: function (s) { return s.casesGood; } },
+    { id: 'harm', label: 'Harm', sort: function (s) { return s.safety ? s.safety.harm : -1; } },
+    { id: 'rescued', label: 'Rescued', sort: function (s) { return s.safety ? s.safety.rescued : -1; } },
+    { id: 'near', label: 'Near misses', sort: function (s) { return s.safety ? s.safety.near : -1; } },
+    { id: 'reports', label: 'Reports filed', sort: function (s) { return s.safety && s.safety.reports != null ? s.safety.reports : -1; } },
+    { id: 'ready', label: 'Readiness', sub: '1–5', sort: function (s) { return typeof s.ready === 'number' ? s.ready : -1; } },
+  ]);
+
+  function sortRows(rows, colId, dir) {
+    var col = COLS.filter(function (c) { return c.id === colId; })[0] || COLS[0], d = dir < 0 ? -1 : 1;
+    return rows.map(function (x, i) { return [x, i]; }).sort(function (a, b) {
+      var va = col.sort(a[0].summary), vb = col.sort(b[0].summary);
+      return (va < vb ? -1 : va > vb ? 1 : 0) * d || a[1] - b[1];
+    }).map(function (p) { return p[0]; });
+  }
+
+  /** One CSV cell. Text that a spreadsheet would read as a formula gets a leading apostrophe. */
+  function csvCell(v) {
+    if (v == null) return '';
+    var s = String(v);
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function csvRow(cells) { return cells.map(csvCell).join(','); }
+
+  function toCsv(summaries) {
+    var head = ['Learner', 'Role', 'Report date'];
+    EPAS.forEach(function (k) { head.push(k + ' tasks done', k + ' tasks total', k + ' quiz correct', k + ' quiz total'); });
+    head.push('Proficiency passed', 'Proficiency best score', 'Proficiency attempts', 'Proficiency date', 'Shifts passed', 'Cases good ending',
+      'Harm events', 'Rescued', 'Near misses', 'Safety reports filed', 'Readiness 1-5', 'Edited after export');
+    var lines = [csvRow(head)];
+    summaries.forEach(function (s) {
+      var c = [s.name, s.role, s.exportedAt || ''];
+      EPAS.forEach(function (k) { var e = s.epa[k]; c.push(e ? e.tasksDone : '', e ? e.tasks : '', e ? e.quizCorrect : '', e ? e.quiz : ''); });
+      var x = s.exam, f = s.safety;
+      c.push(x ? (x.passed ? 'yes' : 'no') : '', x && x.best ? x.best : '', x ? x.attempts : '', x && x.date ? x.date : '', s.shiftsPassed, s.casesGood,
+        f ? f.harm : '', f ? f.rescued : '', f ? f.near : '', f && f.reports != null ? f.reports : '', s.ready == null ? '' : s.ready,
+        s.integrity === 'edited' ? 'yes' : s.integrity === 'ok' ? 'no' : '');
+      lines.push(csvRow(c));
+    });
+    return lines.join('\r\n') + '\r\n';
+  }
+
+  /* ---------- HTML (all values escaped) ---------- */
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  function fmtDate(iso, withTime) {
+    var t = Date.parse(iso);
+    if (iso == null || iso === '') return '';
+    if (isNaN(t)) return String(iso);
+    var d = new Date(t), s = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    return withTime ? s + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : s;
+  }
+  var yn = function (b) { return b === true ? 'Yes' : b === false ? 'No' : ''; };
+  var flag = function (text, cls) { return '<span class="flag ' + cls + '">' + esc(text) + '</span>'; };
+
+  /** Escaped rendering of a value whose shape is not fixed. */
+  function any(v) {
+    if (v == null || v === '') return '';
+    if (typeof v === 'boolean') return yn(v);
+    if (typeof v !== 'object') return esc(v);
+    if (Array.isArray(v)) return v.length ? '<ul class="plain">' + v.map(function (x) { return '<li>' + any(x) + '</li>'; }).join('') + '</ul>' : '';
+    var keys = Object.keys(v).filter(function (k) { return v[k] != null && v[k] !== ''; });
+    return keys.length ? '<dl class="kv">' + keys.map(function (k) { return '<dt>' + esc(k) + '</dt><dd>' + any(v[k]) + '</dd>'; }).join('') + '</dl>' : '';
+  }
+  function list(items) {
+    items = arr(items).filter(function (x) { return x != null && x !== ''; });
+    return items.length ? '<ul class="plain">' + items.map(function (x) { return '<li>' + (typeof x === 'object' ? any(x) : esc(x)) + '</li>'; }).join('') + '</ul>' : '';
+  }
+  /** cells: strings are escaped; {html} is trusted markup built here. */
+  function table(head, rows) {
+    if (!rows.length) return '';
+    var cell = function (c) { return c && typeof c === 'object' && 'html' in c ? c.html : esc(c); };
+    return '<table class="tbl compact"><thead><tr>' + head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>'
+      + rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + cell(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
+  }
+  function sec(title, inner, open) {
+    return inner ? '<details class="sec"' + (open ? ' open' : '') + '><summary>' + esc(title) + '</summary><div class="sec-b">' + inner + '</div></details>' : '';
+  }
+  var h3 = function (t, inner) { return inner ? '<h3>' + esc(t) + '</h3>' + inner : ''; };
+  var n = function (x) { return arr(x).length; };
+
+  function objectivesHtml(r) {
+    return arr(r.objectives).map(function (o) {
+      if (!isObj(o)) return '';
+      var tasks = arr(o.tasks), qs = arr(o.knowledgeCheck);
+      var td = tasks.filter(function (t) { return t && t.completedAt; }).length, qc = qs.filter(function (q) { return q && q.correct === true; }).length;
+      var body = (o.objective ? '<p>' + esc(o.objective) + '</p>' : '') + (o.scope ? '<p class="muted">' + esc(o.scope) + '</p>' : '')
+        + h3('Tasks', table(['Task', 'Done'], tasks.map(function (t) { t = t || {}; return [t.task, t.completedAt ? { html: '<span class="good">' + esc(fmtDate(t.completedAt, true)) + '</span>' } : { html: '<span class="muted">Not yet</span>' }]; })))
+        + h3('Knowledge check', table(['Question', 'Answer', 'Correct'], qs.map(function (q) { q = q || {}; return [q.question, q.answered == null ? { html: '<span class="muted">Not answered</span>' } : q.answered, q.correct == null ? '' : { html: q.correct ? '<span class="good">Yes</span>' : '<span class="bad">No</span>' }]; })))
+        + h3('Also evidence', any(o.alsoEvidence));
+      return '<details class="item"><summary><b>' + esc(o.epa) + '</b> ' + esc(o.epaTitle || '') + ' <span class="muted">· tasks ' + td + '/' + tasks.length + ' · quiz ' + qc + '/' + qs.length + '</span></summary>' + body + '</details>';
+    }).join('');
+  }
+  function notesHtml(ev) {
+    return arr(ev && ev.notes).map(function (x) {
+      x = x || {};
+      var acc = isObj(x.accuracy) ? x.accuracy : null, wrong = acc ? arr(acc.wrong) : [];
+      return '<div class="note' + (wrong.length ? ' flagged' : '') + '"><b>' + esc(x.type || 'Note') + '</b> · ' + esc(x.patient || '') + ' · ' + esc(fmtDate(x.time, true)) + ' · ' + esc(x.status || '')
+        + (x.cosignedBy ? ' · cosigned by ' + esc(x.cosignedBy) : '') + (x.startedIn ? ' <span class="muted">(' + esc(x.startedIn) + ')</span>' : '')
+        + (wrong.length ? ' ' + flag(wrong.length + ' not matching the chart', 'red') : acc ? ' ' + flag(acc.checked + ' checked, all match', 'green') : '')
+        + (wrong.length ? '<div class="acc"><b>Does not match the chart</b>' + (acc.checked != null ? ' <span>(' + esc(acc.checked) + ' checked)</span>' : '') + list(wrong) + '</div>' : '')
+        + (x.attendingFeedback ? '<div class="fb"><b>Attending feedback</b>\n' + esc(x.attendingFeedback) + '</div>' : '')
+        + (x.text ? '<details class="item"><summary>Note text</summary><pre>' + esc(x.text) + '</pre></details>' : '') + '</div>';
+    }).join('');
+  }
+  function ordersHtml(ev) {
+    return table(['Time', 'Patient', 'Order', 'Details', 'Status', 'Advisories overridden', 'Signed / declined by', 'Feedback'], arr(ev && ev.orders).map(function (o) {
+      o = o || {};
+      return [fmtDate(o.time, true), o.patient, o.order, o.details, o.status, { html: list(o.advisoriesOverridden) }, o.signedBy || (o.declinedBy ? 'Declined: ' + o.declinedBy : ''),
+        o.attendingFeedback ? { html: '<div class="fb">' + esc(o.attendingFeedback) + '</div>' } : ''];
+    }));
+  }
+  function examHtml(pc) {
+    if (!isObj(pc)) return '';
+    return '<p>' + (pc.passed ? flag('Passed', 'green') + ' ' + esc(fmtDate(pc.passedAt, true)) : flag('Not passed', 'amber')) + (pc.passMark ? ' <span class="muted">· pass mark ' + esc(pc.passMark) + '</span>' : '') + '</p>'
+      + table(['Attempt', 'Score', 'Passed', 'Time ran out'], arr(pc.attempts).map(function (a) { a = a || {}; return [fmtDate(a.at, true), a.score, yn(a.passed), yn(a.timeRanOut)]; }));
+  }
+  function shiftsHtml(r) {
+    return arr(r.shifts).filter(function (s) { return isObj(s) && (s.plays || s.lastReport); }).map(function (s) {
+      var l = s.lastReport;
+      return '<details class="item"><summary><b>' + esc(s.shift) + '</b> <span class="muted">· best ' + esc(s.bestPercent) + '% · ' + esc(s.plays) + ' play' + (s.plays === 1 ? '' : 's') + '</span></summary>'
+        + table(['Played', 'Score', 'Percent', 'Grade', 'Harm', 'Near misses', 'Ended early'], arr(s.history).map(function (h) { h = h || {}; return [fmtDate(h.at, true), h.score != null ? h.score + ' of ' + h.total : '', h.percent != null ? h.percent + '%' : '', h.grade, h.harm, h.nearMisses, yn(h.endedEarly)]; }))
+        + (l ? '<h3>Last report</h3><p>' + esc(fmtDate(l.at, true)) + ' · ' + esc(l.score) + ' · <b>' + esc(l.grade) + '</b>' + (l.endedEarly ? ' · ended early' : '') + '</p>'
+          + h3('Caught', list(l.caught)) + h3('Missed', list(l.missed)) + h3('Not reachable', list(l.notReachable)) + h3('Patients', list(l.patients))
+          + h3('Harm', any(l.harmEvents)) + h3('Near misses', any(l.nearMisses)) + h3('Unsafe orders', any(l.unsafeOrders)) : '')
+        + '</details>';
+    }).join('');
+  }
+  function casesHtml(r) {
+    return arr(r.cases).filter(function (c) { return isObj(c) && (c.plays || c.lastPlay); }).map(function (c) {
+      var l = c.lastPlay;
+      return '<details class="item"><summary><b>' + esc(c.case) + '</b> <span class="muted">· best ' + esc(c.bestStars) + ' of 3 stars · ' + esc(c.plays) + ' play' + (c.plays === 1 ? '' : 's') + '</span></summary>'
+        + table(['Played', 'Stars', 'Outcome', 'Percent', 'Path'], arr(c.history).map(function (h) { h = h || {}; return [fmtDate(h.at, true), h.stars, h.outcome, h.percent != null ? h.percent + '%' : '', arr(h.path).join(' → ')]; }))
+        + (l ? '<h3>Last play</h3><p>' + esc(fmtDate(l.at, true)) + ' · <b>' + esc(l.outcome) + '</b>' + (l.ending ? ' · ' + esc(l.ending) : '') + ' · ' + esc(l.score) + '</p>'
+          + h3('Decisions', list(l.decisions)) + h3('Loose ends tied', list(l.looseEndsTied)) + h3('Loose ends left', list(l.looseEndsLeft)) + h3('Learning issues', any(l.learningIssues)) : '')
+        + '</details>';
+    }).join('');
+  }
+  function missionsHtml(r) {
+    return table(['Mission', 'Patient', 'Level', 'Best stars', 'Plays', 'Missed last play'], arr(r.missions).filter(function (m) { return m && m.plays; }).map(function (m) {
+      return [m.mission, m.patient, m.difficulty, m.bestStars, m.plays, { html: list(arr(m.missedLastPlay).map(function (x) { return x && x.text; })) }];
+    }));
+  }
+  function safetyHtml(sr) {
+    if (!isObj(sr)) return '';
+    var part = function (p) {
+      p = p || {};
+      return h3('Harm events', table(['Time', 'Patient', 'Order', 'What', 'Outcome', 'During'], arr(p.harmEvents).map(function (e) { e = e || {}; return [fmtDate(e.at, true), e.patient, e.order, e.what, e.outcome, [e.during, e.duringShift].filter(Boolean).join(' · ')]; })))
+        + h3('Rescues', table(['Time', 'Rescued', 'Patient', 'Order', 'What'], arr(p.rescues).map(function (e) { e = e || {}; return [fmtDate(e.at, true), fmtDate(e.rescuedAt, true), e.patient, e.order, e.what]; })))
+        + h3('Near misses', table(['Time', 'Patient', 'Order', 'What', 'Stopped by', 'During'], arr(p.nearMisses).map(function (e) { e = e || {}; return [fmtDate(e.at, true), e.patient, e.order, e.what, e.stoppedBy, e.during]; })));
+    };
+    var practice = part(sr.practice);
+    var status = (sr.currentlySuspended ? flag('Currently suspended', 'red') + ' ' : '') + (sr.debriefOwed ? flag('Debrief owed', 'amber') : '');
+    return (status ? '<p>' + status + '</p>' : '') + '<h3>Assessed</h3>' + (part(sr) || '<p class="muted">None.</p>')
+      + (practice ? '<h3>Practice</h3>' + practice : '')
+      + h3('Debriefs completed', table(['Time', 'Wrong answers before finishing'], arr(sr.debriefsCompleted).map(function (d) { d = d || {}; return [fmtDate(d.at, true), d.wrongAnswersBeforeFinishing]; })))
+      + h3('Suspensions', table(['Time', 'After', 'Lifted', 'Remediation attempts'], arr(sr.suspensions).map(function (x) { x = x || {}; return [fmtDate(x.at, true), x.after, fmtDate(x.liftedAt, true), x.remediationAttempts]; })));
+  }
+  function safetyReportsHtml(list_) {
+    return table(['Time', 'Patient', 'Order', 'Kind', 'Reached the right person', 'Factors match', 'Factors', 'Change proposed'], arr(list_).map(function (x) {
+      x = x || {};
+      return [fmtDate(x.at, true), x.patient, x.order, x.kind === 'nearmiss' ? 'Near miss' : x.kind === 'harm' ? 'Harm' : x.kind, yn(x.reachedRight), yn(x.factorMatch), arr(x.factors).join(', '), x.change];
+    }));
+  }
+  function handoffsHtml(list_) {
+    return table(['Shift', 'Time', 'Planted problem found', 'Wrong questions', 'Read-back'], arr(list_).map(function (x) {
+      x = x || {};
+      return [x.shift, fmtDate(x.at, true), x.plantedFound == null ? '' : { html: x.plantedFound ? '<span class="good">Yes</span>' : '<span class="bad">No</span>' }, x.wrongQuestions, x.readBack ? { html: '<div class="pre">' + esc(x.readBack) + '</div>' } : ''];
+    }));
+  }
+  function escalationsHtml(list_) {
+    return table(['Time', 'Patient', 'S', 'B', 'A', 'R', 'Cites a value', 'Has a request'], arr(list_).map(function (x) {
+      x = x || {};
+      return [fmtDate(x.at, true), x.patient, x.s, x.b, x.a, x.r, yn(x.citesValue), yn(x.hasRequest)];
+    }));
+  }
+  function medRecHtml(list_) {
+    return arr(list_).map(function (x) {
+      x = x || {};
+      var missed = arr(x.missed);
+      return '<div class="note' + (missed.length ? ' flagged' : '') + '"><b>' + esc(x.kind === 'admit' ? 'Admission' : x.kind === 'discharge' ? 'Discharge' : x.kind || 'Med rec') + '</b> · ' + esc(x.patient || '') + ' · ' + esc(fmtDate(x.at, true))
+        + table(['Medication', 'Decision', 'Reason'], arr(x.decisions).map(function (d) { d = d || {}; return [d.med, d.choice, d.reason]; }))
+        + (missed.length ? '<div class="acc"><b>Missed</b>' + list(missed) + '</div>' : '') + '</div>';
+    }).join('');
+  }
+  function rxHtml(list_) {
+    return table(['Time', 'Patient', 'Drug', 'Dose', 'Route', 'Frequency', 'Quantity', 'Refills', 'Sig', 'Complete'], arr(list_).map(function (x) {
+      x = x || {};
+      return [fmtDate(x.at, true), x.patient, x.drug, x.dose, x.route, x.freq, x.quantity, x.refills, x.sig, x.complete == null ? '' : { html: x.complete ? '<span class="good">Yes</span>' : '<span class="bad">No</span>' }];
+    }));
+  }
+  function surveyHtml(s) {
+    if (s === 'skipped') return '<p class="muted">Skipped.</p>';
+    if (!isObj(s)) return '';
+    return '<dl class="kv"><dt>Answered</dt><dd>' + esc(fmtDate(s.at, true)) + '</dd><dt>Ready for a real record (1–5)</dt><dd>' + esc(s.readyForEpic == null ? '–' : s.readyForEpic) + '</dd>'
+      + '<dt>Hardest</dt><dd>' + esc(s.hardest || '–') + '</dd><dt>Would change</dt><dd>' + esc(s.change || '–') + '</dd></dl>';
+  }
+  function gamesHtml(r) {
+    return table(['Game', 'Plays', 'Best', 'Perfect rounds'], arr(r.miniGames).filter(function (g) { return g && g.plays; }).map(function (g) { return [g.game, g.plays, g.bestPercent + '%', g.perfectRounds]; }));
+  }
+  function logHtml(r) {
+    return table(['Time', 'Patient', 'Action'], arr(r.activityLog).map(function (a) { a = a || {}; return [fmtDate(a.time, true), a.patient || '', a.action]; }));
+  }
+
+  function detailHtml(r, s) {
+    var ev = isObj(r.evidence) ? r.evidence : {}, g = isObj(r.game) ? r.game : null, cr = isObj(r.contentReviewed) ? r.contentReviewed : null;
+    var head = '<div class="pane"><h2>' + esc(s.name) + '</h2><p>' + esc(s.role) + (s.exportedAt ? ' · exported ' + esc(fmtDate(s.exportedAt, true)) : '')
+      + (s.integrity === 'edited' ? ' ' + flag('Edited after export', 'amber') : '') + '</p>'
+      + (g ? '<p class="muted">' + [g.rank, g.level != null ? 'level ' + g.level : '', g.xp != null ? g.xp + ' XP' : ''].filter(Boolean).map(esc).join(' · ')
+        + (arr(g.badges).length ? ' · badges: ' + esc(arr(g.badges).join(', ')) : '') + '</p>' : '')
+      + (s.appVersion || s.format || cr ? '<p class="muted">' + [s.appVersion ? 'App ' + s.appVersion : '', s.format || '', cr ? 'content reviewed ' + cr.reviewed + ' of ' + cr.total : ''].filter(Boolean).map(esc).join(' · ') + '</p>' : '')
+      + '</div>';
+    var notes = arr(ev.notes), flagged = notes.filter(function (x) { return x && x.accuracy && arr(x.accuracy.wrong).length; }).length;
+    return head
+      + sec('Objectives', objectivesHtml(r), true)
+      + sec('Other EPAs this work shows', arr(r.secondaryEpas).filter(function (x) { return x && arr(x.evidence).length; }).map(function (x) { return '<p><b>' + esc(x.epa) + '</b> ' + esc(x.title || '') + '</p><ul>' + arr(x.evidence).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>'; }).join(''))
+      + sec('Notes (' + notes.length + (flagged ? ', ' + flagged + ' with chart mismatches' : '') + ')', notesHtml(ev))
+      + sec('Orders (' + n(ev.orders) + ')', ordersHtml(ev))
+      + sec('Proficiency check', examHtml(r.proficiencyCheck))
+      + sec('Shifts', shiftsHtml(r))
+      + sec('Cases', casesHtml(r))
+      + sec('Missions', missionsHtml(r))
+      + sec('Safety record', safetyHtml(r.safetyRecord))
+      + sec('Safety reports (' + n(r.safetyReports) + ')', safetyReportsHtml(r.safetyReports))
+      + sec('Handoffs received (' + n(r.handoffsReceived) + ')', handoffsHtml(r.handoffsReceived))
+      + sec('Escalations (' + n(r.escalations) + ')', escalationsHtml(r.escalations))
+      + sec('Medication reconciliation (' + n(r.medRec) + ')', medRecHtml(r.medRec))
+      + sec('Prescriptions (' + n(r.prescriptions) + ')', rxHtml(r.prescriptions))
+      + sec('Mini-games', gamesHtml(r))
+      + sec('Survey', surveyHtml(r.survey))
+      + sec('Activity log (' + n(r.activityLog) + ')', logHtml(r));
+  }
+
+  /** The class table's cell for one column. */
+  function cellHtml(s, colId) {
+    var e, x, f;
+    switch (colId) {
+      case 'name': return '<b>' + esc(s.name) + '</b>' + (s.integrity === 'edited' ? ' ' + flag('Edited after export', 'amber') : '');
+      case 'role': return esc(s.role);
+      case 'date': return esc(fmtDate(s.exportedAt));
+      case 'exam':
+        x = s.exam; if (!x) return '';
+        return (x.passed ? '<span class="good">Passed</span>' : x.attempts ? 'Not passed' : '<span class="muted">Not taken</span>') + (x.best ? ' · ' + esc(x.best) : '')
+          + (x.attempts ? '<span class="sub">' + x.attempts + ' attempt' + (x.attempts === 1 ? '' : 's') + (x.date ? ' · ' + esc(fmtDate(x.date)) : '') + '</span>' : '');
+      case 'shifts': return '<span class="num">' + s.shiftsPassed + '</span>';
+      case 'cases': return '<span class="num">' + s.casesGood + '</span>';
+      case 'harm': f = s.safety; return f ? (f.harm ? '<span class="bad">' + f.harm + '</span>' : '0') : '';
+      case 'rescued': f = s.safety; return f ? String(f.rescued) : '';
+      case 'near': f = s.safety; return f ? String(f.near) : '';
+      case 'reports': f = s.safety; return f && f.reports != null ? String(f.reports) : '';
+      case 'ready': return s.ready == null ? '' : s.ready === 'skipped' ? '<span class="muted">Skipped</span>' : esc(s.ready);
+      default:
+        e = s.epa[colId];
+        return e ? e.tasksDone + '/' + e.tasks + ' · ' + e.quizCorrect + '/' + e.quiz : '';
+    }
+  }
+
+  return { EPAS: EPAS, COLS: COLS, esc: esc, fnv1a: fnv1a, checksum: checksum, whyNotReport: whyNotReport, parseScore: parseScore, summarize: summarize, merge: merge,
+    sortRows: sortRows, csvCell: csvCell, toCsv: toCsv, detailHtml: detailHtml, cellHtml: cellHtml, fmtDate: fmtDate };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = FV;
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { rows: [], sort: 'name', dir: 1, open: null, msgs: [] };
+
+  function render() {
+    var rows = FV.sortRows(state.rows, state.sort, state.dir), have = rows.length;
+    $('count').textContent = have ? have + ' learner' + (have === 1 ? '' : 's') : 'No reports loaded.';
+    $('csvBtn').disabled = !have; $('clearBtn').disabled = !have && !state.msgs.length;
+    $('msgs').innerHTML = state.msgs.map(function (m) { return '<li class="' + (m.info ? 'info' : '') + '">' + FV.esc(m.text) + '</li>'; }).join('');
+    $('wrap').hidden = !have;
+    if (!have) { $('tbl').innerHTML = ''; $('detail').innerHTML = ''; return; }
+    var head = '<thead><tr>' + FV.COLS.map(function (c, i) {
+      var sort = c.id === state.sort ? (state.dir > 0 ? 'ascending' : 'descending') : 'none';
+      return '<th scope="col"' + (i === 0 ? ' class="stick"' : '') + ' aria-sort="' + sort + '"><button type="button" data-sort="' + FV.esc(c.id) + '">' + FV.esc(c.label) + (c.sub ? '<small>' + FV.esc(c.sub) + '</small>' : '') + '</button></th>';
+    }).join('') + '</tr></thead>';
+    var body = '<tbody>' + rows.map(function (x) {
+      var k = x.summary.key;
+      return '<tr tabindex="0" data-key="' + FV.esc(k) + '"' + (k === state.open ? ' class="sel" aria-selected="true"' : '') + '>'
+        + FV.COLS.map(function (c, i) { return (i === 0 ? '<th scope="row" class="stick">' : '<td>') + FV.cellHtml(x.summary, c.id) + (i === 0 ? '</th>' : '</td>'); }).join('') + '</tr>';
+    }).join('') + '</tbody>';
+    $('tbl').innerHTML = head + body;
+    var open = state.rows.filter(function (x) { return x.summary.key === state.open; })[0];
+    $('detail').innerHTML = open ? FV.detailHtml(open.report, open.summary) : '';
+  }
+
+  function readFile(file) {
+    return new Promise(function (resolve) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve({ file: file.name, text: String(fr.result) }); };
+      fr.onerror = function () { resolve({ file: file.name, error: 'could not be read' }); };
+      fr.readAsText(file);
+    });
+  }
+
+  function addFiles(list) {
+    var files = Array.prototype.slice.call(list || []);
+    if (!files.length) return;
+    state.msgs = [];
+    Promise.all(files.map(readFile)).then(function (results) {
+      var added = 0;
+      results.forEach(function (res) {
+        if (res.error) { state.msgs.push({ text: res.file + ': skipped, ' + res.error + '.' }); return; }
+        var obj;
+        try { obj = JSON.parse(res.text.replace(/^﻿/, '')); } catch (e) { state.msgs.push({ text: res.file + ': skipped, not valid JSON.' }); return; }
+        var why = FV.whyNotReport(obj);
+        if (why) { state.msgs.push({ text: res.file + ': skipped, ' + why + '.' }); return; }
+        var entry = { report: obj, summary: FV.summarize(obj), file: res.file };
+        var m = FV.merge(state.rows, entry);
+        state.rows = m.rows; added++;
+        if (m.note) state.msgs.push({ text: m.note, info: true });
+      });
+      render();
+    });
+  }
+
+  $('pickBtn').addEventListener('click', function () { $('pick').click(); });
+  $('pick').addEventListener('change', function (e) { addFiles(e.target.files); e.target.value = ''; });
+  var drop = $('drop');
+  ['dragenter', 'dragover'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (t) { drop.addEventListener(t, function () { drop.classList.remove('over'); }); });
+  // A file dropped anywhere on the page is loaded rather than opened by the browser.
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer) addFiles(e.dataTransfer.files); });
+
+  $('clearBtn').addEventListener('click', function () { state.rows = []; state.open = null; state.msgs = []; render(); });
+  $('csvBtn').addEventListener('click', function () {
+    var rows = FV.sortRows(state.rows, state.sort, state.dir).map(function (x) { return x.summary; });
+    var url = URL.createObjectURL(new Blob(['﻿' + FV.toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = 'sim-ehr-class-' + FV.fmtDate(new Date().toISOString()) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  });
+
+  $('tbl').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-sort]');
+    if (b) {
+      var id = b.getAttribute('data-sort');
+      state.dir = state.sort === id ? -state.dir : 1; state.sort = id;
+      render();
+      var again = $('tbl').querySelector('button[data-sort="' + id + '"]'); if (again) again.focus();
+      return;
+    }
+    var tr = e.target.closest('tbody tr');
+    if (tr) toggle(tr.getAttribute('data-key'));
+  });
+  $('tbl').addEventListener('keydown', function (e) {
+    var tr = e.target.closest && e.target.closest('tbody tr');
+    if (tr && e.target === tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(tr.getAttribute('data-key')); }
+  });
+  function toggle(key) {
+    state.open = state.open === key ? null : key;
+    render();
+    var tr = $('tbl').querySelector('tbody tr[data-key="' + CSS.escape(key) + '"]'); if (tr) tr.focus();
+    if (state.open) $('detail').scrollIntoView({ block: 'start' });
+  }
+  render();
+})();
+</script>
+</body>
+</html>

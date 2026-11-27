@@ -954,3 +954,35 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .cut-ph b { font: 700 24px/1.15 var(--book); } .cut-ph small { font: 700 10px var(--ui); text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border: 1px dashed rgba(255, 255, 255, .7); border-radius: 2px; }
 .cut-ph em { max-width: 52ch; font: italic 13px/1.4 var(--book); opacity: .92; }
 @media (prefers-reduced-motion: reduce) { .wl-act, .cut-stage * { animation: none !important; } .wl-act { display: none; } }
+
+/* ---------- speaking up (js/speakup.js): the night handoff, the safety event report, the SBAR call ---------- */
+.ho { display: grid; gap: 10px; padding: 4px 2px; }
+.ho-lines { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.ho-line { display: grid; gap: 4px; } .ho-line > span { line-height: 1.45; } .ho-line > .btn { justify-self: start; }
+.ho-line.asked > span { color: var(--muted); }
+.ho-reply { display: flex; gap: 6px; align-items: flex-start; background: var(--note); border: 1px solid var(--line-2); padding: 6px 8px; }
+.ho-rb { display: grid; gap: 4px; } .ho-rb textarea { font: inherit; width: 100%; } .ho-rb p { margin: 2px 0 0; }
+.sr-f { display: grid; gap: 4px; margin: 0 0 12px; border: 0; padding: 0; } .sr-f textarea { font: inherit; width: 100%; }
+fieldset.sr-f { display: flex; flex-wrap: wrap; gap: 6px 16px; } fieldset.sr-f legend { width: 100%; margin-bottom: 4px; font-weight: 600; }
+fieldset.sr-f label { display: inline-flex; gap: 6px; align-items: center; }
+
+/* ---------- documentation tools (js/doctools.js) ---------- */
+.np-more { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px; }
+.pick-menu { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.copy-left { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ph-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; border-bottom: 1px solid var(--line-2); padding-bottom: 8px; margin-bottom: 8px; }
+.ph-row textarea, .sr-f input { font: inherit; width: 100%; }
+
+/* ---------- Chart Review filters ---------- */
+.cr-filters { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line-2); font-size: 12px; }
+.cr-filters label { display: inline-flex; gap: 6px; align-items: center; }
+
+/* ---------- Med Rec (js/medrec.js) ---------- */
+.tbl.mr select, .tbl.mr input { font: inherit; width: 100%; min-width: 120px; }
+.rx { border: 1px solid var(--line-2); padding: 8px 10px 10px; margin: 0 0 10px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 10px; }
+.rx legend { font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.rx-f { display: grid; gap: 2px; font-size: 12px; color: var(--muted); } .rx-f input { font: inherit; font-size: 13px; color: var(--ink); width: 100%; }
+@media (max-width: 700px) { .rx { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rx-f[style] { grid-column: 1 / -1 !important; } }
+/* tick boxes and radio buttons in the new forms keep their own size, beside their words */
+.sr-f input[type="radio"], .sr-f input[type="checkbox"], .survey-scale input, .cr-filters input[type="checkbox"] { width: auto; min-width: 0; flex: none; margin: 0; }
+fieldset.sr-f label, .survey-scale label { flex: 0 0 auto; max-width: 100%; }

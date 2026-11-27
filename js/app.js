@@ -334,8 +334,14 @@
       evidence: ev,
       survey: pr.survey && pr.survey.at ? { at: new Date(pr.survey.at).toISOString(), readyForEpic: pr.survey.ready || null, hardest: pr.survey.hardest || '', change: pr.survey.change || '' } : pr.survey && pr.survey.skipped ? 'skipped' : null,
       contentReviewed: E.contentReviewed ? E.contentReviewed() : null,
+      ...(E.speakReport ? E.speakReport(pr) : {}), ...(E.medrecReport ? E.medrecReport(pr) : {}),
+      secondaryEpas: E.secondaryEpas ? E.secondaryEpas(pr) : [],
       activityLog: E.activityLog(pr),
     };
+    // a format the faculty class view (faculty.html) reads, and a checksum so a hand-edited file shows as edited.
+    // The checksum is FNV-1a (32 bit) over JSON.stringify of the report without its checksum key; faculty.html must match.
+    Object.assign(report, { format: 'sim-ehr-report/2', appVersion: `seed ${E.SEED_VERSION}, levels ${E.LEVELS_V}` });
+    report.checksum = E.reportChecksum(report);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
     a.download = `ehr-sim-report-${pr.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.json`;
@@ -362,12 +368,17 @@
     const bar = $('#blankBar'); if (bar) bar.innerHTML = V.blankBar(t.value);
   }
 
-  /** Select the next *** blank in the note so typing replaces it. */
+  /** Select the next blank in the note: a *** so typing replaces it, or a pick-list ({a|b}, js/doctools.js), whose
+      choices then show in the bar above the editor. */
   function nextBlank(t, say, back) {
     if (!t) return;
-    let i = back ? (t.selectionStart > 0 ? t.value.lastIndexOf('***', t.selectionStart - 1) : -1) : t.value.indexOf('***', t.selectionEnd);
-    if (i < 0) i = back ? t.value.lastIndexOf('***') : t.value.indexOf('***');
-    if (i >= 0) { t.focus(); t.setSelectionRange(i, i + 3); const line = t.value.slice(0, i).split('\n').length; t.scrollTop = Math.max(0, (line - 6) * (parseFloat(getComputedStyle(t).lineHeight) || 19)); } else if (say) toast('Every blank is filled. You can sign.');
+    const b = E.nextBlankAt(t.value, back ? t.selectionStart : t.selectionEnd, back);
+    if (b) {
+      ui.pick = b.options ? { i: b.i, len: b.len, options: b.options } : null;
+      t.focus(); t.setSelectionRange(b.i, b.i + b.len);
+      const line = t.value.slice(0, b.i).split('\n').length; t.scrollTop = Math.max(0, (line - 6) * (parseFloat(getComputedStyle(t).lineHeight) || 19));
+      const bar = $('#blankBar'); if (bar) bar.innerHTML = V.blankBar(t.value);
+    } else if (say) toast('Every blank is filled. You can sign.');
   }
 
   /* ---------- actions (data-act) ---------- */
@@ -517,11 +528,15 @@
     noteSign() {
       const p = curPt(), d = p.noteDraft, u = E.db.user, text = d.text.trim();
       if (!text) return toast('The note is empty.');
-      const left = (text.match(/\*\*\*/g) || []).length;
+      const bl = E.blanksIn(text), left = bl.stars;
       if (left) { nextBlank($('#noteText')); return toast(`${left} blank${left > 1 ? 's' : ''} still to fill. Type over each ***, or delete it.`, 'Not signed yet'); }
+      if (bl.picks) { const t = $('#noteText'); if (t) t.setSelectionRange(0, 0); nextBlank(t); return toast(`${bl.picks} choice${bl.picks > 1 ? 's' : ''} still to make.`, 'Not signed yet'); }
+      const copyLeft = E.copyLeft(d);
+      if (copyLeft.length) return toast(`Copied sections not yet reviewed: ${copyLeft.map((s) => s.head).join(', ')}. Change each one, or confirm it is still true.`, 'Not signed yet');
       const student = u.role === 'student';
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
       if (d.source) n.source = d.source;   // started in a mini-game
+      if (d.copied) { n.copiedForward = { from: d.copied.from, fromTs: d.copied.fromTs, confirmed: d.copied.ok.slice() }; track('note.copyforward'); }
       p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id; ui.npTab = 'read';
       E.audit(`Signed note: ${n.type}${n.source ? ` (started in ${n.source})` : ''}`, p.id);
       if (student) E.message({ type: 'Cosign Note', roles: ['physician'], from: u.name, patientId: p.id, act: 'notes', subject: `${n.type} needs cosign — ${p.name}`, body: `${u.name} (Medical Student) signed a ${n.type} that needs your review and cosignature.` });
@@ -656,7 +671,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     /* Everything that earns XP goes, except the proficiency check: resetting progress must not hand back exam
        attempts, so that record is kept whole (with any pass). The safety record goes (owner's decision: a reset is
        a full start over, harm events included). The work samples stay. */
-    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; ['bonus', 'missions', 'active', 'games', 'shifts', 'cases', 'safety', 'quizRetry', 'quizOrder', 'xpRankKept'].forEach((k) => delete pr[k]); pr.levelsV = E.LEVELS_V; if (E.ui) E.ui.lock = null; award = null; ui.modal = null; E.audit('Reset own learning progress'); const g = E.game(pr); status(`Progress reset. You are at Level ${g.level}.`); commit(); },
+    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; ['bonus', 'missions', 'active', 'games', 'shifts', 'cases', 'safety', 'quizRetry', 'quizOrder', 'xpRankKept', 'handoffsReceived', 'safetyReports', 'escalations', 'speakQueue', 'medRec', 'prescriptions'].forEach((k) => delete pr[k]); pr.levelsV = E.LEVELS_V; if (E.ui) E.ui.lock = null; award = null; ui.modal = null; E.audit('Reset own learning progress'); const g = E.game(pr); status(`Progress reset. You are at Level ${g.level}.`); commit(); },
     learnPrint() { window.print(); },
     learnExport() { exportReport(viewedLearner()); },
   };
@@ -684,11 +699,12 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
       const p = curPt(), d = p.noteDraft, was = d.text;
       // expand ".phrase" when followed by whitespace
       const pos = el.selectionStart, m = el.value.slice(0, pos).match(/(^|\s)\.([a-z]+)(\s)$/i);
-      if (m && E.DOT[m[2].toLowerCase()]) {
-        const rep = E.DOT[m[2].toLowerCase()](p), start = pos - m[2].length - 2;
+      const key = m && m[2].toLowerCase(), own = m && !E.DOT[key] ? E.phraseFor(key, p) : null;   // a built-in phrase, or one of the learner's own (js/doctools.js)
+      if (m && (E.DOT[key] || own != null)) {
+        const rep = own != null ? own : E.DOT[key](p), start = pos - m[2].length - 2;
         el.value = el.value.slice(0, start) + rep + m[3] + el.value.slice(pos);
         el.setSelectionRange(start + rep.length + 1, start + rep.length + 1);
-        track('note.dot'); step = true;
+        track(own != null ? 'note.phrase' : 'note.dot'); step = true;
       }
       if (was !== el.value) noteStep(p, was, step === true);
       noteHist(p).caret = el.selectionStart;
@@ -700,8 +716,10 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     draft(el) { const d = curPt().drafts.find((x) => x.id === el.dataset.id); if (d) { d[el.dataset.field] = el.type === 'checkbox' ? el.checked : el.value; E.save(); } },
     noteInsert(el) {
       const t = $('#noteText'), p = curPt(), k = el.value; el.value = '';
-      if (!t || !E.DOT[k]) return;
-      const rep = E.DOT[k](p), s = t.selectionStart;
+      const own = k.startsWith('my:') ? E.phraseFor(k.slice(3), p) : null;
+      if (!t || (!E.DOT[k] && own == null)) return;
+      const rep = own != null ? own : E.DOT[k](p), s = t.selectionStart;
+      if (own != null) track('note.phrase');
       t.value = t.value.slice(0, s) + rep + t.value.slice(t.selectionEnd); t.setSelectionRange(s + rep.length, s + rep.length); t.focus();
       track('note.dot'); I.noteText(t, true);
     },
@@ -720,8 +738,8 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (fn) fn(el.dataset, el, e);
   });
   document.addEventListener('focusin', (e) => { if (e.target.id === 'ptSearch') $$('#toast > :not([data-critical])').forEach((x) => x.remove()); });   // never let a routine balloon sit over the patient search; a critical one stays
-  document.addEventListener('input', (e) => { const k = e.target.dataset && e.target.dataset.input; if (k && I[k]) I[k](e.target); });
-  document.addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.change; if (k && C[k]) C[k](e.target); });
+  document.addEventListener('input', (e) => { const k = e.target.dataset && e.target.dataset.input; if (k && I[k]) I[k](e.target); else if (k && E.inputExt && E.inputExt[k]) E.inputExt[k](e.target); });
+  document.addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.change; if (k && C[k]) C[k](e.target); else if (k && E.changeExt && E.changeExt[k]) E.changeExt[k](e.target); });
   /* Drag the floating conversation by its title bar. The position is kept in ui.chat, so a redraw leaves it put. */
   document.addEventListener('pointerdown', (e) => {
     const bar = e.target.closest && e.target.closest('.im-float .im-bar'); if (!bar || e.target.closest('button') || !ui.chat) return;
@@ -774,6 +792,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     if (step('missions', () => E.missionsTick && E.missionsTick())) { E.save(); pendingRender = true; }
     if (step('shift', () => E.shiftTick && E.shiftTick())) { E.save(); pendingRender = true; }
     if (step('case', () => E.caseTick && E.caseTick())) { E.save(); pendingRender = true; }   // PBL cases (js/cases.js)
+    if (step('speak', () => E.speakTick && E.speakTick())) { E.save(); pendingRender = true; }   // replies to reports and calls (js/speakup.js)
     if (!held) {
       const done = step('results', () => E.processResults()) || [];
       if (done.length) { E.save(); const crit = done.some((x) => x.crit); toast(done.map((x) => `${x.o.name} — ${x.p.name}`).join('; '), crit ? 'Critical result' : 'New result', 'results', crit ? 'critical' : null); pendingRender = true; }
@@ -793,7 +812,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
 
   // Missions and the proficiency check (js/missions.js) add their actions here and borrow a few helpers.
   E.app = { commit, render, toast, status, go, curPt, busy, track, flushSave };
-  Object.assign(A, E.missionActions || {}, E.shiftActions || {}, E.gameActions || {}, E.caseActions || {}, E.worldActions || {});
+  Object.assign(A, E.missionActions || {}, E.shiftActions || {}, E.gameActions || {}, E.caseActions || {}, E.worldActions || {}, E.speakActions || {}, E.medrecActions || {}, E.docActions || {});
 
   // Glyph bitmaps are drawn first; the screen is built from them.
   (E.glyphsReady || Promise.resolve()).then(() => {

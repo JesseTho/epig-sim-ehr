@@ -662,6 +662,12 @@
     const stamped = /^(latest )?(vitals?: )?t [\d.]+ °c, hr \d+|^\d\d\/\d\d(\/\d{4})? \d\d:\d\d$/;   // a vitals line or a signature time from any hour of the day
     return n.text.split('\n').map((l) => { let k = norm(l); if (machine.has(k) || stamped.test(k)) return ''; const h = heads.find((x) => k.startsWith(x)); if (h) k = k.slice(h.length).trim(); return k.replace(/\(if \.\.\. then \.\.\.\)/g, ''); }).filter(Boolean).join('\n');
   }
+  /** A contingency is one sentence that says "if" (or "should", "in case") and names the problem: the two together, not
+      an "if" in one line and the problem in another. */
+  function contingency(txt, groups) {
+    return String(txt).split(/[.;!?\n]+/).some((sen) => /\b(if|should|in case)\b/.test(sen) && groups.every((alts) => alts.some((w) => sen.includes(w))));
+  }
+  E.handoffContingency = contingency;
   function evaluate(a) {
     const sh = shiftDef(a.id), me = E.db.user.name, now = Date.now(), items = [];
     const mine = E.db.audit.filter((x) => same(x.user, me) && x.ts >= a.start), ctx = ctxOf(a, sh);
@@ -670,6 +676,7 @@
     items.push({ phase: 'Pre-rounds', text: 'Read the overnight messages before rounds', done: sh.preRead.every(readBy), why: 'The Inbox is where overnight events are waiting. Reading it first tells you whom to see first.' });
     const pids = sh.rounds.map((q) => q.pid), looked = pids.filter((pid) => mine.some((x) => x.ts <= cut && x.patientId === pid && /^Viewed/.test(x.action))).length;
     items.push({ phase: 'Pre-rounds', text: `Looked at every patient before rounds (${looked} of ${pids.length})`, done: looked === pids.length, why: 'Pre-rounding means opening each chart: the overnight vitals, the morning labs, the new notes.' });
+    if (E.handoffItems) items.push(...E.handoffItems(a, sh, cut));   // receiving the night handoff (js/speakup.js)
     // rounds
     a.qs.forEach((q, i) => { const p = E.pt(q.pid), picked = a.answers[i]; items.push({ phase: 'Rounds', pid: q.pid, text: `${p.name}: ${q.q}`, done: picked === q.answer, why: `${picked == null ? 'Not answered. ' : `You said “${q.options[picked]}”. `}The answer was “${q.options[q.answer]}”. ${q.where}`, reached: !!a.phaseAt.rounds }); });
     // day work. An event that fired for a patient already in intensive care could not be acted on: "not reachable",
@@ -680,6 +687,7 @@
       const done = reached && (x.within && win[i] != null ? win[i] : !!x.test(ctx(x.pid, from, x.ev)));
       items.push({ phase: 'Day work', pid: x.pid, text: x.text, why: typeof x.why === 'function' ? x.why() : x.why, reached, unreachable: gone, safety: !!x.safety, triage: !!x.triage, done });
     });
+    if (E.escalationItems) items.push(...E.escalationItems(a, sh));   // the call to the attending (js/speakup.js)
     // sign-out. The handoff counts from the moment the day's deterioration was paged (it has to say what happened),
     // or from sign-out if the shift never got that far. One signed before that was written too early.
     const det = sh.events.find((e) => e.type === 'det'), so = a.phaseAt.signout, from = (det && a.fired[det.id]) || so, sick = E.pt(sh.sickest);
@@ -690,7 +698,7 @@
     items.push({ phase: 'Sign-out', pid: sick.id, text: `Signed a handoff note on the sickest patient, ${sick.name}`, done: right.length > 0, reached: !!from, early: !!tooEarly, why: `${tooEarly}${other ? `You handed off ${other.name}. ` : ''}${sh.sickWhy} A Handoff (I-PASS) note, signed after the day's events, is what the night team reads first.` });
     // only what the learner wrote counts: the template's own problem list and vitals would otherwise name the problem for them
     const txt = right.map((n) => ownText(n, sick)).join('\n');
-    items.push({ phase: 'Sign-out', pid: sick.id, text: 'The handoff names the problem and says what to do if it happens again', done: right.length > 0 && /\bif\b/.test(txt) && sh.handoffWords.every((alts) => alts.some((w) => txt.includes(w))), reached: !!from, why: 'The part of a handoff most often missing is the contingency: "if this happens, do that". Only your own words count; the template’s problem list and vitals do not.' });
+    items.push({ phase: 'Sign-out', pid: sick.id, text: 'The handoff names the problem and says what to do if it happens again', done: right.length > 0 && contingency(txt, sh.handoffWords), reached: !!from, why: 'The part of a handoff most often missing is the contingency: "if this happens, do that". Only your own words count; the template’s problem list and vitals do not.' });
     items.forEach((x) => { if (x.reached === undefined) x.reached = true; });
 
     const sf = E.safety(), evs = sf.events.filter((e) => e.ts >= a.start), harm = evs.filter((e) => e.kind === 'harm'), near = evs.filter((e) => e.kind !== 'harm');
@@ -831,10 +839,10 @@
     const s = who.safety;
     if (!s || !(s.events.length || s.suspensions.length)) return '';
     // practice (outside a shift, case or mission) is marked so faculty can tell it from assessed work; both count
-    const rows = [...s.events].sort((x, y) => y.ts - x.ts).map((e) => `<tr><td class="nowrap">${E.fmtDT(e.ts)}</td><td>${e.kind === 'harm' ? chip('Harm', 'red') : chip('Near miss', 'amber')}${isPractice(e) ? ' ' + chip('Practice', 'grey') : ''}</td><td>${esc(e.patient)}</td><td><b>${esc(e.order || (e.source === 'case' ? 'A decision in a case' : ''))}</b><div class="muted">${esc(e.title)}</div></td><td>${e.kind === 'harm' ? (e.source === 'case' || e.outcome === 'case' ? 'Handled in the case' : e.outcome === 'rescued' ? 'Stabilised after the learner responded' : e.outcome === 'icu' ? 'Transferred to intensive care' : 'Not yet resolved') : `Stopped by ${esc(e.by || '')} before it reached the patient`}</td></tr>`).join('');
+    const rows = [...s.events].sort((x, y) => y.ts - x.ts).map((e) => `<tr><td class="nowrap">${E.fmtDT(e.ts)}</td><td>${e.kind === 'harm' ? chip('Harm', 'red') : chip('Near miss', 'amber')}${isPractice(e) ? ' ' + chip('Practice', 'grey') : ''}</td><td>${esc(e.patient)}</td><td><b>${esc(e.order || (e.source === 'case' ? 'A decision in a case' : ''))}</b><div class="muted">${esc(e.title)}</div></td><td>${e.kind === 'harm' ? (e.source === 'case' || e.outcome === 'case' ? 'Handled in the case' : e.outcome === 'rescued' ? 'Stabilised after the learner responded' : e.outcome === 'icu' ? 'Transferred to intensive care' : 'Not yet resolved') : `Stopped by ${esc(e.by || '')} before it reached the patient`}</td><td class="noprint">${own && V.reportButton ? V.reportButton(e.id) : (who.safetyReports || []).some((r) => r.evId === e.id) ? chip('Reported', 'green') : ''}</td></tr>`).join('');
     return `<section class="card"><header class="card-h"><h3>${icon('warn', 24)}Safety record</h3><span class="muted">${own ? 'Cleared when progress is reset' : esc(who.name)}</span></header><div class="card-b">
       ${s.suspensions.map((x) => `<p class="notice warn">${icon('warn', 24)}<span><b>Privileges suspended ${E.fmtDT(x.at)}</b> after ${esc(x.after)}. ${x.unlockedAt && x.startedOver ? `Lifted ${E.fmtDT(x.unlockedAt)} by starting over, without remediation.` : x.unlockedAt ? `Lifted ${E.fmtDT(x.unlockedAt)} after ${x.attempts} remediation attempt${x.attempts === 1 ? '' : 's'}.` : 'Not yet lifted.'}</span></p>`).join('')}
-      ${rows ? `<table class="tbl compact"><thead><tr><th>When</th><th>Kind</th><th>Patient</th><th>Order</th><th>Outcome</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+      ${rows ? `<table class="tbl compact"><thead><tr><th>When</th><th>Kind</th><th>Patient</th><th>Order</th><th>Outcome</th><th class="noprint"></th></tr></thead><tbody>${rows}</tbody></table>` : ''}
       <p class="fine">Events marked Practice happened outside a shift, case or mission. Patients are fictional; the record is for teaching.</p></div></section>`;
   };
 
@@ -948,6 +956,7 @@
         if (x.vitals) { const p = E.pt(x.pid); pushVitals(p, x.vitals); p.vitals[p.vitals.length - 1].ts = t0; }
         if (x.msg) { E.message(x.msg); E.db.inbox[0].ts = t0; }
       });
+      if (E.postNightHandoff) E.postNightHandoff(sh, t0 + 60000);   // js/speakup.js: the night intern's sign-out, to be checked
       const a = (pr.active = { type: 'shift', id, start: Date.now(), elapsed: 0, paused: false, over: false, phase: 'pre', phaseAt: { pre: Date.now() }, fired: {}, seen: {}, qs: [], answers: [] });
       a.qs = buildRounds(sh); a.answers = a.qs.map(() => null);
       last = Date.now();

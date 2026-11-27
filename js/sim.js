@@ -304,7 +304,8 @@
     if (/H&P|Discharge/i.test(n.type) && al && !t.toLowerCase().includes(al.agent.split(' ')[0].toLowerCase())) tips.push(`This note type should list allergies; ${al.agent} is missing.`);
     // what does not match the chart comes first: it is the part that could hurt someone
     const list = (xs) => xs.map((x) => '- ' + x).join('\n');
-    const fb = acc.wrong.length ? `Cosigned, but please correct this with an addendum. Your note does not match the chart:\n${list(acc.wrong)}${tips.length ? `\n\nAlso, for next time:\n${list(tips)}` : ''}`
+    const copied = n.copiedForward ? 'You copied this note forward, and some of what you kept is out of date. ' : '';
+    const fb = acc.wrong.length ? `Cosigned, but please correct this with an addendum. ${copied}Your note does not match the chart:\n${list(acc.wrong)}${tips.length ? `\n\nAlso, for next time:\n${list(tips)}` : ''}`
       : tips.length ? `Cosigned. For next time:\n${list(tips)}` : 'Cosigned. Clear and complete: story, data, assessment and plan are all there, and the numbers match the chart. Nice work.';
     Object.assign(n, { status: 'Signed', cosignedBy: p.attending, cosignedTs: Date.now(), feedback: fb, accuracy: { checked: acc.checked, wrong: acc.wrong } });   // feedback is kept in the learner's evidence
     auditAs(p.attending, `Cosigned note: ${n.type} by ${n.author}`, p.id);

@@ -226,12 +226,12 @@
     'Progress Note': 'PROGRESS NOTE\n' + HEAD +
       'SUBJECTIVE:\n***\n\nOBJECTIVE:\nVitals: {{vitals}}\nExam: ***\n\nLabs:\n{{labs}}\n\nCurrent medications:\n{{meds}}\n\nASSESSMENT & PLAN:\n***\n\n{{me}}',
     'H&P': 'HISTORY & PHYSICAL\n' + HEAD +
-      'CHIEF COMPLAINT: ***\n\nHISTORY OF PRESENT ILLNESS:\n***\n\nPAST MEDICAL HISTORY:\n{{problems}}\n\nMEDICATIONS:\n{{meds}}\n\nALLERGIES: {{allergies}}\n\nSOCIAL / FAMILY HISTORY: ***\n\nREVIEW OF SYSTEMS: ***\n\nPHYSICAL EXAM:\nVitals: {{vitals}}\nGeneral: ***\nCardiovascular: ***\nRespiratory: ***\nAbdomen: ***\nNeuro: ***\n\nDATA:\n{{labs}}\n\nASSESSMENT & PLAN:\n***\n\n{{me}}',
+      'CHIEF COMPLAINT: ***\n\nHISTORY OF PRESENT ILLNESS:\n***\n\nPAST MEDICAL HISTORY:\n{{problems}}\n\nMEDICATIONS:\n{{meds}}\n\nALLERGIES: {{allergies}}\n\nSOCIAL / FAMILY HISTORY: ***\n\nREVIEW OF SYSTEMS: ***\n\nPHYSICAL EXAM:\nVitals: {{vitals}}\nGeneral: ***\nCardiovascular: ***\nRespiratory: ***\nAbdomen: ***\nNeuro: ***\n\nDATA:\n{{labs}}\n\nCODE STATUS DISCUSSED: {yes, with the patient|yes, with family|not yet}\n\nASSESSMENT & PLAN:\n***\n\n{{me}}',
     'Consult Note': 'CONSULT NOTE\n' + HEAD +
       'REASON FOR CONSULT: ***\nREQUESTING PROVIDER: ***\n\nHPI:\n***\n\nPERTINENT DATA:\nVitals: {{vitals}}\n{{labs}}\n\nIMPRESSION:\n***\n\nRECOMMENDATIONS:\n1. ***\n\n{{me}}',
     'Nursing Note': 'NURSING NOTE\n' + HEAD +
       'Assessment: ***\nVitals: {{vitals}}\nInterventions: ***\nPatient response: ***\nPlan / handoff: ***\n\n{{me}}',
     'Discharge Summary': 'DISCHARGE SUMMARY\n' + HEAD +
-      'ADMISSION DIAGNOSIS: ***\nDISCHARGE DIAGNOSIS: ***\n\nHOSPITAL COURSE:\n***\n\nDISCHARGE MEDICATIONS:\n{{meds}}\n\nALLERGIES: {{allergies}}\n\nFOLLOW-UP: ***\nCONDITION AT DISCHARGE: ***\n\n{{me}}',
+      'ADMISSION DIAGNOSIS: ***\nDISCHARGE DIAGNOSIS: ***\n\nHOSPITAL COURSE:\n***\n\nDISCHARGE MEDICATIONS:\n{{dischargemeds}}\n\nALLERGIES: {{allergies}}\n\nFOLLOW-UP: ***\nCONDITION AT DISCHARGE: {improved|stable|unchanged}\n\n{{me}}',
   };
 })();

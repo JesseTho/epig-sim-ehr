@@ -495,8 +495,8 @@
     const ev = ((E.progress().safety || {}).events || []).map((e) => e.id + ':' + (e.outcome || ''));
     if (seen.safety) ((E.progress().safety || {}).events || []).forEach((e) => {
       const p = E.pt(e.pid); if (!p) return;
-      if (e.kind !== 'harm') { if (!seen.safety.some((k) => k.startsWith(e.id + ':')) && !seen.near) { seen.near = true; consequence('nearmiss', { p, order: e.order }); } return; }   // the window for a near miss opens once a session; after that the balloon is enough
-      if (!seen.safety.some((k) => k.startsWith(e.id + ':'))) consequence(e.rule, { p, order: e.order });
+      if (e.kind !== 'harm') { if (!seen.safety.some((k) => k.startsWith(e.id + ':')) && !seen.near) { seen.near = true; consequence('nearmiss', { p, order: e.order, ev: e.id }); } return; }   // the window for a near miss opens once a session; after that the balloon is enough
+      if (!seen.safety.some((k) => k.startsWith(e.id + ':'))) consequence(e.rule, { p, order: e.order, ev: e.id });
       else if (e.outcome === 'rescued' && seen.safety.includes(e.id + ':open')) consequence('rescued', { p, order: e.order });
     });
     seen.safety = ev;
@@ -538,7 +538,7 @@
   function consequence(id, o) {
     const def = E.CONSEQUENCES[id]; if (!def || !CFG().consequences || !CFG().cutscenes) return;
     const p = o.p, sub = { name: p.name, mrms: (p.sex === 'M' ? 'Mr. ' : 'Ms. ') + p.name.split(', ')[0], he: p.sex === 'M' ? 'He' : 'She', him: p.sex === 'M' ? 'him' : 'her', order: o.order || 'the order' };
-    queue.push({ kind: def.kind || 'result', cid: id, title: `${def.title} — ${p.name}`, lines: fill(def.lines, sub), go: id === 'icu' ? '' : `#/pt/${p.id}/orders`, hour: (clock() || {}).hour });
+    queue.push({ kind: def.kind || 'result', cid: id, evId: o.ev || null, title: `${def.title} — ${p.name}`, lines: fill(def.lines, sub), go: id === 'icu' ? '' : `#/pt/${p.id}/orders`, hour: (clock() || {}).hour });
   }
   /** The caption lines with the placeholders filled in. A line that starts with one ({order}: "the order", or an order
       name typed in lower case) still starts with a capital. */
@@ -607,7 +607,7 @@
   });
   function sceneFoot(m) {
     const last = m.i >= m.lines.length - 1, result = m.kind === 'result';
-    return `<span id="modalErr" class="err"></span>${last ? '' : '<button class="btn" data-act="sceneSkip">Skip</button>'}${last && m.go ? `<a class="btn" href="${esc(m.go)}" data-act="sceneSkip">Go to the patient</a>` : ''}<button class="btn primary" data-act="sceneNext">${last ? (result ? 'Close' : 'Continue') : 'Next'}</button>`;
+    return `<span id="modalErr" class="err"></span>${last ? '' : '<button class="btn" data-act="sceneSkip">Skip</button>'}${last && m.evId && E.V.reportButton ? E.V.reportButton(m.evId, '') : ''}${last && m.go ? `<a class="btn" href="${esc(m.go)}" data-act="sceneSkip">Go to the patient</a>` : ''}<button class="btn primary" data-act="sceneNext">${last ? (result ? 'Close' : 'Continue') : 'Next'}</button>`;
   }
   /* The next caption line is put into the open window in place. Drawing the whole window again would start its picture
      over: the ambulance would drive in once for every line. */

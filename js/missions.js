@@ -22,6 +22,7 @@
     read: (re) => (c) => c.audit.some((a) => a.ts >= c.from && a.action.startsWith('Read message') && re.test(a.action)),
   };
   const RN = 'Reyes, Tomas RN';
+  const did = (re) => (c) => c.audit.some((a) => a.ts >= c.from && re.test(a.action));
 
   E.MISSIONS = [
     {
@@ -97,6 +98,24 @@
       ],
       traps: [{ tags: ['sulfa'], why: 'She has a sulfonamide allergy (rash).' }],
       debrief: 'The insulin drip stops only after long-acting insulin has had time to work. Stopping it first lets the ketoacidosis come straight back.',
+    },
+    // FACULTY: new mission (2026-11-27), not yet reviewed. Uses Med Rec (js/medrec.js).
+    {
+      id: 'home', pid: 'p4', glyph: 'mar', title: 'Going home', rank: 5.5, level: 'Medium', needs: 'A discharge reconciliation, prescriptions and a discharge summary.',
+      brief: 'Ms. Kahale’s gap has closed, she is eating, and her long-acting insulin has had time to work. She goes home today. Reconcile her medicines for discharge in Med Rec, write her prescriptions and sign a discharge summary.',
+      required: [
+        { text: 'Complete the discharge reconciliation in Med Rec', test: did(/^Completed discharge medication reconciliation/) },
+        { text: 'Prescribe her long-acting insulin', test: did(/^Prescribed: .*(glargine|lantus)/i) },
+        { text: 'Prescribe her mealtime insulin', test: did(/^Prescribed: .*(lispro|humalog)/i) },
+        { text: 'Sign a discharge summary', test: H.note(['discharge summary']) },
+      ],
+      bonus: [
+        { text: 'Prescribe pen needles and glucose test strips', why: 'Insulin she cannot inject, or a glucose she cannot check, is a readmission waiting to happen.', test: (c) => did(/^Prescribed: .*needle/i)(c) && did(/^Prescribed: .*(strip|meter|glucometer|lancet)/i)(c) },
+        { text: 'Every prescription complete, with no pharmacy call', why: 'Dose, frequency, quantity, refills and instructions in plain words: a pharmacy cannot fill what it has to guess.', test: (c) => did(/^Completed discharge medication reconciliation/)(c) && !(E.db.inbox || []).some((m) => m.patientId === 'p4' && /^Prescription question/.test(m.subject) && m.ts >= c.from) && !(E.progress().speakQueue || []).some((x) => /^Prescription question/.test(x.msg.subject)) },
+        { text: 'The summary lists the medicines she goes home on', why: 'The .dischargemeds phrase pulls in the reconciled list, so the summary and the prescriptions agree.', test: H.note(['new:', 'glargine']) },
+      ],
+      traps: [{ tags: ['sulfa'], why: 'She has a sulfonamide allergy (rash).' }],
+      debrief: 'A discharge is a prescription list a patient can follow at home, and a summary that says the same thing. Every gap is a phone call from the pharmacy or a return to the emergency department.',
     },
     {
       id: 'chen', pid: 'p5', glyph: 'vitals', title: 'Watch for a rebleed', rank: 6, level: 'Hardest', needs: 'Six steps, and his condition changes partway through.',

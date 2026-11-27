@@ -10,7 +10,7 @@
      SAVE_VERSION: the shape of what is saved (progress records above all) changed. An older save is brought
      forward one step at a time by E.MIGRATIONS; a newer one is refused, so an old copy of the app never
      half-reads a newer learner's record and then writes over it. */
-  E.SEED_VERSION = 3;
+  E.SEED_VERSION = 4;   // 4 (2026-11-27): progress notes to copy forward, home medications
   E.SAVE_VERSION = 2;
   const LOG_MAX = 400, NOTES_MAX = 60, ORDERS_MAX = 300, TEXT_MAX = 6000, BACKUP_EVERY = 3 * 60e3;
 

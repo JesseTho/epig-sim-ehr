@@ -34,12 +34,14 @@
     {
       id: 'lo2', epa: 'EPA 4', epaTitle: 'Enter and discuss orders and prescriptions',
       objective: 'Enter safe, complete orders and respond appropriately to clinical decision support.',
-      scope: 'Inpatient orders and decision support. Prescriptions and medication reconciliation are not yet covered.',
+      scope: 'Inpatient orders and decision support, medication reconciliation on admission and at discharge, and discharge prescriptions. Outpatient prescribing is not covered.',
       tasks: [
         { event: 'allergy.review', text: 'Review a patient’s allergies in Problems & Allergies before ordering.' },
         { event: 'order.submit', text: 'Search for an order, adjust its details, and sign it (students: pend for cosign).' },
         { event: 'order.set', text: 'Use an order set to place several related orders at once.' },
         { event: 'alert.allergy', text: 'Trigger and respond to an allergy advisory (try a penicillin-class antibiotic for Santos, Maria).' },
+        { event: 'medrec.admit', text: 'Reconcile a patient’s home medicines on admission in Med Rec, with a reason for each one not continued.' },
+        { event: 'rx.write', text: 'Write a complete discharge prescription: dose, how often, quantity, refills and instructions in plain words.' },
         { event: 'alert.other', text: 'Trigger and respond to an interaction or lab-based advisory (try ibuprofen for Whitfield, James).' },
       ],
       quiz: [
@@ -52,11 +54,14 @@
     {
       id: 'lo3', epa: 'EPA 5', epaTitle: 'Document a clinical encounter in the patient record',
       objective: 'Write accurate, timely documentation using templates and data links without copying errors forward.',
-      scope: 'Written notes in the inpatient record. Personal phrases, pick-lists and copy-forward are not yet practised; copied errors are practised in the Note Doctor game.',
+      scope: 'Written notes in the inpatient record, with templates, pick-lists, the learner\'s own phrases and copy-forward with a review of each section. The attending checks the numbers against the chart.',
       tasks: [
         { event: 'note.template', text: 'Start a new note from a template.' },
         { event: 'note.dot', text: 'Type a dot phrase in a note (for example .vitals followed by a space).' },
         { event: 'note.sign', text: 'Complete every *** placeholder and sign the note.' },
+        { event: 'note.picklist', text: 'Make a choice from a pick-list in a template (try the Handoff note, or an H&P).' },
+        { event: 'note.phrase', text: 'Save some text as a phrase of your own, then use it in a note.' },
+        { event: 'note.copyforward', text: 'Copy the last progress note forward, review every section, and sign it.' },
         { event: 'chart.update', text: 'Add an entry to a patient’s problem list or allergy list.' },
       ],
       quiz: [
@@ -68,11 +73,12 @@
     },
     {
       id: 'lo4', epa: 'EPA 8', epaTitle: 'Give or receive a patient handover to transition care responsibility',
-      objective: 'Use the EHR to prepare a structured handoff for a patient.',
-      scope: 'Giving a written I-PASS handoff. Receiving a handoff is in the knowledge check only; the verbal handoff is not covered.',
+      objective: 'Use the EHR to give and receive a structured handoff.',
+      scope: 'Giving a written I-PASS handoff, and receiving one: checking it against the chart and reading back the plan. The verbal handoff is not covered.',
       tasks: [
         { event: 'summary.view', text: 'Review a patient’s Summary to gather the current picture.' },
         { event: 'note.handoff', text: 'Write and sign a Handoff (I-PASS) note for one patient.' },
+        { event: 'handoff.receive', text: 'In a shift, question the line in the night handoff that the chart does not support.' },
       ],
       quiz: [
         { id: 'q4a', q: 'Which item belongs in the “Situation awareness and contingency planning” part of an I-PASS handoff?', options: ['The full past surgical history', '“If hemoglobin is below 8 on the 22:00 CBC, transfuse one unit and call GI”', 'The patient’s insurance status', 'A list of every lab since admission'], answer: 1, why: 'Contingency plans tell the receiving clinician what might happen and what to do about it. That is the part of a handoff most often missing.' },
@@ -84,10 +90,11 @@
     {
       id: 'lo5', epa: 'EPA 10', epaTitle: 'Recognize a patient requiring urgent or emergent care and initiate evaluation and management',
       objective: 'Use vital-sign trends and critical results in the EHR to recognize a deteriorating patient.',
-      scope: 'Recognising deterioration from the record and choosing the first steps. Bedside assessment and spoken escalation are not covered.',
+      scope: 'Recognising deterioration from the record, the first steps, and a written SBAR call to the attending. Bedside assessment and the spoken call are not covered.',
       tasks: [
         { event: 'vitals.trend', text: 'In Flowsheets, select a vital sign to view its trend.' },
         { event: 'critical.read', text: 'Open a critical result message in the Inbox.' },
+        { event: 'escalate.sbar', text: 'Call the attending about a deteriorating patient, from the page in the Inbox.' },
         { event: 'code.review', text: 'Find a patient’s code status in the chart sidebar and confirm the matching order in Orders (see Chen, Robert).' },
       ],
       quiz: [
@@ -100,11 +107,12 @@
     {
       id: 'lo6', epa: 'EPA 13', epaTitle: 'Identify system failures and contribute to a culture of safety and improvement',
       objective: 'Use the EHR in a way that protects patient safety and privacy.',
-      scope: 'Using the record safely and protecting privacy. Reporting safety events is in the knowledge check only; taking part in improvement is not covered.',
+      scope: 'Using the record safely, protecting privacy, and reporting near misses and harm with the factors behind them. Taking part in an improvement project is not covered.',
       tasks: [
         { event: 'alert.removed', text: 'When an advisory identifies a real risk, remove the order rather than overriding it.' },
         { event: 'log.view', text: 'Open the Activity Log and see how every chart access and action is recorded.' },
         { event: 'mar.view', text: 'Open a patient’s MAR and check whether scheduled doses were given, held or are overdue.' },
+        { event: 'safety.report', text: 'Report a near miss or harm event, with what made it easier to happen.' },
         { event: 'allergy.process', text: 'Start to remove an allergy the proper way: give a reason, then read what the record does with your request.' },
       ],
       quiz: [
@@ -141,7 +149,7 @@
 
   E.NOTE_TEMPLATES['Handoff (I-PASS)'] =
     'HANDOFF (I-PASS)\nPatient: {{name}}, {{age}} y.o. {{sex}}   MRN: {{mrn}}\nDate: {{date}}\n\n' +
-    'I - ILLNESS SEVERITY (stable / watcher / unstable): ***\n\n' +
+    'I - ILLNESS SEVERITY: {stable|watcher|unstable}\n\n' +
     'P - PATIENT SUMMARY:\n***\nActive problems:\n{{problems}}\nLatest vitals: {{vitals}}\n\n' +
     'A - ACTION LIST (to do this shift):\n- ***\n\n' +
     'S - SITUATION AWARENESS & CONTINGENCY PLANNING (if ... then ...):\n- ***\n\n' +
@@ -173,12 +181,16 @@
       (The old pr.bonus field is moved to pr.pigs when a save is loaded: js/core.js, E.MIGRATIONS[1].) */
   E.pigs = (pr) => Number(pr.pigs) || 0;
   /* The top rank's XP is what every practice task, every knowledge-check question right first time and gold on every
-     mission add up to (22 x 50 + 18 x 100 + 18 x 50 = 3800), so the demonstrations in E.RANK_NEEDS are what gate the
-     upper ranks. The thresholds below it keep the same proportions. FACULTY: if you add tasks or questions, move the
-     thresholds with them, raise E.LEVELS_V and copy the old thresholds into E.LEVELS_BEFORE, so nobody loses a rank. */
-  E.LEVELS = [[0, 'New Arrival'], [500, 'Observer'], [1100, 'Clerk'], [1950, 'Sub-Intern'], [2950, 'Acting Intern'], [3800, 'Ready for the Wards']];
-  E.LEVELS_V = 2;
-  E.LEVELS_BEFORE = [0, 400, 900, 1600, 2400, 3100];   // version 1, until 2026-11-27 (11 questions)
+     mission add up to (30 x 50 + 18 x 100 + 21 x 50 = 4350), so the demonstrations in E.RANK_NEEDS are what gate the
+     upper ranks. The thresholds below it keep the same proportions. FACULTY: if you add tasks, questions or missions,
+     move the thresholds with them, raise E.LEVELS_V and keep the old thresholds in E.LEVELS_HISTORY, so nobody loses a
+     rank. The test in tests/learning-test.js checks that the top threshold matches the content. */
+  E.LEVELS = [[0, 'New Arrival'], [550, 'Observer'], [1250, 'Clerk'], [2250, 'Sub-Intern'], [3350, 'Acting Intern'], [4350, 'Ready for the Wards']];
+  E.LEVELS_V = 3;
+  E.LEVELS_HISTORY = {
+    1: [0, 400, 900, 1600, 2400, 3100],   // until 2026-11-27: 22 tasks, 11 questions, 6 missions
+    2: [0, 500, 1100, 1950, 2950, 3800],   // 2026-11-27, briefly: 18 questions
+  };
 
   /* ---------- what the records say the learner has shown, read defensively (older saves lack fields) ---------- */
   const vals = (o) => (o && typeof o === 'object' ? Object.values(o).filter((x) => x && typeof x === 'object') : []);
@@ -233,6 +245,7 @@
     { id: 'case', name: 'Good Outcome', glyph: 'summary', how: 'Finish a case with a good ending.' },
     { id: 'allcases', name: 'Case Closed', glyph: 'review', how: 'Finish every case with a good ending.' },
     { id: 'rescue', name: 'Turned It Around', glyph: 'add', how: 'Stabilise a patient harmed by one of your orders, in time.' },
+    { id: 'speak', name: 'Speaking Up', glyph: 'inbox', how: 'Report a near miss or harm event.' },
   ];
   /** Stars earned on missions: the best result on each one. */
   E.missionStars = (pr) => Object.values(pr.missions || {}).reduce((n, r) => n + (r.best || 0), 0);
@@ -244,6 +257,7 @@
     mission: (pr) => vals(pr.missions).some((r) => r.best > 0),
     allstar: (pr) => { const all = E.MISSIONS || []; return all.length > 0 && all.every((m) => ((pr.missions || {})[m.id] || {}).best === 3); },
     responder: (pr) => vals(pr.missions).some((r) => r.responded),
+    speak: (pr) => Array.isArray(pr.safetyReports) && pr.safetyReports.length > 0,
     proficient: E.examPassed, shift: E.shiftPassed, honors: E.shiftHonors, case: E.caseGood, allcases: E.caseAllGood, rescue: E.harmRescued,
   };
   /** Points, rank and badges. The rank is the highest whose XP is reached and whose demonstration is shown (or was
@@ -258,8 +272,8 @@
     // old ones (pr.xpRankKept). It goes when they reset their progress, like any other kept title.
     if (pr.levelsV !== E.LEVELS_V) {
       let old = 0;
-      E.LEVELS_BEFORE.forEach((min, i) => { if (xp >= min) old = i; });
-      pr.xpRankKept = old > byXp ? old : 0; pr.levelsV = E.LEVELS_V;
+      (E.LEVELS_HISTORY[pr.levelsV] || E.LEVELS_HISTORY[1]).forEach((min, i) => { if (xp >= min) old = i; });
+      pr.xpRankKept = Math.max(Number(pr.xpRankKept) || 0, old > byXp ? old : 0); pr.levelsV = E.LEVELS_V;
     }
     const kept = Math.min(Number(pr.xpRankKept) || 0, E.LEVELS.length - 1);
     if (kept > byXp) byXp = kept;
@@ -370,6 +384,9 @@
       (sh.expect || []).forEach((x, i) => add(`shift.${sh.id}.expect.${i + 1}`, 'js/shift.js', g, 'Expected: ' + txt(x.text), [['Why', x.why], ['Counts as safety', x.safety ? 'yes' : '']]));
       add(`shift.${sh.id}.handoff`, 'js/shift.js', g, 'Words the sign-out must mention', [['Any of', (sh.handoffWords || []).map((w) => w.join(', ')).join(' / ')]]);
     });
+    Object.entries(E.HOME_MEDS || {}).forEach(([pid, list]) => list.forEach((h) => add(`homemed.${pid}.${h.id}`, 'js/medrec.js', 'Home medicines', `${pid}: ${h.name} ${h.dose} ${h.freq}`, [['Source', h.source], ['Accepted decisions', h.ok.join(', ')], ['The attending says otherwise', h.why], h.askedBy ? ['Appears once the learner asks', h.askedBy] : null].filter(Boolean))));
+    Object.entries(E.NIGHT_HANDOFFS || {}).forEach(([id, h]) => add(`handoff.${id}`, 'js/speakup.js', 'Night handoffs', `Shift ${id}: the wrong line`, [['Line', h.text], ['Why it is wrong', h.why], ['Night intern replies', h.reply]]));
+    Object.entries(E.SAFETY_REVIEW || {}).forEach(([id, r]) => add(`safetyfix.${id}`, 'js/speakup.js', 'Safety report replies', `After a ${id} event`, [['Factors the review finds', r.factors.join(', ')], ['What the hospital changed', r.fix]]));
     (E.MISSIONS || []).forEach((m) => add('mission.' + m.id, 'js/missions.js', 'Missions', m.title, [['Brief', m.brief]].concat((m.required || []).map((x) => ['Required', x.text]), (m.bonus || []).map((x) => ['Bonus', x.text]), [['Debrief', m.debrief]])));
     (E.CASES || []).forEach((cs) => {
       const g = `Case ${cs.n}: ${cs.title}`;
@@ -384,6 +401,37 @@
     });
     return out;
   };
+  /** FNV-1a, 32 bit, over the UTF-16 code units of JSON.stringify(report) with no checksum key. faculty.html has the same. */
+  E.reportChecksum = (report) => {
+    const copy = Object.assign({}, report); delete copy.checksum;
+    const s = JSON.stringify(copy); let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  };
+
+  /* ---------- secondary EPAs ----------
+     Work the sim already asks for that also shows other Core EPAs. Listed in the report as evidence for faculty; no XP,
+     no badges, nothing new on the learner's screens. FACULTY: edit the mapping here. */
+  E.SECONDARY_EPAS = [
+    { epa: 'EPA 1', title: 'Gather a history and perform a physical examination', evidence: (pr) => {
+      const hp = ((pr.evidence || {}).notes || []).filter((n) => n.type === 'H&P');
+      return hp.length ? [`${hp.length} H&P note${hp.length > 1 ? 's' : ''} signed`] : [];
+    } },
+    { epa: 'EPA 6', title: 'Provide an oral presentation of a clinical encounter', evidence: (pr) => {
+      const items = Object.values(pr.shifts || {}).flatMap((r) => ((r && r.last && r.last.items) || []).filter((x) => x.phase === 'Rounds'));
+      return items.length ? [`${items.filter((x) => x.done).length} of ${items.length} questions on rounds answered from the chart (last play of each shift)`] : [];
+    } },
+    { epa: 'EPA 9', title: 'Collaborate as a member of an interprofessional team', evidence: (pr) => {
+      const out = [], consults = ((pr.evidence || {}).orders || []).filter((o) => /^Consult to/i.test(o.order)).length;
+      if (consults) out.push(`${consults} consult${consults > 1 ? 's' : ''} requested`);
+      const calls = (pr.escalations || []).length; if (calls) out.push(`${calls} call${calls > 1 ? 's' : ''} to the attending`);
+      const asked = (pr.handoffsReceived || []).reduce((n, r) => n + (r.questioned || []).length, 0); if (asked) out.push(`${asked} question${asked > 1 ? 's' : ''} to the night intern about a handoff`);
+      const reports = (pr.safetyReports || []).length; if (reports) out.push(`${reports} safety report${reports > 1 ? 's' : ''} to Patient Safety`);
+      return out;
+    } },
+  ];
+  E.secondaryEpas = (pr) => E.SECONDARY_EPAS.map((x) => { let ev = []; try { ev = x.evidence(pr); } catch (e) { ev = []; } return { epa: x.epa, title: x.title, evidence: ev }; });
+
   /** How much of the content has been reviewed: { reviewed, total }. */
   E.contentReviewed = () => { const items = E.contentItems(), ok = items.filter((x) => E.CONTENT_REVIEWED[x.id]).length; return { reviewed: ok, total: items.length }; };
 })();
