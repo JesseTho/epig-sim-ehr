@@ -394,6 +394,7 @@
       ['What medical problems do you have?', hx.length ? `Let me think. ${hx.join(', ')}. That is what my doctors tell me, anyway.` : 'Nothing much, I have been pretty healthy.'],
       ['Do you have any allergies? What happens?', al.length ? al.map((a) => `${a.agent.replace(/\s*\(.*?\)/, '')}: I get ${a.reaction.toLowerCase()}.`).join(' ') : 'None that I know of.'],
       ['What medicines are you taking?', meds.length ? `They are giving me ${meds.join(', ')} in here. At home I have a list in my wallet; my pharmacy would know better than I do.` : 'Nothing regular.'],
+      ...((E.HOME_MEDS && E.HOME_MEDS[p.id]) || []).filter((h) => h.askedBy === E.OTC_QUESTION && h.answer).slice(0, 1).map((h) => [E.OTC_QUESTION, h.answer]),
       ['Tell me about home. Who do you live with? Do you smoke or drink?', s[1]],
       ['If your heart were to stop, what would you want us to do?', p.codeStatus === 'Full Code' ? 'I would want you to do everything you can.' : 'No. I have decided I do not want CPR or a breathing tube. Keep me comfortable. My family knows.'],
       ['What worries you most right now?', s[2]],

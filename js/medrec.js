@@ -20,6 +20,9 @@
      1. HOME MEDICINES
      ===================================================================================================== */
   const PHARM = 'Pharmacy fill record', PT = 'Patient report';
+  /** Asked in the patient's message thread (js/sim.js E.interview). Over-the-counter medicines are on no pharmacy list. */
+  E.OTC_QUESTION = 'Do you take anything over the counter, or anything you only take now and then?';
+  const OTC = E.OTC_QUESTION;
   const hm = (id, name, dose, route, freq, source, ok, why, more) => Object.assign({ id, name, dose, route, freq, source, ok, why }, more || {});
   E.HOME_MEDS = {
     p1: [   // Akana: heart failure, CKD 3b (Cr 2.1), K 5.1, ACE inhibitor angioedema
@@ -32,20 +35,20 @@
     p2: [   // Santos: sepsis from pneumonia, BP soft, penicillin anaphylaxis
       hm('s1', 'lisinopril tablet', '10 mg', 'PO', 'Daily', PHARM, ['hold'], 'In sepsis, with a blood pressure around 100, blood pressure medicines are held.', { catId: 'lisinopril' }),
       hm('s2', 'albuterol inhaler', '2 puffs', 'Inhaled', 'Q4H PRN', PHARM, ['continue', 'change'], 'A rescue inhaler is continued; a nebulizer is a reasonable change while she is breathless.'),
-      hm('s3', 'ibuprofen tablet (over the counter)', '400 mg', 'PO', 'PRN', PT, ['hold', 'stop'], 'An NSAID in sepsis risks the kidneys. She told you about it; the pharmacy list never would have.', { tags: ['nsaid'] }),
+      hm('s3', 'ibuprofen tablet (over the counter)', '400 mg', 'PO', 'PRN', PT, ['hold', 'stop'], 'An NSAID in sepsis risks the kidneys. She told you about it; the pharmacy list never would have.', { tags: ['nsaid'], askedBy: OTC, answer: 'Ibuprofen, two of the little brown ones, when my back aches. Most days this last week, with the fever.' }),
       hm('s4', 'sertraline tablet', '50 mg', 'PO', 'Daily', PHARM, ['continue'], 'Stopping an antidepressant abruptly causes withdrawal. It is continued.'),
     ],
     p3: [   // Whitfield: day 1 after hip replacement, on warfarin
       hm('w1', 'warfarin tablet', '5 mg', 'PO', 'Daily', PHARM, ['continue', 'change'], 'Warfarin continues after surgery, with the dose set by the INR.', { catId: 'warfarin' }),
       hm('w2', 'amlodipine tablet', '5 mg', 'PO', 'Daily', PHARM, ['continue', 'hold'], 'Continue if his blood pressure allows; hold if it is low after the blood loss.', { catId: 'amlodipine' }),
-      hm('w3', 'naproxen tablet (over the counter)', '220 mg', 'PO', 'BID', PT, ['stop'], 'Naproxen with warfarin, two days after surgery, is a bleeding risk. It stops.', { tags: ['nsaid'] }),
+      hm('w3', 'naproxen tablet (over the counter)', '220 mg', 'PO', 'BID', PT, ['stop'], 'Naproxen with warfarin, two days after surgery, is a bleeding risk. It stops.', { tags: ['nsaid'], askedBy: OTC, answer: 'Aleve, for the hip, morning and night. It was the only thing that let me sleep before the operation.' }),
     ],
     p4: [   // Kahale: DKA, type 1 diabetes; the two sources disagree on her long-acting insulin
       hm('k1', 'insulin glargine', '18 units (pharmacy) — she says 22 units', 'SUBQ', 'Nightly', `${PHARM} and ${PT}`, ['change'], 'The sources disagree. Confirm the dose she really takes, then restart long-acting insulin at that dose before the drip stops.', { catId: 'glargine' }),
       hm('k2', 'insulin lispro', 'about 6 units with meals', 'SUBQ', 'TID with meals', PHARM, ['hold', 'change'], 'Mealtime insulin waits while she is on the drip and not eating; it restarts with meals.'),
     ],
     p5: [   // Chen: bleeding duodenal ulcer, DNR/DNI
-      hm('c1', 'naproxen tablet (over the counter)', '220 mg', 'PO', 'BID', 'Patient’s daughter', ['stop'], 'Naproxen caused his ulcer. It stops, for good, and he needs to be told why.', { tags: ['nsaid'] }),
+      hm('c1', 'naproxen tablet (over the counter)', '220 mg', 'PO', 'BID', 'Patient’s daughter', ['stop'], 'Naproxen caused his ulcer. It stops, for good, and he needs to be told why.', { tags: ['nsaid'], askedBy: OTC, answer: 'My daughter buys me the naproxen for my knees. Two a day, for months now. Is that a problem?' }),
       hm('c2', 'omeprazole capsule', '20 mg', 'PO', 'Daily', PHARM, ['change', 'hold', 'stop'], 'He is on IV pantoprazole now; the tablet is replaced, not doubled.'),
       hm('c3', 'amlodipine tablet', '5 mg', 'PO', 'Daily', PHARM, ['hold'], 'His blood pressure was low after the bleed. It is held until he is stable.', { catId: 'amlodipine' }),
     ],
@@ -55,9 +58,35 @@
       hm('o3', 'prednisone tablet (long-term)', '5 mg', 'PO', 'Daily', PHARM, ['change'], 'She is on 40 mg for the flare. Her usual 5 mg is replaced by the higher dose, not added to it, and must not simply stop.', { catId: 'prednisone' }),
     ],
     p8: [   // Kealoha (chest pain case): one pill on no list, found only by asking
-      hm('e1', 'lisinopril tablet', '20 mg', 'PO', 'Daily', PHARM, ['continue', 'hold'], 'Usually continued in a heart attack if the blood pressure allows.', { catId: 'lisinopril' }),
-      hm('e2', 'metformin tablet', '1,000 mg', 'PO', 'BID', PHARM, ['hold'], 'Held before a likely angiogram with contrast.', { catId: 'metformin' }),
+      hm('e1', 'amlodipine tablet', '10 mg', 'PO', 'Daily', 'Emergency department triage list', ['continue', 'hold'], 'Continued if the blood pressure allows; a beta blocker is the drug a heart attack needs.', { catId: 'amlodipine' }),
+      hm('e4', 'atorvastatin tablet', '40 mg', 'PO', 'Nightly', 'Emergency department triage list', ['continue', 'change'], 'Continued, or raised to 80 mg: a heart attack calls for a high-intensity statin.', { catId: 'atorvastatin' }),
+      hm('e2', 'metformin tablet', '1,000 mg', 'PO', 'BID', 'Emergency department triage list', ['hold'], 'Held before a likely angiogram with contrast.', { catId: 'metformin' }),
       hm('e3', 'sildenafil tablet', '50 mg (took one last night)', 'PO', 'PRN', 'Patient, when asked', ['hold', 'stop'], 'No nitrates for 24 hours after sildenafil. It must be on the list so the advisory can protect him.', { tags: ['pde5'], askedBy: 'Do you take anything else, even pills you only take now and then?' }),
+    ],
+    p9: [   // Nakoa: low glucose on a sulfonylurea, not eating, kidneys worse (case: She is not making sense)
+      hm('n1', 'insulin glargine', '24 units', 'SUBQ', 'Nightly', PHARM, ['change', 'hold'], 'She is barely eating and her kidneys are worse. The full dose of long-acting insulin is too much now.', { catId: 'glargine' }),
+      hm('n2', 'glipizide tablet', '10 mg', 'PO', 'BID', PHARM, ['stop', 'hold'], 'Glipizide with no food and failing kidneys is the cause of the low glucose. It does not continue.'),
+      hm('n3', 'lisinopril tablet', '20 mg', 'PO', 'Daily', PHARM, ['hold'], 'Her creatinine is up and her blood pressure is 104/60. It is held.', { catId: 'lisinopril' }),
+      hm('n4', 'acetaminophen tablet', '650 mg', 'PO', 'PRN', PHARM, ['continue'], 'Safe to continue as needed.', { catId: 'acetaminophen' }),
+    ],
+    p11: [   // Tavares: two days after bowel surgery, a pulmonary embolism, creatinine 2.3 (case: Day two after surgery)
+      hm('t1', 'estradiol tablet (hormone replacement)', '1 mg', 'PO', 'Daily', PT, ['stop', 'hold'], 'Oral estrogen raises the risk of clots. After surgery, and now with a clot, it stops.'),
+      hm('t2', 'amlodipine tablet', '5 mg', 'PO', 'Daily', PHARM, ['continue', 'hold'], 'Continue if her blood pressure allows.', { catId: 'amlodipine' }),
+      hm('t3', 'omeprazole capsule', '20 mg', 'PO', 'Daily', PHARM, ['continue', 'change'], 'Continued, or given as pantoprazole while she cannot take tablets.'),
+    ],
+    p12: [   // Ito: delirium from a full bladder and a new anticholinergic (case: Sundown)
+      hm('i1', 'tamsulosin capsule', '0.4 mg', 'PO', 'Nightly', 'His daughter, who keeps his pills', ['continue'], 'His prostate is the reason he cannot pass water. Stopping tamsulosin in hospital makes retention more likely.'),
+      hm('i2', 'amlodipine tablet', '5 mg', 'PO', 'Daily', PHARM, ['continue', 'hold'], 'Continue if his blood pressure allows; hold while he is septic and dry.', { catId: 'amlodipine' }),
+      hm('i3', 'acetaminophen tablet', '650 mg', 'PO', 'PRN', PHARM, ['continue'], 'Pain is a cause of delirium. Regular acetaminophen helps.', { catId: 'acetaminophen' }),
+    ],
+    p13: [   // Fonoti: iron deficiency anemia, transfusion (case: The second unit)
+      hm('f1', 'amlodipine tablet', '5 mg', 'PO', 'Daily', PHARM, ['continue', 'hold'], 'Continue if his blood pressure allows.', { catId: 'amlodipine' }),
+      hm('f2', 'allopurinol tablet', '300 mg', 'PO', 'Daily', PHARM, ['continue'], 'Nothing in this admission is a reason to stop it.'),
+    ],
+    p14: [   // Alapai: vomiting, low potassium, kidney injury, atrial fibrillation (case: A fast, irregular pulse)
+      hm('l1', 'hydrochlorothiazide tablet', '25 mg', 'PO', 'Daily', PHARM, ['hold', 'stop'], 'A thiazide lowered her potassium and her kidneys are dry. It is held.'),
+      hm('l2', 'alendronate tablet', '70 mg', 'PO', 'Weekly', PHARM, ['continue', 'hold'], 'Continue, or hold while she is vomiting: it has to be taken upright with water.'),
+      hm('l3', 'calcium and vitamin D tablet', '1 tablet', 'PO', 'Daily', PT, ['continue'], 'Safe to continue.'),
     ],
   };
   /* What a discharge from each patient's admission should leave her with (only Kahale is sent home in this build). */

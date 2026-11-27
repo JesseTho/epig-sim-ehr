@@ -66,7 +66,7 @@
     const fly = (name, cls, size, top, dur, offset) => {
       const key = kind + n++, left = dur - ((now + offset) % dur);
       if (popped[key] > now) return '';
-      return `<span class="fly ${cls}" data-act="pigPop" data-key="${key}" data-left="${left.toFixed(1)}" style="top:${top};width:${size}px;height:${size}px;${at(dur, offset)}">${icon(name + '1', size)}${icon(name + '2', size)}</span>`;   // the hand-drawn pig, wing up and wing down
+      return `<span class="fly ${cls}" aria-hidden="true" data-act="pigPop" data-key="${key}" data-left="${left.toFixed(1)}" style="top:${top};width:${size}px;height:${size}px;${at(dur, offset)}">${icon(name + '1', size)}${icon(name + '2', size)}</span>`;   // the hand-drawn pig, wing up and wing down
     };
     // Back to front: clouds, the distant hills, the pigs, the nearest hill.
     const far = '<i class="land"></i>' + (big ? '<i class="hosp"></i>' : '');   // the pink hospital stands on the far hills, behind the pigs
@@ -353,7 +353,7 @@
           ${tool('notePrev', '', 'Previous blank (Shift+F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3L3 8l6 5v-3h4V6H9z" fill="#C98A00" stroke="#7A5200"/></svg>')}${tool('noteNext', '', 'Next blank (F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 3l6 5-6 5v-3H3V6h4z" fill="#C98A00" stroke="#7A5200"/></svg>')}</div>
         ${V.noteTools ? V.noteTools(p, d) : ''}
         <div class="blanks" id="blankBar" aria-live="polite">${V.blankBar(d.text)}</div>
-        <textarea id="noteText" class="note-edit" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
+        <textarea id="noteText" class="note-edit" aria-label="Note text" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
         <div class="np-foot"><button class="btn primary" data-act="noteSign">${icon('check', 16)}${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button><button class="btn" data-act="noteCancel">Cancel note</button><span class="fine">SmartLinks: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> then a space</span></div>`
       : `<div class="np-empty"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button><p>Signed notes are in the Notes activity.</p></div>`;
     // Reading and writing share the pane (owner's request): one tab for the chart's notes, one for the learner's own.
@@ -397,7 +397,7 @@
     E.GROUPS.forEach((g) => { const rows = list.filter((o) => o.group === g); if (rows.length) active += `<tr class="grp"><th colspan="4">${g}</th></tr>` + rows.map(row).join(''); });
     const left = `${pend.length ? card(`Pended — awaiting physician signature (${pend.length})`, `<table class="tbl compact"><tbody>${pend.map((o) => `<tr><td><b>${esc(o.name)}</b><div class="muted">${esc(E.orderDetail(o))}</div>${(o.overrides || []).map((x) => `<div class="fine">Advisory overridden: ${esc(x.title)} — ${esc(x.reason)}</div>`).join('')}</td><td class="muted">${esc(o.by)}<br>${E.fmtDT(o.ts)}</td><td class="nowrap">${E.can('order.sign') ? `<button class="btn primary xs" data-act="orderCosign" data-id="${o.id}">Sign</button> <button class="btn xs" data-act="orderDecline" data-id="${o.id}">Decline</button>` : chip('Pended', 'amber')}</td></tr>`).join('')}</tbody></table>`) : ''}
       ${card(hist ? 'All orders' : 'Active orders', active ? `<table class="tbl compact"><tbody>${active}</tbody></table>` : empty('No orders'), `<button class="btn xs" data-act="toggleHistory">${hist ? 'Show active only' : 'Show order history'}</button>`)}`;
-    const right = locked ? `<div class="notice warn">${icon('warn', 24)}<span>${esc(locked)}</span></div>` : canOrder ? card('New orders', `<input id="orderSearch" class="wide" data-input="orderSearch" placeholder="Search medications, labs, imaging, nursing orders…" value="${esc(E.ui.orderQuery)}" autocomplete="off">
+    const right = locked ? `<div class="notice warn">${icon('warn', 24)}<span>${esc(locked)}</span></div>` : canOrder ? card('New orders', `<input id="orderSearch" class="wide" aria-label="Search orders" data-input="orderSearch" placeholder="Search medications, labs, imaging, nursing orders…" value="${esc(E.ui.orderQuery)}" autocomplete="off">
         <div id="orderRes" class="res-list">${V.orderResults(E.ui.orderQuery)}</div>
         <div class="sets"><span class="muted">Order sets:</span> ${E.ORDER_SETS.map((s) => `<button class="btn xs" data-act="setOpen" data-id="${s.id}">${icon('set', 16)}${esc(s.name)}</button>`).join(' ')}</div>
         <h4>Unsigned orders (${p.drafts.length})</h4>
