@@ -327,11 +327,13 @@
       title: 'SIM+EHR Student Edition — learner report', framework: E.EPA_SOURCE, exportedAt: new Date().toISOString(),
       learner: { name: pr.name, role: E.roleLabel(pr.role) }, game: { xp: g.xp, flyingPigsCaught: E.pigs(pr), bonusXpFromFlyingPigs: Math.min(E.pigs(pr) * E.XP.pig, E.XP.pigMax), level: g.level, rank: g.title, badges: E.BADGES.filter((b) => g.earned.includes(b.id)).map((b) => b.name) }, missions: E.missionReport(pr), shifts: E.shiftReport ? E.shiftReport(pr) : [], cases: E.caseReport ? E.caseReport(pr) : [], safetyRecord: E.safetyReport ? E.safetyReport(pr) : null, proficiencyCheck: E.examReport(pr), miniGames: E.GAMES.map((g) => { const r = (pr.games || {})[g.id] || {}; return { game: g.name, plays: r.plays || 0, bestPercent: r.best || 0, perfectRounds: r.perfect || 0 }; }), summary: { tasksCompleted: s.tasksDone, tasksTotal: s.tasks, quizCorrect: s.quizCorrect, quizAnswered: s.quizAnswered, quizTotal: s.quiz },
       objectives: E.LEARNING.map((lo) => ({
-        epa: lo.epa, epaTitle: lo.epaTitle, objective: lo.objective,
+        epa: lo.epa, epaTitle: lo.epaTitle, objective: lo.objective, scope: lo.scope || null,
         tasks: lo.tasks.map((t) => ({ task: t.text, completedAt: pr.events[t.event] ? new Date(pr.events[t.event]).toISOString() : null })),
         knowledgeCheck: lo.quiz.map((q) => ({ question: q.q, answered: pr.quiz[q.id] != null ? q.options[pr.quiz[q.id]] : null, correct: pr.quiz[q.id] != null ? pr.quiz[q.id] === q.answer : null })),
       })),
       evidence: ev,
+      survey: pr.survey && pr.survey.at ? { at: new Date(pr.survey.at).toISOString(), readyForEpic: pr.survey.ready || null, hardest: pr.survey.hardest || '', change: pr.survey.change || '' } : pr.survey && pr.survey.skipped ? 'skipped' : null,
+      contentReviewed: E.contentReviewed ? E.contentReviewed() : null,
       activityLog: E.activityLog(pr),
     };
     const a = document.createElement('a');
@@ -654,7 +656,7 @@ allergyRemoveOpen(d) { ui.modal = { type: 'allergyRemove', pid: curPt().id, id: 
     /* Everything that earns XP goes, except the proficiency check: resetting progress must not hand back exam
        attempts, so that record is kept whole (with any pass). The safety record goes (owner's decision: a reset is
        a full start over, harm events included). The work samples stay. */
-    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; ['bonus', 'missions', 'active', 'games', 'shifts', 'cases', 'safety', 'quizRetry', 'quizOrder'].forEach((k) => delete pr[k]); if (E.ui) E.ui.lock = null; award = null; ui.modal = null; E.audit('Reset own learning progress'); const g = E.game(pr); status(`Progress reset. You are at Level ${g.level}.`); commit(); },
+    progressDo() { const pr = E.progress(); pr.events = {}; pr.quiz = {}; pr.pigs = 0; ['bonus', 'missions', 'active', 'games', 'shifts', 'cases', 'safety', 'quizRetry', 'quizOrder', 'xpRankKept'].forEach((k) => delete pr[k]); pr.levelsV = E.LEVELS_V; if (E.ui) E.ui.lock = null; award = null; ui.modal = null; E.audit('Reset own learning progress'); const g = E.game(pr); status(`Progress reset. You are at Level ${g.level}.`); commit(); },
     learnPrint() { window.print(); },
     learnExport() { exportReport(viewedLearner()); },
   };

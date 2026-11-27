@@ -216,7 +216,7 @@
      refreshed on every save, so any file that changes an order or note is covered without its own hook. */
   const evOf = (pr) => { const e = isObj(pr.evidence) ? pr.evidence : (pr.evidence = {}); if (!Array.isArray(e.notes)) e.notes = []; if (!Array.isArray(e.orders)) e.orders = []; return e; };
   const orderCopy = (p, o) => ({ id: o.id, pid: p.id, patient: p.name, order: o.name, details: E.orderDetail ? E.orderDetail(o) : '', ts: o.ts, status: o.status, overrides: (o.overrides || []).map((x) => `${x.title} — ${x.reason}`), signedBy: o.signedBy || null, declinedBy: o.declinedBy || null, feedback: o.feedback || null });
-  const noteCopy = (p, n) => { const t = String(n.text || ''); return { id: n.id, pid: p.id, patient: p.name, type: n.type, ts: n.ts, status: n.status, cosignedBy: n.cosignedBy || null, text: t.length > TEXT_MAX ? t.slice(0, TEXT_MAX) + '\n[shortened for storage]' : t, feedback: n.feedback || null, source: n.source || null }; };
+  const noteCopy = (p, n) => { const t = String(n.text || ''); return { id: n.id, pid: p.id, patient: p.name, type: n.type, ts: n.ts, status: n.status, cosignedBy: n.cosignedBy || null, text: t.length > TEXT_MAX ? t.slice(0, TEXT_MAX) + '\n[shortened for storage]' : t, feedback: n.feedback || null, accuracy: n.accuracy || null, source: n.source || null }; };
   E.evidenceSync = () => {
     const db = E.db; if (!db || !isObj(db.progress) || !Array.isArray(db.patients)) return;
     const slots = new Map();
@@ -245,7 +245,7 @@
     try { E.evidenceSync(); } catch (e) { console.error('SIM+EHR: evidence copy failed', e); }
     const ev = isObj(pr.evidence) ? pr.evidence : {}, iso = (t) => new Date(t).toISOString(), byTs = (a, b) => a.ts - b.ts;
     return {
-      notes: (ev.notes || []).slice().sort(byTs).map((n) => ({ patient: n.patient, type: n.type, time: iso(n.ts), status: n.status, cosignedBy: n.cosignedBy || null, text: n.text, attendingFeedback: n.feedback || null, startedIn: n.source || null })),
+      notes: (ev.notes || []).slice().sort(byTs).map((n) => ({ patient: n.patient, type: n.type, time: iso(n.ts), status: n.status, cosignedBy: n.cosignedBy || null, text: n.text, attendingFeedback: n.feedback || null, accuracy: n.accuracy || null, startedIn: n.source || null })),
       orders: (ev.orders || []).slice().sort(byTs).map((o) => ({ patient: o.patient, order: o.order, details: o.details, time: iso(o.ts), status: o.status, advisoriesOverridden: o.overrides || [], signedBy: o.signedBy || null, declinedBy: o.declinedBy || null, attendingFeedback: o.feedback || null })),
     };
   };

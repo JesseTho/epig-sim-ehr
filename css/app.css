@@ -494,6 +494,10 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .result-score { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 84px; height: 84px; flex: none; border-radius: 50%; font: 700 34px/1 var(--book); color: #fff; box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .5), 2px 4px 6px rgba(0, 0, 0, .3); }
 .result-score small { font: 700 11px var(--ui); } .result-score.pass { background: #2E7A20; } .result-score.fail { background: #8A5A00; }
 .exam-review { list-style: none; padding: 0; margin: 0; } .exam-review li { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line-2); }
+.survey { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line-2); display: grid; gap: 10px; }
+.survey label { display: grid; gap: 4px; } .survey textarea { font: inherit; width: 100%; }
+.survey-scale { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; } .survey-scale legend { margin-bottom: 4px; }
+.survey-scale label { display: inline-flex; gap: 4px; align-items: center; } .survey-go { display: flex; gap: 8px; }
 .exam-review li > div { display: flex; flex-direction: column; gap: 2px; } .exam-review small { color: var(--muted); } .exam-review li.bad b + span { color: var(--red); }
 
 /* ---------- the printable certificate (built by js/missions.js only when printing) ---------- */

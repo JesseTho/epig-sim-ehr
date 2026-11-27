@@ -260,15 +260,53 @@
     E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'orders', critical: !!no.length && !nOk, subject: `${nNo ? (nOk ? 'Some orders declined' : 'Orders declined') : 'Orders cosigned'} — ${p.name}`, body });
     out.push(`${p.attending} reviewed your orders — ${p.name}`);
   }
+  /** Does the note match the chart at the moment it is signed? Reads lab values written as "K 5.2" (the .labs dot
+      phrase writes them this way, and so do most people) and blood pressures written as 128/76. A value counts as
+      wrong only when the note never gives the current one, so a trend that ends on today's value ("Cr 1.9, now 2.1")
+      is fine. Also catches "no known allergies" written for a patient who has some.
+      history: true for a note that tells the story from admission (an H&P), where an older value is not an error.
+      Returns { checked, wrong: [text] } for the attending's feedback and the learner's evidence. */
+  E.noteAccuracy = (p, text, history) => {
+    const t = String(text || ''), wrong = [], when = (ts) => E.fmtDT(ts), same = (a, b) => Math.abs(a - b) < 1e-6;
+    let checked = 0;
+    Object.keys(E.LABS).forEach((k) => {
+      const latest = E.latestLab(p, k); if (!latest) return;
+      const re = new RegExp(`(?:^|[^A-Za-z0-9])${k}\\s*(?:[:=]|was|is|of)?\\s*[<>]?(\\d+(?:\\.\\d+)?)`, 'g');
+      const said = [...t.matchAll(re)].map((m) => Number(m[1]));
+      if (!said.length) return;
+      checked++;
+      if (said.some((v) => same(v, Number(E.labVal(k, latest.value))))) return;
+      const older = p.labs.some((l) => k in l.values && l.ts < latest.ts && said.some((v) => same(v, Number(E.labVal(k, l.values[k])))));
+      if (older && history) return;
+      const name = E.LABS[k].name.toLowerCase(), now = E.labVal(k, latest.value);
+      wrong.push(older ? `You wrote ${k} ${said[0]}, which is an older value. The ${name} at ${when(latest.ts)} is ${now}.`
+        : `You wrote ${k} ${said[0]}, but no ${name} in the chart has that value. The latest, at ${when(latest.ts)}, is ${now}.`);
+    });
+    const v = E.lastVitals(p);
+    const bps = [...t.matchAll(/(?:^|\D)(\d{2,3})\/(\d{2,3})(?!\d)/g)].map((m) => [Number(m[1]), Number(m[2])]).filter(([s, d]) => s >= 50 && s <= 260 && d >= 20 && d <= 160 && s > d);
+    if (v && bps.length) {
+      checked++;
+      if (!bps.some(([s, d]) => s === v.sbp && d === v.dbp)) {
+        const older = p.vitals.some((x) => x.ts < v.ts && bps.some(([s, d]) => s === x.sbp && d === x.dbp));
+        if (!(older && history)) wrong.push(`You wrote a blood pressure of ${bps[0][0]}/${bps[0][1]}${older ? ', an older reading' : ''}. The latest, at ${when(v.ts)}, is ${v.sbp}/${v.dbp}.`);
+      }
+    }
+    const al = E.allergiesOf(p);
+    if (/\b(NKDA|NKA|no known (drug )?allergies)\b/i.test(t)) { checked++; if (al.length) wrong.push(`You wrote no known allergies. The chart lists ${al.map((a) => `${a.agent} (${a.reaction.toLowerCase()})`).join(' and ')}.`); }
+    return { checked, wrong };
+  };
   function reviewNote(p, n, out) {
-    const t = n.text, words = t.split(/\s+/).filter(Boolean).length, tips = [];
+    const t = n.text, words = t.split(/\s+/).filter(Boolean).length, tips = [], acc = E.noteAccuracy(p, t, /H&P/.test(n.type));
     if (words < 60) tips.push('It is short. Give me enough of the story and the exam that I could present this patient from your note.');
     if (!/assessment|impression|plan/i.test(t)) tips.push('I could not find an assessment and plan. That is the part I read first.');
     if (!/\d{2,3}\/\d{2,3}/.test(t) && !/vitals?/i.test(t)) tips.push('Include today\'s vital signs (the .vitals dot phrase pulls them in).');
     const al = E.allergiesOf(p)[0];
     if (/H&P|Discharge/i.test(n.type) && al && !t.toLowerCase().includes(al.agent.split(' ')[0].toLowerCase())) tips.push(`This note type should list allergies; ${al.agent} is missing.`);
-    const fb = tips.length ? `Cosigned. For next time:\n${tips.map((x) => '- ' + x).join('\n')}` : 'Cosigned. Clear and complete: story, data, assessment and plan are all there. Nice work.';
-    Object.assign(n, { status: 'Signed', cosignedBy: p.attending, cosignedTs: Date.now(), feedback: fb });   // feedback is kept in the learner's evidence
+    // what does not match the chart comes first: it is the part that could hurt someone
+    const list = (xs) => xs.map((x) => '- ' + x).join('\n');
+    const fb = acc.wrong.length ? `Cosigned, but please correct this with an addendum. Your note does not match the chart:\n${list(acc.wrong)}${tips.length ? `\n\nAlso, for next time:\n${list(tips)}` : ''}`
+      : tips.length ? `Cosigned. For next time:\n${list(tips)}` : 'Cosigned. Clear and complete: story, data, assessment and plan are all there, and the numbers match the chart. Nice work.';
+    Object.assign(n, { status: 'Signed', cosignedBy: p.attending, cosignedTs: Date.now(), feedback: fb, accuracy: { checked: acc.checked, wrong: acc.wrong } });   // feedback is kept in the learner's evidence
     auditAs(p.attending, `Cosigned note: ${n.type} by ${n.author}`, p.id);
     E.message({ type: 'Attending review', from: p.attending, patientId: p.id, act: 'notes', subject: `${n.type} cosigned — ${p.name}`, body: fb });
     out.push(`${p.attending} cosigned your note — ${p.name}`);

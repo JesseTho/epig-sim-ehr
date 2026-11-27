@@ -500,7 +500,13 @@
       const pr = E.progress(), ex = examState(pr), t = ex.attempts[m.n], need = Math.ceil(E.EXAM.pass * t.total), left = E.EXAM.attempts - ex.attempts.length;
       return modal('Proficiency check — results', `
         <div class="result-head"><span class="result-score ${t.passed ? 'pass' : 'fail'}">${t.score}<small>of ${t.total}</small></span><div><b>${t.passed ? 'Passed' : 'Not passed yet'}</b><span>${need} correct needed to pass${t.timeUp ? ' · time ran out' : ''}</span><span>${t.passed ? 'Your certificate is ready to print.' : left > 0 ? `${left} attempt${left > 1 ? 's' : ''} left. Each attempt draws new questions.` : 'No attempts left. A faculty member can reset them from the Learning page.'}</span></div></div>
-        <h4>Your answers</h4><ol class="exam-review">${t.review.map((r) => `<li class="${r.right ? 'done' : 'bad'}">${icon(r.right ? 'check' : 'remove', 16)}<div><b>${esc(r.q)}</b>${r.right ? `<span>${esc(r.answer)}</span>` : `<span>Your answer: ${esc(r.chosen || 'none')}</span><span>Correct: <b>${esc(r.answer)}</b></span><small>Where to find it: ${esc(r.where)}</small>`}</div></li>`).join('')}</ol>`,
+        <h4>Your answers</h4><ol class="exam-review">${t.review.map((r) => `<li class="${r.right ? 'done' : 'bad'}">${icon(r.right ? 'check' : 'remove', 16)}<div><b>${esc(r.q)}</b>${r.right ? `<span>${esc(r.answer)}</span>` : `<span>Your answer: ${esc(r.chosen || 'none')}</span><span>Correct: <b>${esc(r.answer)}</b></span><small>Where to find it: ${esc(r.where)}</small>`}</div></li>`).join('')}</ol>${pr.survey ? '' : `
+        <section class="survey"><h4>Three quick questions</h4>
+          <fieldset class="survey-scale"><legend>How ready do you feel to find things in a real Epic chart?</legend>${[1, 2, 3, 4, 5].map((n) => `<label><input type="radio" name="surveyReady" value="${n}"> ${n}</label>`).join('')}<span class="muted">1 not at all · 5 very</span></fieldset>
+          <label>What was hardest?<textarea id="surveyHard" rows="2" maxlength="500"></textarea></label>
+          <label>What would you change?<textarea id="surveyChange" rows="2" maxlength="500"></textarea></label>
+          <div class="survey-go"><button class="btn" data-act="surveySend">Send answers</button><button class="btn" data-act="surveySkip">Skip</button></div>
+        </section>`}`,
         `${t.passed ? `<button class="btn" data-act="certPrint">${icon('print', 16)}Print certificate</button>` : left > 0 ? '<button class="btn" data-act="examAsk">Try again</button>' : ''}<button class="btn primary" data-act="closeModal">Close</button>`, 'lg');
     },
   });
@@ -590,6 +596,13 @@
       E.audit(`Reset proficiency check attempts for ${pr.name}`);
       E.app.status(`Attempts reset for ${pr.name}.`); E.app.commit();
     },
+    /* The pilot survey, offered under the proficiency check result until it is answered or skipped. */
+    surveySend() {
+      const pr = E.progress(), r = document.querySelector('input[name="surveyReady"]:checked'), val = (id) => { const el = document.getElementById(id); return el ? el.value.trim().slice(0, 500) : ''; };
+      pr.survey = { at: Date.now(), ready: r ? Number(r.value) : null, hardest: val('surveyHard'), change: val('surveyChange') };
+      E.audit('Answered the feedback survey'); E.app.status('Thank you. Your answers are in your learner report.'); E.app.commit();
+    },
+    surveySkip() { const pr = E.progress(); pr.survey = { skipped: Date.now() }; E.app.commit(); },
     certPrint() {
       const pr = E.progress(), ex = examState(pr);
       if (!ex.passed) return;
