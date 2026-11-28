@@ -16,10 +16,10 @@
   /* Which practice tasks belong to which screen, so a tip is about what is in front of the learner. */
   const AREA = {
     summary: ['summary.view'], results: ['results.trend', 'report.view'], flowsheets: ['vitals.trend'], mar: ['mar.view'],
-    notes: ['note.template', 'note.dot', 'note.sign', 'note.handoff'], orders: ['allergy.review', 'order.submit', 'order.set', 'lab.order', 'alert.allergy', 'alert.other', 'alert.removed', 'code.review'],
-    problems: ['chart.update', 'allergy.process'], review: ['report.view'], inbox: ['result.read', 'critical.read'], log: ['log.view'],
+    notes: ['note.template', 'note.dot', 'note.picklist', 'note.sign', 'note.phrase', 'note.copyforward', 'note.handoff'], medrec: ['medrec.admit', 'rx.write'], orders: ['allergy.review', 'order.submit', 'order.set', 'lab.order', 'alert.allergy', 'alert.other', 'alert.removed', 'code.review'],
+    problems: ['chart.update', 'allergy.process'], review: ['report.view'], inbox: ['result.read', 'critical.read', 'escalate.sbar'], log: ['log.view'],
   };
-  const LABEL = { summary: 'the Summary', results: 'Results', flowsheets: 'Flowsheets', mar: 'the MAR', notes: 'Notes', orders: 'Orders', problems: 'Problems & Allergies', review: 'Chart Review', inbox: 'the Inbox', log: 'the Activity Log' };
+  const LABEL = { summary: 'the Summary', results: 'Results', flowsheets: 'Flowsheets', mar: 'the MAR', notes: 'Notes', orders: 'Orders', medrec: 'Med Rec', problems: 'Problems & Allergies', review: 'Chart Review', inbox: 'the Inbox', log: 'the Activity Log' };
 
   let root, back, timedPose = null, mood = null, poseTimer = null, bubbleTimer = null, area = null, signedIn = false, queued = false;
   let tucked = false;      // no clear spot on this screen: waiting in the corner tab

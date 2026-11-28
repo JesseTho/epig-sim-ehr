@@ -99,6 +99,8 @@
         would draw a road in the debrief that a student can never travel. */
     tried: (...ids) => tag((c) => c.orders.some((o) => o.ts >= c.from && ids.includes(o.catId) && o.status !== 'Draft'), ids),
     viewed: (label) => tag((c) => c.audit.some((x) => x.ts >= c.from && x.action === 'Viewed ' + label)),
+    /** Did something the audit trail records in these exact words (for example a finished reconciliation). */
+    did: (action) => tag((c) => c.audit.some((x) => x.ts >= c.from && x.action === action)),
     note: (...words) => tag((c) => c.notes.some((n) => n.ts >= c.from && words.every((w) => [].concat(w).some((alt) => n.text.toLowerCase().includes(alt))))),
     /** Asked the patient this question in the message thread (js/app.js msgAsk stores each one as
         { who: 'you', text }). Matched on the question's text, so it must be one of the case's `interview` questions;
@@ -521,6 +523,7 @@
         { text: 'Opened the H&P before treating him', why: 'The H&P holds his risk factors and the plan the team agreed: repeat the ECG and the troponin.', test: W.viewed('Notes') },
         { text: 'Signed a note about the event', why: 'A change of diagnosis from “rule out” to a heart attack needs a note the next team can find.', test: W.note(['troponin', 'stemi', 'nstemi', 'ecg', 'infarct']) },
         { text: 'Asked the patient about pills he takes now and then', why: 'He took sildenafil last night and it was on no list. Asking him is how you learn it before anyone reaches for nitroglycerin.', test: W.asked(ASK_PRN) },
+        { text: 'Reconciled his home medicines in Med Rec', why: 'Every admission starts with a decision about each home medicine. Done after asking him, the list includes the sildenafil, and the nitrate warning has something to fire on.', test: W.did('Completed admission medication reconciliation') },
       ],
       interview: [
         { q: ASK_PRN, a: 'Just the blood pressure one and the diabetes ones. Oh. And the blue pill, the Viagra, from the urology doctor. I took one last night, about ten. Does that matter?' },

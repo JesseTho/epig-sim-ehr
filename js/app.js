@@ -519,7 +519,7 @@
       const p = curPt(), type = E.db.user.role === 'nurse' ? 'Nursing Note' : 'Progress Note';
       p.noteDraft = { type, text: E.expandTemplate(E.NOTE_TEMPLATES[type], p), pristine: true };
       if (ui.noteHist) delete ui.noteHist[p.id];
-      ui.notePane = true; ui.npTab = 'mine';
+      ui.notePane = true;
       track('note.template'); commit();
       const ta = $('#noteText'); if (ta) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
     },
@@ -537,7 +537,7 @@
       const n = { id: E.uid('n'), ts: Date.now(), type: d.type, author: u.name, role: u.role, status: student ? 'Cosign needed' : 'Signed', text };
       if (d.source) n.source = d.source;   // started in a mini-game
       if (d.copied) { n.copiedForward = { from: d.copied.from, fromTs: d.copied.fromTs, confirmed: d.copied.ok.slice() }; track('note.copyforward'); }
-      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id; ui.npTab = 'read';
+      p.notes.push(n); p.noteDraft = null; ui.noteSel = n.id;
       E.audit(`Signed note: ${n.type}${n.source ? ` (started in ${n.source})` : ''}`, p.id);
       if (student) E.message({ type: 'Cosign Note', roles: ['physician'], from: u.name, patientId: p.id, act: 'notes', subject: `${n.type} needs cosign — ${p.name}`, body: `${u.name} (Medical Student) signed a ${n.type} that needs your review and cosignature.` });
       track('note.sign'); if (d.type.startsWith('Handoff')) track('note.handoff');
@@ -548,7 +548,7 @@
     noteUndo() { noteUndo(false); },
     noteRedo() { noteUndo(true); },
     notePane() { ui.notePane = !E.noteOpen(curPt()); (E.db.prefs || (E.db.prefs = {})).notePane = ui.notePane; E.save(); render(); },   // the learner's own choice outlives the visit
-    notePaneOpen() { ui.notePane = true; ui.npTab = 'mine'; render(); const t = $('#noteText'); if (t) t.focus(); },
+    notePaneOpen() { ui.notePane = true; render(); const t = $('#noteText'); if (t) t.focus(); },
     /* Bold and Italic wrap the selection in plain marks; List starts each selected line with "- ". */
     noteFmt(d) {
       const t = $('#noteText'); if (!t) return;
@@ -557,8 +557,7 @@
       else { const m = d.id === 'b' ? '**' : '_', word = sel || (d.id === 'b' ? 'bold' : 'italic'); t.value = v.slice(0, s) + m + word + m + v.slice(e); t.setSelectionRange(s + m.length, s + m.length + word.length); }
       t.focus(); I.noteText(t, true);
     },
-    noteSel(d) { ui.noteSel = d.id; if (!/\/notes$/.test(location.hash)) { ui.notePane = true; ui.npTab = 'read'; } render(); },
-    npTab(d) { ui.npTab = d.id; render(); if (d.id === 'mine') { const t = $('#noteText'); if (t) t.focus(); } },
+    noteSel(d) { ui.noteSel = d.id; if (!/\/notes$/.test(location.hash)) ui.notePane = true; render(); },
     noteCosign(d) {
       const p = curPt(), n = p.notes.find((x) => x.id === d.id);
       Object.assign(n, { status: 'Signed', cosignedBy: E.db.user.name, cosignedTs: Date.now() });

@@ -101,7 +101,7 @@
     },
     // FACULTY: new mission (2026-11-27), not yet reviewed. Uses Med Rec (js/medrec.js).
     {
-      id: 'home', pid: 'p4', glyph: 'mar', title: 'Going home', rank: 5.5, level: 'Medium', needs: 'A discharge reconciliation, prescriptions and a discharge summary.',
+      id: 'home', pid: 'p4', glyph: 'medrec', title: 'Going home', rank: 5.5, level: 'Medium', needs: 'A discharge reconciliation, prescriptions and a discharge summary.',
       brief: 'Ms. Kahale’s gap has closed, she is eating, and her long-acting insulin has had time to work. She goes home today. Reconcile her medicines for discharge in Med Rec, write her prescriptions and sign a discharge summary.',
       required: [
         { text: 'Complete the discharge reconciliation in Med Rec', test: did(/^Completed discharge medication reconciliation/) },

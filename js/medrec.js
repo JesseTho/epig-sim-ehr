@@ -141,7 +141,7 @@
     if (mode === 'admit') {
       const done = st.admit.done;
       const rows = home.map((h) => { const c = st.admit.choices[h.id] || {}; return `<tr><td><b>${esc(h.name)}</b><div class="muted">${esc(h.dose)} · ${esc(h.route)} · ${esc(h.freq)}</div></td><td>${esc(h.source)}</td>
-        <td>${done ? esc((CHOICES.admit.find((x) => x[0] === c.choice) || [, ''])[1]) : sel('mrChoice', CHOICES.admit, c.choice, `data-mode="admit" data-id="${h.id}" aria-label="Decision for ${esc(h.name)}"`)}</td>
+        <td>${done ? esc((CHOICES.admit.find((x) => x[0] === c.choice) || [, ''])[1]) + (c.choice === 'continue' || c.choice === 'change' ? onMar(p, h) : '') : sel('mrChoice', CHOICES.admit, c.choice, `data-mode="admit" data-id="${h.id}" aria-label="Decision for ${esc(h.name)}"`)}</td>
         <td>${done ? esc(c.why || '') : `<input data-input="mrWhy" data-mode="admit" data-id="${h.id}" value="${esc(c.why || '')}" maxlength="160" aria-label="Reason for ${esc(h.name)}"${c.choice && c.choice !== 'continue' ? '' : ' placeholder="Reason, if not continued"'}>`}</td></tr>`; }).join('');
       return `<div class="pane">${tabs}<div class="toolbar"><b>Home medicines on admission</b><span class="muted">${esc(p.name)}</span><span class="spacer"></span>${done ? `${chip(`Reviewed by ${done.by}`, 'green')}` : `<button class="btn primary xs" data-act="mrSubmit" data-mode="admit">Mark reviewed</button>`}</div>
         <table class="tbl mr"><thead><tr><th>Medicine</th><th>Source</th><th>Decision</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table>
@@ -163,6 +163,21 @@
   /* =====================================================================================================
      4. INPUTS AND ACTIONS
      ===================================================================================================== */
+  /* Med Rec and the MAR point at each other. While the admission reconciliation is not done, the MAR and Orders say
+     so, as Epic does; a continued home medicine links to its line on the MAR; and once discharge decisions are made,
+     each inpatient medicine on the MAR shows what happens to it at discharge. */
+  E.medrecPending = (p) => !!(p && E.homeMeds(p).length && !mr(p).admit.done);
+  const pendingBar = (p) => (E.medrecPending(p) ? `<div class="notice info mr-due">${icon('mar', 24)}<span>Home medicines have not been reconciled for this admission.</span><a class="btn xs" href="#/pt/${p.id}/medrec" data-act="mrMode" data-id="admit">Go to Med Rec</a></div>` : '');
+  ['mar', 'orders'].forEach((a) => { const base = V.act[a]; V.act[a] = (p) => pendingBar(p) + base(p); });
+  V.marTag = (p, o) => {
+    const c = p.medrec && p.medrec.discharge.choices[o.id], t = c && (CHOICES.dischargeInpt.find((x) => x[0] === c.choice) || [])[1];
+    return t ? `<div><a class="chip ${c.choice === 'stop' ? 'grey' : 'blue'}" href="#/pt/${p.id}/medrec" data-act="mrMode" data-id="discharge">Discharge: ${esc(t)}</a></div>` : '';
+  };
+  const onMar = (p, h) => {
+    if (!h.catId) return '';
+    if (E.liveOrders(p).some((o) => o.catId === h.catId)) return ` <a href="#/pt/${p.id}/mar">See on MAR</a>`;
+    return p.drafts.some((o) => o.catId === h.catId) ? ` <a href="#/pt/${p.id}/orders">Unsigned order: sign it in Orders</a>` : '';
+  };
   const cur = () => E.app.curPt();
   E.changeExt = Object.assign(E.changeExt || {}, {
     mrChoice(el) {

@@ -600,6 +600,10 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .badge-pin { position: absolute; right: -16px; bottom: -8px; }
 .lo .card-h { min-height: 48px; background: var(--g-lo) 0 0 / 8px 48px repeat-x, #D8E1BD; } .lo .card-h h3 { font: 700 18px var(--book); gap: 10px; }
 .lo-obj { font: 14px/1.5 var(--book); max-width: 75ch; }
+.page.learn { max-width: 1680px; }
+@media (min-width: 1500px) { .lo-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; } .lo-split .lo-check > .quiz-g { margin-top: 0; } }
+.task-go { margin-left: 4px; font-size: 12px; white-space: nowrap; }
+.mr-due { display: flex; align-items: center; gap: 8px; } .mr-due .btn { margin-left: auto; text-decoration: none; }
 .tasks { list-style: none; padding: 0; margin: 0 0 10px; } .tasks li { display: flex; gap: 8px; padding: 3px 0; align-items: flex-start; max-width: 85ch; }
 .tick { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border: 1px solid #7F9D5E; background: #fff; box-shadow: inset 1px 1px 0 #DCDACA; } .tasks li.done .tick { border: 0; background: none; }
 .quiz { border-top: 1px solid var(--line-2); padding-top: 10px; margin-top: 10px; max-width: 85ch; }

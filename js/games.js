@@ -309,7 +309,7 @@
       if (p.noteDraft) { E.ui.modal = null; E.app.status(`${p.name} already has an unsigned note. Finish or discard it first.`); return E.app.go(`#/pt/${p.id}/notes`); }
       // the checked facts are kept; the clinical judgement (history, exam, plan) is left for the learner to write
       const text = m.s.lines.map((l) => (['subj', 'exam', 'plan'].includes(l.key) ? l.good.replace(/:.*/, ': ***') : l.good)).join('\n') + `\n\n${E.db.user.name}, ${E.roleLabel(E.db.user.role)}`;
-      p.noteDraft = { type: 'Progress Note', text, pristine: false, source: 'Note Doctor' }; E.ui.notePane = true; E.ui.npTab = 'mine';
+      p.noteDraft = { type: 'Progress Note', text, pristine: false, source: 'Note Doctor' }; E.ui.notePane = true;
       E.audit('Opened a corrected note from Note Doctor', p.id);
       E.ui.modal = null; E.save();
       E.app.status('The facts are corrected. Write the history, exam and plan yourself, then sign.');
