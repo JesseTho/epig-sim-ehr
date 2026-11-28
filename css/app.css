@@ -770,11 +770,19 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .np-tools { display: flex; align-items: center; gap: 3px; margin-bottom: 6px; flex-wrap: wrap; }
 .np-t { width: 24px; height: 24px; padding: 3px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 2px; background: none; cursor: pointer; font: 14px Georgia, serif; color: var(--ink); } .np-t:hover { border-color: #919B76; background: var(--olive-0); } .np-t svg { width: 16px; height: 16px; }
 .np-smart { flex: 1; min-width: 110px; height: 24px; margin: 0 4px; }
-.notepane .blanks { padding: 4px 7px; font-size: 11px; line-height: 1.35; } .notepane .note-edit { flex: 1; height: auto; min-height: 160px; resize: none; margin-bottom: 8px; font-size: 14px; line-height: 21px; border: 2px solid #5B8FD6; }
+.np-b .blanks { padding: 4px 7px; font-size: 11px; line-height: 1.35; } .np-b .note-edit { flex: 1; height: auto; min-height: 160px; resize: none; margin-bottom: 8px; font-size: 14px; line-height: 21px; border: 2px solid #5B8FD6; }
 .np-hint { margin: 0 0 8px; } .np-foot { display: flex; justify-content: flex-end; gap: 6px; flex: none; } .np-foot .btn { display: inline-flex; align-items: center; gap: 4px; }
 .np-empty { padding: 26px 14px; text-align: center; } .np-empty p { margin: 12px auto 0; max-width: 34ch; color: var(--muted); line-height: 1.5; }
 .np-list { max-height: 34%; overflow: auto; border: 1px solid #A9B38B; margin-bottom: 10px; } .np-doc pre.doc { max-width: none; } .np-doc .doc-h { flex-wrap: wrap; }
 .list-row.draft { background: #FFF6D6; }
+/* the Notes activity: list | selected note | my note (markup: V.act.notes) */
+.activity:has(.notes-page) { display: flex; flex-direction: column; }
+.notes-page { flex: 1; min-height: 420px; display: grid; gap: 10px; grid-template-columns: 250px minmax(0, 1fr); }
+.notes-page.writing { grid-template-columns: 230px minmax(0, 1fr) minmax(0, 1fr); }
+.notes-page > .pane { min-height: 0; overflow: auto; } .notes-page .nb-read { background: #fff; } .notes-page .nb-edit { padding: 9px; }
+.nb-read pre.doc { max-width: none; } .nb-read .doc-h { flex-wrap: wrap; }
+@media (max-width: 1400px) { .notes-page.writing { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 150px) minmax(0, 1fr); } .notes-page.writing .nb-list { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .notes-page, .notes-page.writing { grid-template-columns: 1fr; grid-template-rows: none; } .notes-page > .pane { max-height: none; } .notes-page .nb-list { max-height: 200px; } .notes-page .nb-edit { min-height: 480px; } }
 /* With the pane open the activity is narrower, so its multi-column layouts step down. */
 .chartwrap:has(.notepane:not(.shut)) .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 1760px) { .chartwrap:has(.notepane:not(.shut)) .split, .chartwrap:has(.notepane:not(.shut)) .g-split { grid-template-columns: 1fr; } }

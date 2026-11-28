@@ -7,7 +7,7 @@
   E.ACTS = [['summary', 'Summary'], ['review', 'Chart Review'], ['results', 'Results'], ['flowsheets', 'Flowsheets'], ['mar', 'MAR'], ['notes', 'Notes'], ['orders', 'Orders'], ['medrec', 'Med Rec'], ['problems', 'Problems & Allergies']];
 
   const icon = E.icon;
-  const ACT_GLYPH = { summary: 'summary', review: 'review', results: 'results', flowsheets: 'flowsheets', mar: 'mar', notes: 'notes', orders: 'orders', medrec: 'mar', problems: 'problems' };
+  const ACT_GLYPH = { summary: 'summary', review: 'review', results: 'results', flowsheets: 'flowsheets', mar: 'mar', notes: 'notes', orders: 'orders', medrec: 'medrec', problems: 'problems' };
   /** Explorer-style task pane group; collapses from its header. */
   const pane = (id, title, body, cls) => { const shut = E.ui.collapsed[id]; return `<section class="tp ${cls || ''}${shut ? ' shut' : ''}"><button class="tp-h" data-act="paneToggle" data-id="${id}" aria-expanded="${!shut}"><span>${esc(title)}</span><i class="chev"></i></button>${shut ? '' : `<div class="tp-b">${body}</div>`}</section>`; };
   const chip = (t, cls) => `<span class="chip ${cls || ''}">${esc(t)}</span>`;
@@ -190,7 +190,7 @@
   };
   V.chart = (p, act) => `<div class="chartwrap">${V.sidebar(p)}<section class="chart">
       <nav class="acts">${E.ACTS.map(([id, label]) => `<a href="#/pt/${p.id}/${id}" class="${id === act ? 'on' : ''}">${icon(ACT_GLYPH[id], 24)}${label}</a>`).join('')}</nav>
-      <div class="activity" id="activity">${V.chartBanner ? V.chartBanner(p) : ''}${V.act[act](p)}</div></section>${V.notePane(p)}${V.chatFloat(p)}</div>`;
+      <div class="activity" id="activity">${V.chartBanner ? V.chartBanner(p) : ''}${V.act[act](p)}</div></section>${act === 'notes' ? '' : V.notePane(p)}${V.chatFloat(p)}</div>`;
 
   /* ================= trend chart ================= */
   V.trend = (pts, lo, hi, dec) => {
@@ -345,16 +345,7 @@
   V.notePane = (p) => {
     const d = p.noteDraft;
     if (!noteOpen(p)) return `<aside class="notepane shut"><button data-act="notePane" title="Open the note pane" aria-label="Open the note pane">${icon('notes', 24)}<span>My Note</span>${d ? '<i class="np-dot" title="Unsigned note"></i>' : ''}</button></aside>`;
-    const tool = (act, id, title, inner) => `<button class="np-t" data-act="${act}"${id ? ` data-id="${id}"` : ''} title="${title}" aria-label="${title}">${inner}</button>`;
-    const mine = d ? `<div class="np-my"><b>Type</b><select data-change="noteType" aria-label="Note type">${opts(Object.keys(E.NOTE_TEMPLATES), d.type)}</select><span>unsigned · autosaved</span></div>
-        <div class="np-tools" role="toolbar" aria-label="Note tools">${tool('noteFmt', 'b', 'Bold', '<b>B</b>')}${tool('noteFmt', 'i', 'Italic', '<i>I</i>')}${tool('noteFmt', 'l', 'Bulleted list', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h2v2H2zM6 4.500h8v1H6zM2 10h2v2H2zM6 10.500h8v1H6z" fill="currentColor"/></svg>')}
-          ${tool('noteUndo', '', 'Undo (Ctrl+Z)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3L2 7l4 4V8.500h3.500a2.500 2.500 0 0 1 0 5H7v1.500h2.500a4 4 0 0 0 0-8H6z" fill="#2F5E9E"/></svg>')}${tool('noteRedo', '', 'Redo (Ctrl+Y)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3l4 4-4 4V8.500H6.500a2.500 2.500 0 0 0 0 5H9v1.500H6.500a4 4 0 0 1 0-8H10z" fill="#2F5E9E"/></svg>')}
-          <select class="np-smart" data-change="noteInsert" aria-label="Insert SmartText"><option value="">Insert SmartText…</option>${Object.keys(E.DOT).map((k) => `<option value="${k}">.${k}</option>`).join('')}${V.phraseOptions ? V.phraseOptions() : ''}</select>
-          ${tool('notePrev', '', 'Previous blank (Shift+F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3L3 8l6 5v-3h4V6H9z" fill="#C98A00" stroke="#7A5200"/></svg>')}${tool('noteNext', '', 'Next blank (F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 3l6 5-6 5v-3H3V6h4z" fill="#C98A00" stroke="#7A5200"/></svg>')}</div>
-        ${V.noteTools ? V.noteTools(p, d) : ''}
-        <div class="blanks" id="blankBar" aria-live="polite">${V.blankBar(d.text)}</div>
-        <textarea id="noteText" class="note-edit" aria-label="Note text" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
-        <div class="np-foot"><button class="btn primary" data-act="noteSign">${icon('check', 16)}${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button><button class="btn" data-act="noteCancel">Cancel note</button><span class="fine">SmartLinks: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> then a space</span></div>`
+    const mine = d ? V.noteEditor(p, d)
       : `<div class="np-empty"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button><p>Signed notes are in the Notes activity.</p></div>`;
     // Reading and writing share the pane (owner's request): one tab for the chart's notes, one for the learner's own.
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), sel = notes.find((n) => n.id === E.ui.noteSel) || firstNote(notes);
@@ -365,13 +356,32 @@
     return `<aside class="notepane" aria-label="Notes"><nav class="np-tabs">${tb('read', `${icon('notes', 16)}Notes (${notes.length})`)}${tb('mine', `My Note${d ? ' <i class="np-dot" title="Unsigned note"></i>' : ''}`)}<span class="spacer"></span><button class="np-hide" data-act="notePane" title="Hide the note pane" aria-label="Hide the note pane"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l6 5-6 5z" fill="currentColor"/></svg></button></nav>
       <div class="np-b${tab === 'mine' && d ? ' edit' : ''}">${tab === 'read' ? read : mine}</div></aside>`;
   };
+  /** The learner's unsigned note: type, tools, blanks line, editor and Sign. Drawn in the side pane and on the Notes page. */
+  V.noteEditor = (p, d) => {
+    const tool = (act, id, title, inner) => `<button class="np-t" data-act="${act}"${id ? ` data-id="${id}"` : ''} title="${title}" aria-label="${title}">${inner}</button>`;
+    return `<div class="np-my"><b>Type</b><select data-change="noteType" aria-label="Note type">${opts(Object.keys(E.NOTE_TEMPLATES), d.type)}</select><span>unsigned · autosaved</span></div>
+        <div class="np-tools" role="toolbar" aria-label="Note tools">${tool('noteFmt', 'b', 'Bold', '<b>B</b>')}${tool('noteFmt', 'i', 'Italic', '<i>I</i>')}${tool('noteFmt', 'l', 'Bulleted list', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h2v2H2zM6 4.500h8v1H6zM2 10h2v2H2zM6 10.500h8v1H6z" fill="currentColor"/></svg>')}
+          ${tool('noteUndo', '', 'Undo (Ctrl+Z)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3L2 7l4 4V8.500h3.500a2.500 2.500 0 0 1 0 5H7v1.500h2.500a4 4 0 0 0 0-8H6z" fill="#2F5E9E"/></svg>')}${tool('noteRedo', '', 'Redo (Ctrl+Y)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3l4 4-4 4V8.500H6.500a2.500 2.500 0 0 0 0 5H9v1.500H6.500a4 4 0 0 1 0-8H10z" fill="#2F5E9E"/></svg>')}
+          <select class="np-smart" data-change="noteInsert" aria-label="Insert SmartText"><option value="">Insert SmartText…</option>${Object.keys(E.DOT).map((k) => `<option value="${k}">.${k}</option>`).join('')}${V.phraseOptions ? V.phraseOptions() : ''}</select>
+          ${tool('notePrev', '', 'Previous blank (Shift+F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3L3 8l6 5v-3h4V6H9z" fill="#C98A00" stroke="#7A5200"/></svg>')}${tool('noteNext', '', 'Next blank (F2)', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 3l6 5-6 5v-3H3V6h4z" fill="#C98A00" stroke="#7A5200"/></svg>')}</div>
+        ${V.noteTools ? V.noteTools(p, d) : ''}
+        <div class="blanks" id="blankBar" aria-live="polite">${V.blankBar(d.text)}</div>
+        <textarea id="noteText" class="note-edit" aria-label="Note text" data-input="noteText" spellcheck="true">${esc(d.text)}</textarea>
+        <div class="np-foot"><button class="btn primary" data-act="noteSign">${icon('check', 16)}${E.db.user.role === 'student' ? 'Sign (requires cosign)' : 'Sign'}</button><button class="btn" data-act="noteCancel">Cancel note</button><span class="fine">SmartLinks: type <code>.vitals</code> <code>.labs</code> <code>.meds</code> then a space</span></div>`;
+  };
+  /* One page for reading and writing: the list, the selected note (the newest until another is chosen) and, while
+     the learner has a note going, the editor beside it, so the H&P can be read while the progress note is written.
+     The side pane is not drawn here (V.chart); it carries the same editor on every other activity. */
   V.act.notes = (p) => {
     const notes = [...p.notes].sort((a, b) => b.ts - a.ts), d = p.noteDraft;
-    // An index only: a note opens in the note pane on the right, where it is read and written.
-    const sel = E.ui.npTab === 'read' && noteOpen(p) ? (notes.find((n) => n.id === E.ui.noteSel) || firstNote(notes)) : null;
-    return `<div class="pane list"><div class="toolbar"><b>Notes (${notes.length})</b><span class="muted">Open one to read it in the note pane on the right.</span><span class="spacer"></span><button class="btn xs" data-act="noteNew"${d ? ' disabled' : ''}>${icon('add', 16)}New note</button></div>
-        ${d ? `<button class="list-row draft" data-act="notePaneOpen"><b>Draft: ${esc(d.type)}</b><span class="muted">Unsigned · autosaved · open in the note pane on the right</span></button>` : ''}
-        ${notes.map((n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`).join('') || empty('No notes yet')}</div>`;
+    const sel = notes.find((n) => n.id === E.ui.noteSel) || notes[0];
+    const row = (n) => `<button class="list-row${sel && sel.id === n.id ? ' sel' : ''}" data-act="noteSel" data-id="${n.id}"${sel && sel.id === n.id ? ' aria-current="true"' : ''}><b>${esc(n.type)}</b><span class="muted">${E.fmtDT(n.ts)} · ${esc(n.author)}</span>${n.status !== 'Signed' ? statusChip(n.status) : ''}</button>`;
+    return `<div class="notes-page${d ? ' writing' : ''}">
+        <section class="pane list nb-list" aria-label="All notes"><div class="toolbar"><b>Notes (${notes.length})</b><span class="spacer"></span><button class="btn xs" data-act="noteNew"${d ? ' disabled' : ''}>${icon('add', 16)}New note</button></div>
+          ${d ? `<button class="list-row draft" data-act="notePaneOpen"><b>My note: ${esc(d.type)}</b><span class="muted">Unsigned · autosaved</span></button>` : ''}
+          ${notes.map(row).join('') || empty('No notes yet')}</section>
+        <section class="pane nb-read np-doc" aria-label="Selected note">${sel ? V.noteDoc(p, sel) : empty('No notes yet')}</section>
+        ${d ? `<section class="pane nb-edit np-b edit" aria-label="My note">${V.noteEditor(p, d)}</section>` : ''}</div>`;
   };
 
   /* ================= Orders ================= */
@@ -675,7 +685,7 @@
       { id: 'layout', group: 'The chart', title: 'Sidebar and activities', body: `<p>The left <b>sidebar</b> of a chart always shows identity, code status, allergies and the latest vitals.</p><p>The activity tabs across the top of the chart: Summary, Chart Review, Results, Flowsheets, MAR, Notes, Orders, and Problems &amp; Allergies.</p>` },
       { id: 'results', group: 'The chart', title: 'Results and the Inbox', body: `<p>Lab and imaging orders result on their own about 15 to 25 seconds after they are signed, and a message arrives in the <b>Inbox</b>. Critical results and pages are marked as urgent.</p><p><b>Message patient</b> in the chart sidebar opens a message thread with the patient in your Inbox. <b>Call patient</b> is for video visits.</p>` },
       { id: 'orders', group: 'Orders and notes', title: 'Placing orders', body: `<p>Search the catalog in <b>Orders</b>, or start from an order set, then sign. Advisories warn about allergies, interactions and doses; you can override one with a reason.</p><p>As a medical student your orders are <b>pended</b>: they take effect only after a physician reviews and cosigns them.</p>` },
-      { id: 'notes', group: 'Orders and notes', title: 'Reading and writing notes', body: `<p>Notes are read and written in the <b>note pane</b> on the right of the chart. Its <b>Notes</b> tab shows the chart's notes; <b>My Note</b> is where you write. The pane stays open while you move around the chart, so you can write from what is in front of you.</p><p>The Notes activity lists every note: click one to open it in the pane.</p><p>Student notes need a cosign once signed.</p>` },
+      { id: 'notes', group: 'Orders and notes', title: 'Reading and writing notes', body: `<p>Notes are read and written in the <b>note pane</b> on the right of the chart. Its <b>Notes</b> tab shows the chart's notes; <b>My Note</b> is where you write. The pane stays open while you move around the chart, so you can write from what is in front of you.</p><p>The <b>Notes</b> activity puts it all on one page: the list of notes, the newest one open to read, and your own note beside it while you write.</p><p>Student notes need a cosign once signed.</p>` },
       { id: 'smart', group: 'Orders and notes', title: 'Dot phrases and blanks', body: `<p>Type a dot phrase followed by a space to pull data into a note: <code>.vitals</code>, <code>.labs</code>, <code>.meds</code>. The <b>Insert SmartText</b> list has them all.</p><p>Templates leave <code>***</code> blanks. Press <b>F2</b> to jump to the next one and <b>Shift+F2</b> for the previous. A note with blanks left cannot be signed.</p><p>Some templates offer choices in braces, such as <code>{stable|watcher|unstable}</code>. <b>F2</b> stops on them too; pick one from the bar above the note.</p><p>To make a phrase of your own, select text in a note and choose <b>Save as phrase</b>. Type its name after a dot, then a space. <b>My phrases</b> lists them.</p><p><b>Copy last progress note</b> starts today's note from the last one. Each copied section must be changed or confirmed before the note can be signed.</p>` },
       { id: 'learning', group: 'Learning and missions', title: 'Learning, XP and badges', body: `<p><b>Learning</b> tracks your practice tasks, knowledge-check answers, XP, level and badges.</p><p>The upper ranks need more than points. Sub-Intern needs one shift passed, Acting Intern one case with a good ending, and Ready for the Wards the proficiency check. The level widget in the banner says what is missing. Points are never taken away, and your best result on each mission, shift and case is the one that counts.</p><p><b>Scoring.</b> Mission: bronze for every objective, silver for ordering nothing unsafe, gold for every bonus. Shift: Honors is 90% or more with nobody harmed, and a pass is 70%. Case: three stars is a good outcome with 85% or more of the points and no harm, two is a good outcome, one a rocky course. Mini-games and the remediation round are not timed.</p><p>A knowledge-check question missed on the first try can be answered again for the Honor Roll badge. The points for the first answer stay as they are.</p><p>The speaker button beside the level widget turns every sound in the sim off or on.</p><p><b>Reset your progress</b> on that page starts you over completely, including your safety record. The proficiency check record is kept.</p>` },
       { id: 'missions', group: 'Learning and missions', title: 'Shifts, missions and cases', body: `<p><b>Missions</b> is laid out easiest first: a card with your next step, the single-patient missions, the mini-games, the shifts (a whole day on the ward against a clock you can pause), the PBL cases and the proficiency check. One shift, mission or case runs at a time.</p><p>In a shift, pages arrive in groups: deal with the most urgent one first. Safety events that happen outside a shift, mission or case are marked as practice and are reported separately.</p>` },

@@ -557,7 +557,7 @@
       else { const m = d.id === 'b' ? '**' : '_', word = sel || (d.id === 'b' ? 'bold' : 'italic'); t.value = v.slice(0, s) + m + word + m + v.slice(e); t.setSelectionRange(s + m.length, s + m.length + word.length); }
       t.focus(); I.noteText(t, true);
     },
-    noteSel(d) { ui.noteSel = d.id; ui.notePane = true; ui.npTab = 'read'; render(); },
+    noteSel(d) { ui.noteSel = d.id; if (!/\/notes$/.test(location.hash)) { ui.notePane = true; ui.npTab = 'read'; } render(); },
     npTab(d) { ui.npTab = d.id; render(); if (d.id === 'mine') { const t = $('#noteText'); if (t) t.focus(); } },
     noteCosign(d) {
       const p = curPt(), n = p.notes.find((x) => x.id === d.id);
