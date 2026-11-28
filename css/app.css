@@ -602,6 +602,7 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .lo-obj { font: 14px/1.5 var(--book); max-width: 75ch; }
 .page.learn { max-width: 1680px; }
 @media (min-width: 1500px) { .lo-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; } .lo-split .lo-check > .quiz-g { margin-top: 0; } }
+#tour-ring { position: fixed; z-index: 40; pointer-events: none; border: 4px solid var(--hot); border-radius: 5px; box-shadow: 0 0 0 3px rgba(255, 255, 255, .85), 0 0 14px 2px rgba(226, 117, 11, .55); }
 .task-go { margin-left: 4px; font-size: 12px; white-space: nowrap; }
 .mr-due { display: flex; align-items: center; gap: 8px; } .mr-due .btn { margin-left: auto; text-decoration: none; }
 .tasks { list-style: none; padding: 0; margin: 0 0 10px; } .tasks li { display: flex; gap: 8px; padding: 3px 0; align-items: flex-start; max-width: 85ch; }

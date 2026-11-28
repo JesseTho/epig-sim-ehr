@@ -123,12 +123,26 @@
     setTimeout(() => pig.classList.remove('flutter'), 1300);
   }
   const place = dodge;
+  /** A balloon that stays until a button in it is pressed: the walkthrough's (js/tour.js). The pig comes out for it
+      even where it would overlap a control, and stands at the bottom of the right edge. */
+  function guide(title, text, buttons) {
+    if (!root || !signedIn) return;
+    forced = true; unprompted = false; clearTimeout(bubbleTimer);
+    const b = $('.pal-bubble');
+    b.innerHTML = `<b>${E.esc(title)}</b><p>${E.esc(text)}</p><div class="pal-acts">${buttons.map(([id, label]) => `<button class="btn xs${id === 'skip' || id === 'close' ? '' : ' primary'}" data-pal="tour" data-id="${id}">${E.esc(label)}</button>`).join('')}</div>`;
+    b.hidden = false;
+    dodge();
+  }
 
   E.pal = {
     name: NAME,
     poses: POSES,
     pose,
     say,
+    guide,
+    hush,
+    /** Out of the corner and back on screen, for something the learner asked for. */
+    wake() { prefs().palOff = false; E.save(); signedIn = true; place(); },
     /** Called after every redraw with the mood the screen calls for (or null), and whether anyone is signed in. */
     sync(nextMood, isSignedIn) {
       if (!root) return;
@@ -138,7 +152,7 @@
     /** Called on navigation. The first time a screen with an open task is visited, the pig offers it. */
     context(a) {
       area = a;
-      if (!root || !signedIn || prefs().palOff || !a) return;
+      if (!root || !signedIn || prefs().palOff || !a || (E.tour && E.tour.active)) return;
       const t = taskFor(a);
       if (t && !seen.has(a)) { seen.add(a); pose('idea', 2600); say(`It looks like you're in ${LABEL[a]}. Want a challenge worth ${E.XP.task} XP? ${t.text}`, { auto: true }); }
     },
@@ -147,6 +161,7 @@
       signedIn = true; place();
       if (prefs().palOff) return;
       pose('wave', 3200);
+      if (E.tour && E.tour.offer()) return;   // a newcomer is offered the walkthrough instead of the hello
       say(`Hi ${E.db.user.name.split(' ')[0]}, I'm ${NAME}. Click me any time for a tip.`, { more: false, ms: 11000, auto: true });
     },
     show() { prefs().palOff = false; E.save(); place(); pose('wave', 2600); say(`I'm back. Click me any time for a tip.`, { more: false, ms: 8000 }); },
@@ -165,7 +180,8 @@
       const b = e.target.closest('[data-pal]');
       if (!b) return;
       const act = b.dataset.pal;
-      if (act === 'toggle') { flutter(); if ($('.pal-bubble').hidden) tip(); else hush(); }
+      if (act === 'tour') E.tour.button(b.dataset.id);
+      else if (act === 'toggle') { flutter(); if (E.tour && E.tour.active) return; if ($('.pal-bubble').hidden) tip(); else hush(); }
       else if (act === 'more') say(fact());
       else if (act === 'close') hush();
       else if (act === 'hide') E.pal.hide();
