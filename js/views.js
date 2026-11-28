@@ -362,9 +362,10 @@
     const pick = notes.length ? `<select data-change="notePick" aria-label="Note to read">${notes.map((n) => `<option value="${n.id}"${n.id === sel.id ? ' selected' : ''}>${esc(n.type)} · ${E.fmtDT(n.ts)} · ${esc(n.author)}${n.status !== 'Signed' ? ' (' + esc(n.status) + ')' : ''}</option>`).join('')}</select>` : '';
     const read = `<section class="np-read" aria-label="Read a note"><div class="np-row"><b>Read</b>${pick || '<span class="muted">No notes yet</span>'}</div>${sel ? `<div class="np-doc">${V.noteDoc(p, sel)}</div>` : ''}</section>`;
     const mine = d ? `<section class="np-b edit" aria-label="My note">${V.noteEditor(p, d)}</section>`
-      : `<div class="np-new"><button class="btn" data-act="noteNew">${icon('add', 16)}Create Note</button></div>`;
+      : '';
+    const start = d ? '' : `<div class="np-new"><button class="btn primary" data-act="noteNew">${icon('add', 24)}Create Note</button></div>`;
     return `<aside class="notepane${d ? ' writing' : ''}" aria-label="Notes"><nav class="np-tabs"><span class="np-title">${icon('notes', 16)}Notes (${notes.length})${d ? ' <i class="np-dot" title="Unsigned note"></i>' : ''}</span><span class="spacer"></span><button class="np-hide" data-act="notePane" title="Hide the note pane" aria-label="Hide the note pane"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l6 5-6 5z" fill="currentColor"/></svg></button></nav>
-      ${read}${mine}</aside>`;
+      ${start}${read}${mine}</aside>`;
   };
   /** The learner's unsigned note: type, tools, blanks line, editor and Sign. Drawn in the side pane and on the Notes page. */
   V.noteEditor = (p, d) => {
