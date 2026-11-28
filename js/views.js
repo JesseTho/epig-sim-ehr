@@ -109,6 +109,18 @@
     E.audio.onChange(() => { const b = document.getElementById('soundBtn'); if (b && b.outerHTML !== undefined) { const f = document.activeElement === b; b.outerHTML = V.soundBtn(); if (f) { const n = document.getElementById('soundBtn'); if (n) n.focus(); } } });
   }
 
+  /* ================= colour theme =================
+     Beside the speaker: a swatch of the current theme (js/theme.js). Each press moves to the next theme. */
+  V.themeBtn = () => {
+    const T = window.EHRTheme; if (!T) return '';
+    const t = T.get(), nx = T.THEMES[(T.THEMES.indexOf(t) + 1) % T.THEMES.length];
+    return `<button id="themeBtn" class="snd-btn theme-btn" data-theme-next aria-label="Colour theme: ${t.name}. Switch to ${nx.name}" title="Theme: ${t.name}. Click for ${nx.name}."><span class="theme-sw" aria-hidden="true">${t.swatch.map((c) => `<i style="background:${c}"></i>`).join('')}</span></button>`;
+  };
+  if (window.EHRTheme) {
+    document.addEventListener('click', (e) => { if (e.target && e.target.closest && e.target.closest('[data-theme-next]')) window.EHRTheme.next(); });
+    window.EHRTheme.onChange(() => { const b = document.getElementById('themeBtn'); if (b) { const f = document.activeElement === b; b.outerHTML = V.themeBtn(); if (f) { const n = document.getElementById('themeBtn'); if (n) n.focus(); } } });
+  }
+
   /* ================= shell ================= */
   E.myInbox = () => E.db.inbox.filter((m) => !m.roles || m.roles.includes(E.db.user.role));
   V.shell = (r, body) => {
@@ -125,7 +137,7 @@
       <span class="spacer">${E.world ? E.world.banner() : ''}</span>
       <span class="bn-tag">${tagSet()}</span>
       <a class="lvl${need ? ' held' : ''}" href="#/learning" title="${esc(lvlTip)}" aria-label="Level ${g.level}, ${esc(g.title)}. ${esc(lvlTip)}">${icon('star', 40)}<span class="lvl-t"><b>Level ${g.level} · ${esc(g.title)}</b><span class="xpbar" role="img" aria-label="${g.xp} experience points${toGo ? ', ' + toGo : ''}"><i style="width:${g.pct}%"></i></span>${need ? `<small class="lvl-need">${esc(need.short || need.todo)}</small>` : ''}</span><span class="lvl-n">${g.xp} XP<br>${icon('medal', 16)}${g.earned.length}/${E.BADGES.length}</span></a>
-      ${V.soundBtn()}
+      ${V.soundBtn()}${V.themeBtn()}
       <span class="bn-user" title="The role you are playing. Log out to switch."><b>${esc(db.user.name)}</b>Playing: ${esc(E.roleLabel(db.user.role))}</span>
       <button class="cap" data-act="help" title="Help" aria-label="Help"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.2 6c0-3.600 5.600-3.600 5.600-.2 0 2.200-2.800 2.100-2.800 4.400" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="12.800" r="1.200" fill="#fff"/></svg></button>
       <button class="cap close" data-act="logout" title="Log off" aria-label="Log off"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>

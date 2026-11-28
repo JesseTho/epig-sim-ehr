@@ -301,35 +301,41 @@
      screen pixel. To add one: add a line here, then use it with image-rendering: pixelated. */
   const root = document.documentElement.style;
   const set = (name, url) => root.setProperty(name, `url("${url}")`);
-  const v = (name, stops, h) => set(name, ramp(stops, h));          // vertical ramp, 8px wide
-  const hz = (name, stops, w) => set(name, ramp(stops, w, true));   // horizontal ramp, 8px tall
-  v('--g-banner', ['#5596DC', '#8DBDEC', '#D6E9F9'], 72);
-  v('--g-sky', ['#4F92DA', '#8DBDEC', '#E3F1FC'], 640);
-  v('--g-rank', ['#84B8EA', '#E0EFFB'], 150);
-  v('--g-bar', ['#647A3A', '#506428', '#36441A'], 28);
-  v('--g-band', ['#667B38', '#3A4A1B'], 64);
-  v('--g-pane', ['#E6EED2', '#C9D8AC'], 640);
-  v('--g-tool', ['#FDFCF7', '#E4E1CD'], 64);
-  v('--g-card', ['#F8FAEF', '#D8E1BD'], 32);
-  v('--g-lo', ['#F8FAEF', '#D8E1BD'], 48);
-  v('--g-btn', ['#FFFFFF', '#F2F1E8', '#D6D4C2'], 23);
-  v('--g-down', ['#D2D0BE', '#F2F1E8'], 23);
-  v('--g-btn-30', ['#FFFFFF', '#F2F1E8', '#D6D4C2'], 30);
-  v('--g-btn-40', ['#FFFFFF', '#F2F1E8', '#D6D4C2'], 40);
-  v('--g-sticker-30', ['#FFF3A8', '#E6A61C'], 30);
-  v('--g-tab', ['#FFFFFF', '#ECEADB'], 26);
-  v('--g-th', ['#FDFCF8', '#E9E7D7'], 26);
-  v('--g-tile', ['#A4D0F4', '#E8F4FD'], 64);
-  v('--g-hot', ['#FFF6DA', '#FFD98A'], 64);
-  v('--g-lvl', ['#FFFFFF', '#EBEADD'], 56);
-  v('--g-cap', ['#C6D3A3', '#6F8449'], 21);
-  v('--g-cap-x', ['#F0A084', '#C03A22'], 21);
-  v('--g-gold', ['#FFFEF4', '#FFF0B8'], 170);
-  v('--g-sticker', ['#FFF3A8', '#E6A61C'], 22);
-  hz('--g-tp', ['#FFFFFF', '#DAE3C1'], 232);
-  hz('--g-tp-danger', ['#FFFFFF', '#F7C3BB'], 232);
-  hz('--g-tp-caution', ['#FFFFFF', '#F8DE96'], 232);
-  hz('--g-tp-limited', ['#FFFFFF', '#D6C8F1'], 232);
+  // Chrome ramps go through the colour theme (js/theme.js); they are drawn again whenever the theme changes.
+  const th = (name, stops) => (window.EHRTheme ? window.EHRTheme.stops(name, stops) : stops);
+  const v = (name, stops, h) => set(name, ramp(th(name, stops), h));          // vertical ramp, 8px wide
+  const hz = (name, stops, w) => set(name, ramp(th(name, stops), w, true));   // horizontal ramp, 8px tall
+  const chrome = () => {
+    v('--g-banner', ['#5596DC', '#8DBDEC', '#D6E9F9'], 72);
+    v('--g-sky', ['#4F92DA', '#8DBDEC', '#E3F1FC'], 640);
+    v('--g-rank', ['#84B8EA', '#E0EFFB'], 150);
+    v('--g-bar', ['#647A3A', '#506428', '#36441A'], 28);
+    v('--g-band', ['#667B38', '#3A4A1B'], 64);
+    v('--g-pane', ['#E6EED2', '#C9D8AC'], 640);
+    v('--g-tool', ['#FDFCF7', '#E4E1CD'], 64);
+    v('--g-card', ['#F8FAEF', '#D8E1BD'], 32);
+    v('--g-lo', ['#F8FAEF', '#D8E1BD'], 48);
+    v('--g-btn', ['#FFFFFF', '#F2F1E8', '#D6D4C2'], 23);
+    v('--g-down', ['#D2D0BE', '#F2F1E8'], 23);
+    v('--g-btn-30', ['#FFFFFF', '#F2F1E8', '#D6D4C2'], 30);
+    v('--g-btn-40', ['#FFFFFF', '#F2F1E8', '#D6D4C2'], 40);
+    v('--g-sticker-30', ['#FFF3A8', '#E6A61C'], 30);
+    v('--g-tab', ['#FFFFFF', '#ECEADB'], 26);
+    v('--g-th', ['#FDFCF8', '#E9E7D7'], 26);
+    v('--g-tile', ['#A4D0F4', '#E8F4FD'], 64);
+    v('--g-hot', ['#FFF6DA', '#FFD98A'], 64);
+    v('--g-lvl', ['#FFFFFF', '#EBEADD'], 56);
+    v('--g-cap', ['#C6D3A3', '#6F8449'], 21);
+    v('--g-cap-x', ['#F0A084', '#C03A22'], 21);
+    v('--g-gold', ['#FFFEF4', '#FFF0B8'], 170);
+    v('--g-sticker', ['#FFF3A8', '#E6A61C'], 22);
+    hz('--g-tp', ['#FFFFFF', '#DAE3C1'], 232);
+    hz('--g-tp-danger', ['#FFFFFF', '#F7C3BB'], 232);
+    hz('--g-tp-caution', ['#FFFFFF', '#F8DE96'], 232);
+    hz('--g-tp-limited', ['#FFFFFF', '#D6C8F1'], 232);
+  };
+  chrome();
+  if (window.EHRTheme) window.EHRTheme.onChange(chrome);
   set('--cloud-a', cloud(180, 40, 11)); set('--cloud-b', cloud(120, 28, 29)); set('--cloud-c', cloud(260, 54, 47));
   // Countryside. In the banner it stays low at the left, behind the wordmark, and rises to the right.
   // Each strip is drawn twice: the far and middle ridges, and the near ridge on its own. Flying pigs are
