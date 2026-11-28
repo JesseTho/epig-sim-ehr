@@ -775,6 +775,11 @@ button.g-l:hover { background: #F4F7E8; } .g-line.flagged { background: var(--am
 .np-empty { padding: 26px 14px; text-align: center; } .np-empty p { margin: 12px auto 0; max-width: 34ch; color: var(--muted); line-height: 1.5; }
 .np-list { max-height: 34%; overflow: auto; border: 1px solid #A9B38B; margin-bottom: 10px; } .np-doc pre.doc { max-width: none; } .np-doc .doc-h { flex-wrap: wrap; }
 .list-row.draft { background: #FFF6D6; }
+/* the side pane: a note to read on top, my note below (markup: V.notePane) */
+.np-read { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 10px; background: #fff; }
+.notepane.writing .np-read { flex: 0 1 auto; max-height: 38%; border-bottom: 2px solid #919B76; }
+.np-read .np-row select { flex: 1; max-width: none; min-width: 0; } .np-read .np-doc { flex: 1; min-height: 0; overflow: auto; }
+.notepane .np-b.edit { flex: 1; min-height: 0; } .np-new { flex: none; padding: 10px; border-top: 1px solid #919B76; background: var(--face); text-align: center; }
 /* the Notes activity: list | selected note | my note (markup: V.act.notes) */
 .activity:has(.notes-page) { display: flex; flex-direction: column; }
 .notes-page { flex: 1; min-height: 420px; display: grid; gap: 10px; grid-template-columns: 250px minmax(0, 1fr); }
